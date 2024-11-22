@@ -6,7 +6,7 @@ from base64 import b64encode
 from transformers import pipeline
 import torch
 from pydantic import BaseModel
-from nilai.model import ChatRequest, ChatResponse, Message, Choice, Usage, AttestationResponse, Model
+from nilai.model import ChatRequest, ChatResponse, Message, Choice, Usage, AttestationResponse, Model, HealthCheckResponse
 from nilai.cryptography import generate_key_pair, sign_message, verify_signature
 
 app = FastAPI()
@@ -31,13 +31,33 @@ class AppState:
                 source="https://huggingface.co/meta-llama/Llama-3.2-1B-Instruct",
             )
         ]
+        self._uptime = time.time()
+
+    @property
+    def uptime(self):
+        elapsed_time = time.time() - self._uptime
+        days, remainder = divmod(elapsed_time, 86400)
+        hours, remainder = divmod(remainder, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        
+        parts = []
+        if days > 0:
+            parts.append(f"{int(days)} days")
+        if hours > 0:
+            parts.append(f"{int(hours)} hours")
+        if minutes > 0:
+            parts.append(f"{int(minutes)} minutes")
+        if seconds > 0:
+            parts.append(f"{int(seconds)} seconds")
+        
+        return ", ".join(parts)
 
 state = AppState()
 
 # Health Check Endpoint
 @app.get("/v1/health")
-async def health_check():
-    return {"status": "ok", "uptime": int(time.time())}
+async def health_check() -> HealthCheckResponse:
+    return HealthCheckResponse(status="ok", uptime=state.uptime)
 
 # Model Information Endpoint
 @app.get("/v1/model-info")
@@ -60,7 +80,7 @@ async def get_attestation() -> AttestationResponse:
 
 # Available Models Endpoint
 @app.get("/v1/models")
-async def get_models():
+async def get_models() -> dict[str, list[Model]]:
     return {"models": state.models}
 
 # Chat Completion Endpoint

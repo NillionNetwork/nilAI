@@ -41,3 +41,7 @@ class Model(BaseModel):
     author: str
     license: str
     source: str
+
+class HealthCheckResponse(BaseModel):
+    status: str
+    uptime: str
