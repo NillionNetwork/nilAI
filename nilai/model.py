@@ -32,3 +32,11 @@ class AttestationResponse(BaseModel):
     verifying_key: str      # PEM encoded public key
     cpu_attestation: str    # Base64 encoded CPU attestation
     gpu_attestation: str    # Base64 encoded GPU attestation
+    
+class Model(BaseModel):
+    id: str
+    name: str
+    description: str
+    author: str
+    license: str
+    source: str

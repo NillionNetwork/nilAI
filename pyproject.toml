@@ -6,12 +6,29 @@ authors = ["José Cabrero-Holgueras <jose.cabrero@nillion.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.13"
+python = "^3.12"
 fastapi = {extras = ["standard"], version = "^0.115.5"}
 cryptography = "^43.0.3"
 uvicorn = "^0.32.1"
+transformers = "^4.46.3"
+black = {version="24.8.0", optional=true}
+isort = {version="^5.13.2", optional=true}
+torch = "^2.5.1"
+accelerate = "^1.1.1"
 
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.2.0"
+pylint = "^3.2.3"
+mypy = "^1.11.2"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.extras]
+linter = ["black", "isort"]
+examples = ["scikit-learn"]
+
+
+
+
