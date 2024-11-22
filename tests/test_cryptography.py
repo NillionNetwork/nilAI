@@ -1,9 +1,11 @@
-import pytest
-from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.primitives import serialization
-from cryptography.exceptions import InvalidSignature
 from base64 import b64decode
-from nilai.cryptography import generate_key_pair, sign_message, verify_signature
+
+import pytest
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+
+from nilai.crypto import generate_key_pair, sign_message, verify_signature
 
 
 def test_generate_key_pair():
