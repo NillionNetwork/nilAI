@@ -13,6 +13,7 @@ class Choice(BaseModel):
     index: int
     message: Message
     finish_reason: str
+    logprobs: Optional[dict]
 
 class Usage(BaseModel):
     prompt_tokens: int
