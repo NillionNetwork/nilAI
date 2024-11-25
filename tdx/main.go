@@ -5,6 +5,8 @@ import (
 
 	"github.com/google/go-tdx-guest/client"
 	"github.com/google/go-tdx-guest/verify"
+
+	"github.com/google/go-tdx-guest/rtmr"
 )
 
 var device client.Device
@@ -39,5 +41,22 @@ func main() {
 	if err != nil {
 		panic(fmt.Sprintf("failed to verify quote: %v", err))
 	}
+
+	func ExtendDigest(rtmrIndex int, digest []byte) error
+
+	// This is a mock digest.
+	// It should be the docker image hash.
+	digest := [64]byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}
+	// Extend the digest to the rtmr 3
+	rtmr.ExtendDigest(3, digest)
+
+	
+	// Get the RTM report.
+	rtmReport, err := rtmr.GetRtmrsFromTdQuote(quote)
+	if err != nil {
+		panic(fmt.Sprintf("failed to get RTM report: %v", err))
+	}
+
+
 
 }
