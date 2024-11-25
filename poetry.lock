@@ -2506,4 +2506,4 @@ linter = ["black", "isort"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "67b26c1ffdc4702927e9f051b0dbae9b316c4a0e0c92de6a24e2310df9927847"
+content-hash = "6414a3262d8ef18afae41f80eae8880323c33616df1a7c06b9d5dd35ae284b07"

@@ -6,8 +6,15 @@ from transformers import pipeline
 from nilai.crypto import generate_key_pair
 from nilai.model import Model
 
+from dotenv import load_dotenv
+import os
+
+# Load the .env file
+load_dotenv()
 
 # Application State Initialization
+torch.set_num_threads(1)
+torch.set_num_interop_threads(1)
 class AppState:
     def __init__(self):
         self.private_key, self.public_key, self.verifying_key = generate_key_pair()
@@ -16,6 +23,7 @@ class AppState:
             model="meta-llama/Llama-3.2-1B-Instruct",
             model_kwargs={"torch_dtype": torch.bfloat16},
             device_map="auto",
+            token=os.getenv("HUGGINGFACE_API_TOKEN"),
         )
         self.models = [
             Model(
