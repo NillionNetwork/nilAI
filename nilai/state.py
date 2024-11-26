@@ -11,9 +11,9 @@ from nilai.model import Model
 # Load the .env file
 load_dotenv()
 
-# Application State Initialization
-torch.set_num_threads(1)
-torch.set_num_interop_threads(1)
+# # Application State Initialization
+# torch.set_num_threads(1)
+# torch.set_num_interop_threads(1)
 
 
 class AppState:

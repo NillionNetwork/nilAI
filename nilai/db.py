@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 # Database configuration with better defaults and connection pooling
 class DatabaseConfig:
     # Use environment variables in a real-world scenario
-    DATABASE_URL = "sqlite:///users.sqlite"
+    DATABASE_URL = "sqlite:///db/users.sqlite"
     POOL_SIZE = 5
     MAX_OVERFLOW = 10
     POOL_TIMEOUT = 30
