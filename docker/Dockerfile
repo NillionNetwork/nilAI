@@ -1,7 +1,7 @@
 FROM python:3.12-slim
 
 COPY --link nilai /app/nilai
-COPY pyproject.toml uv.lock .env /app
+COPY pyproject.toml uv.lock .env /app/
 
 WORKDIR /app
 

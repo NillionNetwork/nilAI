@@ -170,16 +170,6 @@ class TestConcurrency:
         assert len(all_users) >= num_users
 
 
-# Optional: Error handling tests
-# class TestErrorHandling:
-#     def test_duplicate_api_key(self, user_manager):
-#         """Ensure unique API key constraint."""
-#         with pytest.raises(Exception):
-#             # This would typically raise an IntegrityError in a real database
-#             user_manager.insert_user("Duplicate Key User")
-#             user_manager.insert_user("Another User With Same Details")
-
-
 # Additional Tests Configuration
 def pytest_configure(config):
     """Configure pytest with additional settings."""
