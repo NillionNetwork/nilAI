@@ -1,65 +1,32 @@
 # Fast API and serving
 import time
 from base64 import b64encode
+from typing import Any, List
 from uuid import uuid4
 
-from fastapi import Body, FastAPI, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Body, Depends, HTTPException
 
+from nilai.auth import get_user
 from nilai.crypto import sign_message
+
 # Internal libraries
-from nilai.model import (AttestationResponse, ChatRequest, ChatResponse,
-                         Choice, HealthCheckResponse, Message, Model, Usage)
-
-app = FastAPI(
-    title="NilAI",
-    description="An AI model serving platform based on TEE",
-    version="0.1.0",
-    terms_of_service="https://nillion.com",
-    contact={
-        "name": "Nillion AI Support",
-        # "url": "https://nillion.com",
-        "email": "jose.cabrero@nillion.com",
-    },
-    license_info={
-        "name": "Apache 2.0",
-        "url": "https://www.apache.org/licenses/LICENSE-2.0",
-    },
-    openapi_tags=[
-        {
-            "name": "Attestation",
-            "description": "Retrieve attestation information",
-        },
-        {
-            "name": "Chat",
-            "description": "Chat completion endpoint",
-        },
-        {
-            "name": "Health",
-            "description": "Health check endpoint",
-        },
-        {
-            "name": "Model",
-            "description": "Model information",
-        },
-    ],
+from nilai.model import (
+    AttestationResponse,
+    ChatRequest,
+    ChatResponse,
+    Choice,
+    Message,
+    Model,
+    Usage,
 )
+from nilai.state import state
 
-
-from nilai.state import AppState
-
-state = AppState()
-
-
-# Health Check Endpoint
-@app.get("/v1/health", tags=["Health"])
-async def health_check() -> HealthCheckResponse:
-    return HealthCheckResponse(status="ok", uptime=state.uptime)
+router = APIRouter()
 
 
 # Model Information Endpoint
-@app.get("/v1/model-info", tags=["Model"])
-async def get_model_info():
+@router.get("/v1/model-info", tags=["Model"])
+async def get_model_info(user: str = Depends(get_user)) -> dict:
     return {
         "model_name": state.models[0].name,
         "version": state.models[0].version,
@@ -69,8 +36,8 @@ async def get_model_info():
 
 
 # Attestation Report Endpoint
-@app.get("/v1/attestation/report", tags=["Attestation"])
-async def get_attestation() -> AttestationResponse:
+@router.get("/v1/attestation/report", tags=["Attestation"])
+async def get_attestation(user: str = Depends(get_user)) -> AttestationResponse:
     return AttestationResponse(
         verifying_key=state.verifying_key,
         cpu_attestation="...",
@@ -79,13 +46,13 @@ async def get_attestation() -> AttestationResponse:
 
 
 # Available Models Endpoint
-@app.get("/v1/models", tags=["Model"])
-async def get_models() -> dict[str, list[Model]]:
+@router.get("/v1/models", tags=["Model"])
+async def get_models(user: str = Depends(get_user)) -> dict[str, list[Model]]:
     return {"models": state.models}
 
 
 # Chat Completion Endpoint
-@app.post("/v1/chat/completions", tags=["Chat"])
+@router.post("/v1/chat/completions", tags=["Chat"])
 def chat_completion(
     req: ChatRequest = Body(
         ChatRequest(
@@ -95,7 +62,8 @@ def chat_completion(
                 Message(role="user", content="What is your name?"),
             ],
         )
-    )
+    ),
+    user: str = Depends(get_user),
 ) -> ChatResponse:
     if not req.messages or len(req.messages) == 0:
         raise HTTPException(status_code=400, detail="The 'messages' field is required.")
@@ -115,9 +83,10 @@ def chat_completion(
     ]
 
     # Generate response
-    generated = state.chat_pipeline(
+    generated: List[Any] = state.chat_pipeline(
         prompt, max_length=1024, num_return_sequences=1, truncation=True
-    )
+    )  # type: ignore
+    print(type(generated))
     if not generated or len(generated) == 0:
         raise HTTPException(status_code=500, detail="The model returned no output.")
 
@@ -147,26 +116,8 @@ def chat_completion(
     )
 
     # Sign the response
-    response_json = response.json()
+    response_json = response.model_dump_json()
     signature = sign_message(state.private_key, response_json)
     response.signature = b64encode(signature).decode()
 
-    return JSONResponse(
-        content=response.dict(), headers={"Content-Type": "application/json"}
-    )
-
-
-if __name__ == "__main__":
-    import uvicorn
-
-    # Path to your SSL certificate and key files
-    # SSL_CERTFILE = "/path/to/certificate.pem"  # Replace with your certificate file path
-    # SSL_KEYFILE = "/path/to/private-key.pem"  # Replace with your private key file path
-
-    uvicorn.run(
-        app,
-        host="0.0.0.0",  # Listen on all interfaces
-        port=12345,  # Use port 8443 for HTTPS
-        # ssl_certfile=SSL_CERTFILE,
-        # ssl_keyfile=SSL_KEYFILE,
-    )
+    return response
