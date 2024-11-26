@@ -129,6 +129,7 @@ env.bak/
 venv.bak/
 
 *.sqlite
+.ruff_cache/
 # Spyder project settings
 .spyderproject
 .spyproject
