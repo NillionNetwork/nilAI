@@ -86,7 +86,7 @@ async def get_models() -> dict[str, list[Model]]:
 
 # Chat Completion Endpoint
 @app.post("/v1/chat/completions", tags=["Chat"])
-async def chat_completion(
+def chat_completion(
     req: ChatRequest = Body(
         ChatRequest(
             model=state.models[0].name,
