@@ -1,13 +1,13 @@
-
 services:
-  web:
+  nilai:
     build: 
       context: .
       dockerfile: docker/Dockerfile
     ports:
       - "12345:12345"
     volumes:
-      - hugging_face_models:/root/.cache/huggingface
+      - ${PWD}/db/:/app/db/   # sqlite database for users
+      - hugging_face_models:/root/.cache/huggingface  # cache models
   
 volumes:
   hugging_face_models:

@@ -13,6 +13,7 @@ dependencies = [
     "fastapi[standard]>=0.115.5",
     "gunicorn>=23.0.0",
     "python-dotenv>=1.0.1",
+    "sqlalchemy>=2.0.36",
     "torch>=2.5.1",
     "transformers>=4.46.3",
     "uvicorn>=0.32.1",
@@ -22,6 +23,7 @@ dependencies = [
 dev = [
     "black>=24.10.0",
     "isort>=5.13.2",
+    "pytest>=8.3.3",
     "ruff>=0.8.0",
     "uvicorn>=0.32.1",
 ]

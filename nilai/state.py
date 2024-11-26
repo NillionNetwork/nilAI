@@ -1,20 +1,21 @@
+import os
 import time
 
 import torch
+from dotenv import load_dotenv
 from transformers import pipeline
 
 from nilai.crypto import generate_key_pair
 from nilai.model import Model
 
-from dotenv import load_dotenv
-import os
-
 # Load the .env file
 load_dotenv()
 
-# Application State Initialization
-torch.set_num_threads(1)
-torch.set_num_interop_threads(1)
+# # Application State Initialization
+# torch.set_num_threads(1)
+# torch.set_num_interop_threads(1)
+
+
 class AppState:
     def __init__(self):
         self.private_key, self.public_key, self.verifying_key = generate_key_pair()
@@ -57,3 +58,6 @@ class AppState:
             parts.append(f"{int(seconds)} seconds")
 
         return ", ".join(parts)
+
+
+state = AppState()
