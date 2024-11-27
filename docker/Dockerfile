@@ -5,8 +5,13 @@ COPY pyproject.toml uv.lock .env /app/
 
 WORKDIR /app
 
-RUN pip install uv
-RUN uv sync
+RUN sudo apt-get update && \
+sudo apt-get install build-essential && \
+sudo apt-get clean && \
+sudo apt-get autoremove && \
+rm -rf /var/lib/apt/lists/* && \
+pip install uv && \
+uv sync
 
 EXPOSE 12345
 

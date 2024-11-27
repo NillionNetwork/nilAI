@@ -53,8 +53,8 @@ class User(Base):
     userid = Column(String(36), primary_key=True, index=True)
     name = Column(String(100), nullable=False)
     apikey = Column(String(36), unique=True, nullable=False, index=True)
-    input_tokens = Column(Integer, default=0, nullable=False)
-    generated_tokens = Column(Integer, default=0, nullable=False)
+    prompt_tokens = Column(Integer, default=0, nullable=False)
+    completion_tokens = Column(Integer, default=0, nullable=False)
 
     def __repr__(self):
         return f"<User(userid={self.userid}, name={self.name})>"
@@ -146,7 +146,7 @@ class UserManager:
             raise
 
     @staticmethod
-    def check_api_key(api_key: str) -> Optional[str]:
+    def check_api_key(api_key: str) -> Optional[dict]:
         """
         Validate an API key.
 
@@ -159,28 +159,55 @@ class UserManager:
         try:
             with get_db_session() as session:
                 user = session.query(User).filter(User.apikey == api_key).first()
-                return user.name if user else None  # type: ignore
+                print(user)
+                return {"name": user.name, "userid": user.userid} if user else None  # type: ignore
         except SQLAlchemyError as e:
             logger.error(f"Error checking API key: {e}")
             return None
 
     @staticmethod
-    def update_token_usage(userid: str, input_tokens: int, generated_tokens: int):
+    def update_token_usage(userid: str, prompt_tokens: int, completion_tokens: int):
         """
         Update token usage for a specific user.
 
         Args:
             userid (str): User's unique ID
-            input_tokens (int): Number of input tokens
-            generated_tokens (int): Number of generated tokens
+            prompt_tokens (int): Number of input tokens
+            completion_tokens (int): Number of generated tokens
         """
         try:
             with get_db_session() as session:
                 user = session.query(User).filter(User.userid == userid).first()
                 if user:
-                    user.input_tokens += input_tokens  # type: ignore
-                    user.generated_tokens += generated_tokens  # type: ignore
+                    user.prompt_tokens += prompt_tokens  # type: ignore
+                    user.completion_tokens += completion_tokens  # type: ignore
                     logger.info(f"Updated token usage for user {userid}")
+                else:
+                    logger.warning(f"User {userid} not found")
+        except SQLAlchemyError as e:
+            logger.error(f"Error updating token usage: {e}")
+
+    @staticmethod
+    def get_token_usage(
+        userid: str,
+    ) -> (
+        Dict[str, Any] | None
+    ):  # -> dict[str, Any] | None:# -> dict[str, Any] | None:# -> dict[str, Any] | None:# -> dict[str, Any] | None:# -> dict[str, Any] | None:
+        """
+        Get token usage for a specific user.
+
+        Args:
+            userid (str): User's unique ID
+        """
+        try:
+            with get_db_session() as session:
+                user = session.query(User).filter(User.userid == userid).first()
+                if user:
+                    return {
+                        "prompt_tokens": user.prompt_tokens,
+                        "completion_tokens": user.completion_tokens,
+                        "total_tokens": user.prompt_tokens + user.completion_tokens,
+                    }
                 else:
                     logger.warning(f"User {userid} not found")
         except SQLAlchemyError as e:
@@ -202,8 +229,8 @@ class UserManager:
                         userid=user.userid,  # type: ignore
                         name=user.name,  # type: ignore
                         apikey=user.apikey,  # type: ignore
-                        input_tokens=user.input_tokens,  # type: ignore
-                        generated_tokens=user.generated_tokens,  # type: ignore
+                        input_tokens=user.prompt_tokens,  # type: ignore
+                        generated_tokens=user.completion_tokens,  # type: ignore
                     )
                     for user in users
                 ]
@@ -227,8 +254,8 @@ class UserManager:
                 user = session.query(User).filter(User.userid == userid).first()
                 if user:
                     return {
-                        "input_tokens": user.input_tokens,
-                        "generated_tokens": user.generated_tokens,
+                        "prompt_tokens": user.prompt_tokens,
+                        "completion_tokens": user.completion_tokens,
                     }  # type: ignore
                 return None
         except SQLAlchemyError as e:
@@ -255,6 +282,8 @@ if __name__ == "__main__":
     print(f"API key validation: {user_name}")
 
     # Update and retrieve token usage
-    UserManager.update_token_usage(bob["userid"], input_tokens=50, generated_tokens=20)
+    UserManager.update_token_usage(
+        bob["userid"], prompt_tokens=50, completion_tokens=20
+    )
     usage = UserManager.get_user_token_usage(bob["userid"])
     print(f"Bob's token usage: {usage}")

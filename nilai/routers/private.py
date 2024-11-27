@@ -14,14 +14,19 @@ from nilai.model import (
     AttestationResponse,
     ChatRequest,
     ChatResponse,
-    Choice,
     Message,
     Model,
     Usage,
 )
 from nilai.state import state
+from nilai.db import UserManager
 
 router = APIRouter()
+
+
+@router.get("/v1/usage", tags=["Usage"])
+async def get_usage(user: dict = Depends(get_user)) -> Usage:
+    return Usage(**UserManager.get_token_usage(user["userid"]))
 
 
 # Model Information Endpoint
@@ -37,7 +42,7 @@ async def get_model_info(user: str = Depends(get_user)) -> dict:
 
 # Attestation Report Endpoint
 @router.get("/v1/attestation/report", tags=["Attestation"])
-async def get_attestation(user: str = Depends(get_user)) -> AttestationResponse:
+async def get_attestation(user: dict = Depends(get_user)) -> AttestationResponse:
     return AttestationResponse(
         verifying_key=state.verifying_key,
         cpu_attestation="...",
@@ -47,7 +52,7 @@ async def get_attestation(user: str = Depends(get_user)) -> AttestationResponse:
 
 # Available Models Endpoint
 @router.get("/v1/models", tags=["Model"])
-async def get_models(user: str = Depends(get_user)) -> dict[str, list[Model]]:
+async def get_models(user: dict = Depends(get_user)) -> dict[str, list[Model]]:
     return {"models": state.models}
 
 
@@ -63,7 +68,7 @@ def chat_completion(
             ],
         )
     ),
-    user: str = Depends(get_user),
+    user: dict = Depends(get_user),
 ) -> ChatResponse:
     if not req.messages or len(req.messages) == 0:
         raise HTTPException(status_code=400, detail="The 'messages' field is required.")
@@ -83,38 +88,22 @@ def chat_completion(
     ]
 
     # Generate response
-    generated: List[Any] = state.chat_pipeline(
-        prompt, max_length=1024, num_return_sequences=1, truncation=True
-    )  # type: ignore
-    print(type(generated))
+    generated: dict = state.chat_pipeline.create_chat_completion(prompt)
     if not generated or len(generated) == 0:
         raise HTTPException(status_code=500, detail="The model returned no output.")
 
-    response = generated[0]["generated_text"][-1]
-    print(f"Prompt: {prompt}, Response: {response}")
-    usage = Usage(
-        prompt_tokens=sum(len(msg.content.split()) for msg in req.messages),
-        completion_tokens=len(response["content"].split()),
-        total_tokens=0,
-    )
-    usage.total_tokens = usage.prompt_tokens + usage.completion_tokens
     response = ChatResponse(
-        id=f"chat-{uuid4()}",
-        object="chat.completion",
-        created=int(time.time()),
-        model=req.model,
-        choices=[
-            Choice(
-                index=0,
-                message=Message(**response),
-                finish_reason="stop",
-                logprobs=None,
-            )
-        ],
-        usage=usage,
-        signature="",  # Will be filled later
+        signature="",
+        **generated,
     )
 
+    print(user)
+    print(response.usage.prompt_tokens, response.usage.completion_tokens)
+    UserManager.update_token_usage(
+        user["userid"],
+        input_tokens=response.usage.prompt_tokens,
+        generated_tokens=response.usage.completion_tokens,
+    )
     # Sign the response
     response_json = response.model_dump_json()
     signature = sign_message(state.private_key, response_json)

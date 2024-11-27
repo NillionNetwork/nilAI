@@ -35,6 +35,10 @@ app = FastAPI(
             "name": "Model",
             "description": "Model information",
         },
+        {
+            "name": "Usage",
+            "description": "User token usage",
+        },
     ],
 )
 
