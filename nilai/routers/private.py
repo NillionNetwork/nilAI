@@ -74,8 +74,6 @@ def chat_completion(
         raise HTTPException(status_code=400, detail="The 'model' field is required.")
 
     # Combine messages into a single prompt
-    print(req)
-    prompt = "\n".join([f"{msg.role}: {msg.content}" for msg in req.messages])
     prompt = [
         {
             "role": msg.role,
@@ -94,12 +92,12 @@ def chat_completion(
         **generated,
     )
 
-    print(user)
-    print(response.usage.prompt_tokens, response.usage.completion_tokens)
+    response.model = req.model
+
     UserManager.update_token_usage(
         user["userid"],
-        input_tokens=response.usage.prompt_tokens,
-        generated_tokens=response.usage.completion_tokens,
+        prompt_tokens=response.usage.prompt_tokens,
+        completion_tokens=response.usage.completion_tokens,
     )
     # Sign the response
     response_json = response.model_dump_json()

@@ -159,7 +159,6 @@ class UserManager:
         try:
             with get_db_session() as session:
                 user = session.query(User).filter(User.apikey == api_key).first()
-                print(user)
                 return {"name": user.name, "userid": user.userid} if user else None  # type: ignore
         except SQLAlchemyError as e:
             logger.error(f"Error checking API key: {e}")
