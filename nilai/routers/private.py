@@ -1,8 +1,5 @@
 # Fast API and serving
-import time
 from base64 import b64encode
-from typing import Any, List
-from uuid import uuid4
 
 from fastapi import APIRouter, Body, Depends, HTTPException
 

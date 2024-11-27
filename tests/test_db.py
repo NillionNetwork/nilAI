@@ -8,7 +8,7 @@ from sqlalchemy.pool import StaticPool
 import nilai.db as db
 
 # Import the classes and functions to test
-from nilai.db import Base, DatabaseConfig, User, UserManager, get_db_session
+from nilai.db import Base, UserManager
 
 
 @pytest.fixture(scope="function")
@@ -124,8 +124,8 @@ class TestUserManager:
     def test_get_all_users(self, user_manager):
         """Test retrieving all users."""
         # Insert multiple users
-        user1 = user_manager.insert_user("User 1")
-        user2 = user_manager.insert_user("User 2")
+        _ = user_manager.insert_user("User 1")
+        _ = user_manager.insert_user("User 2")
 
         # Retrieve all users
         all_users = user_manager.get_all_users()

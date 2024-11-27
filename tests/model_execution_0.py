@@ -5,8 +5,6 @@ import torch
 from dotenv import load_dotenv
 from transformers import pipeline
 
-from nilai.crypto import generate_key_pair
-from nilai.model import Model
 
 # Load the .env file
 load_dotenv()

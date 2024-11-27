@@ -1,8 +1,6 @@
-import os
 import time
 
 from llama_cpp import Llama
-import time
 
 from nilai.crypto import generate_key_pair
 from nilai.model import Model
