@@ -45,18 +45,3 @@ app = FastAPI(
 
 app.include_router(public.router)
 app.include_router(private.router, dependencies=[Depends(get_user)])
-
-if __name__ == "__main__":
-    import uvicorn
-
-    # Path to your SSL certificate and key files
-    # SSL_CERTFILE = "/path/to/certificate.pem"  # Replace with your certificate file path
-    # SSL_KEYFILE = "/path/to/private-key.pem"  # Replace with your private key file path
-
-    uvicorn.run(
-        app,
-        host="0.0.0.0",  # Listen on all interfaces
-        port=12345,  # Use port 8443 for HTTPS
-        # ssl_certfile=SSL_CERTFILE,
-        # ssl_keyfile=SSL_KEYFILE,
-    )

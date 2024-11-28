@@ -15,6 +15,7 @@ class AppState:
             repo_id="bartowski/Llama-3.2-1B-Instruct-GGUF",
             filename="Llama-3.2-1B-Instruct-Q5_K_S.gguf",
             n_threads=16,
+            verbose=False,
         )
         self.sem = Semaphore(2)
         self.models = [

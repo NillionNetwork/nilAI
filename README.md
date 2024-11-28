@@ -7,5 +7,5 @@ docker compose up --build web
 ```
 
 ```
-uv run gunicorn -w 2 --threads 16 --timeout 120 -b :12345 -k uvicorn.workers.UvicornWorker nilai.main:app 
+uv run gunicorn -c gunicorn.config.py nilai.__main__
 ```
