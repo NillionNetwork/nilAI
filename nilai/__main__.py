@@ -10,7 +10,7 @@ def run_uvicorn():
     uvicorn.run(
         app,
         host="0.0.0.0",  # Listen on all interfaces
-        port=12345,  # Use the desired port
+        port=8080,  # Use the desired port
         reload=True,  # Enable auto-reload for development
         # ssl_certfile=SSL_CERTFILE,
         # ssl_keyfile=SSL_KEYFILE,

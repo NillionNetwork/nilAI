@@ -1,0 +1,18 @@
+# Route for HTTPS
+nilai.sandbox.nilogy.xyz {
+    reverse_proxy nilai:8443 {
+        transport http {}
+    }
+}
+
+# Route for HTTP
+http://nilai.sandbox.nilogy.xyz {
+    reverse_proxy nilai:8080 {
+        transport http {}
+    }
+}
+
+# Global option to ensure auto HTTPS is enabled for other routes, but HTTP is allowed here
+{
+    auto_https disable_redirects
+}

@@ -2,8 +2,14 @@
 
 Copy the `.env.sample` to `.env` to and replace the value of the `HUGGINGFACE_API_TOKEN` with the appropriate value. It is required to download Llama3.2 1B.
 
+For development environments:
 ```shell
-docker compose up --build web
+docker compose up -f docker-compose.yml -f docker-compose.dev.yml --build nilai
+```
+
+For production environments:
+```shell
+docker compose up -f docker-compose.yml -f docker-compose.prod.yml --build nilai
 ```
 
 ```
