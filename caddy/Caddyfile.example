@@ -1,7 +1,0 @@
-domain.example.com {
-	reverse_proxy kasm:8443 {
-		transport http {
-			tls_insecure_skip_verify
-		}
-	}
-}

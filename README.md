@@ -4,12 +4,12 @@ Copy the `.env.sample` to `.env` to and replace the value of the `HUGGINGFACE_AP
 
 For development environments:
 ```shell
-docker compose up -f docker-compose.yml -f docker-compose.dev.yml --build nilai
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build nilai
 ```
 
 For production environments:
 ```shell
-docker compose up -f docker-compose.yml -f docker-compose.prod.yml --build nilai
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d 
 ```
 
 ```

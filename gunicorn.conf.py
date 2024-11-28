@@ -14,7 +14,3 @@ timeout = 120
 
 # Set the worker class to UvicornWorker for async handling
 worker_class = "uvicorn.workers.UvicornWorker"
-
-# SSL settings
-# certfile = "/path/to/your/certificate.crt"  # Path to your SSL certificate
-# keyfile = "/path/to/your/private.key"       # Path to your SSL private key
