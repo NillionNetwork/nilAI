@@ -1,5 +1,0 @@
-nilai.sandbox.nilogy.xyz {
-	reverse_proxy nilai:8443 {
-		transport http
-	}
-}
