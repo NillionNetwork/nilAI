@@ -7,5 +7,5 @@ docker compose up --build web
 ```
 
 ```
-uv run gunicorn -c gunicorn.config.py nilai.__main__
+uv run gunicorn -c gunicorn.conf.py nilai.__main__:app
 ```
