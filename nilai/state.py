@@ -1,9 +1,13 @@
+from dotenv import load_dotenv
 import time
 
 from llama_cpp import Llama
 
 from nilai.crypto import generate_key_pair
 from nilai.model import Model
+
+
+load_dotenv()
 
 
 class AppState:

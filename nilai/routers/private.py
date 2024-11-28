@@ -55,7 +55,7 @@ async def get_models(user: dict = Depends(get_user)) -> dict[str, list[Model]]:
 
 # Chat Completion Endpoint
 @router.post("/v1/chat/completions", tags=["Chat"])
-def chat_completion(
+async def chat_completion(
     req: ChatRequest = Body(
         ChatRequest(
             model=state.models[0].name,
