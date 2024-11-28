@@ -1,5 +1,6 @@
-from llama_cpp import Llama
 import time
+
+from llama_cpp import Llama
 
 llm = Llama.from_pretrained(
     repo_id="bartowski/Llama-3.2-1B-Instruct-GGUF",

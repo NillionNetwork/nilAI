@@ -4,7 +4,6 @@ import time
 from dotenv import load_dotenv
 from optimum.pipelines import pipeline
 
-
 # Load the .env file
 load_dotenv()
 

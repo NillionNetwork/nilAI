@@ -5,6 +5,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 
 from nilai.auth import get_user
 from nilai.crypto import sign_message
+from nilai.db import UserManager
 
 # Internal libraries
 from nilai.model import (
@@ -16,7 +17,6 @@ from nilai.model import (
     Usage,
 )
 from nilai.state import state
-from nilai.db import UserManager
 
 router = APIRouter()
 
@@ -69,7 +69,6 @@ async def chat_completion(
 ) -> ChatResponse:
     if not req.messages or len(req.messages) == 0:
         raise HTTPException(status_code=400, detail="The 'messages' field is required.")
-
     if not req.model:
         raise HTTPException(status_code=400, detail="The 'model' field is required.")
 

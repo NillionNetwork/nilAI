@@ -5,3 +5,7 @@ Copy the `.env.sample` to `.env` to and replace the value of the `HUGGINGFACE_AP
 ```shell
 docker compose up --build web
 ```
+
+```
+uv run gunicorn -w 2 --threads 16 --timeout 120 -b :12345 -k uvicorn.workers.UvicornWorker nilai.main:app 
+```

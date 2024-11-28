@@ -1,7 +1,8 @@
+import time
+
+from onnxruntime import InferenceSession
 from optimum.onnxruntime import ORTModelForCausalLM
 from transformers import AutoTokenizer
-import time
-from onnxruntime import InferenceSession
 
 # Define the model directory and ONNX export location
 model_name = "meta-llama/Llama-3.2-1B-Instruct"

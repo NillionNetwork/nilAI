@@ -5,7 +5,6 @@ import torch
 from dotenv import load_dotenv
 from transformers import pipeline
 
-
 # Load the .env file
 load_dotenv()
 

@@ -1,13 +1,11 @@
-from dotenv import load_dotenv
 import time
+from asyncio import Semaphore
 
+from dotenv import load_dotenv
 from llama_cpp import Llama
 
 from nilai.crypto import generate_key_pair
 from nilai.model import Model
-
-
-load_dotenv()
 
 
 class AppState:
@@ -16,7 +14,9 @@ class AppState:
         self.chat_pipeline = Llama.from_pretrained(
             repo_id="bartowski/Llama-3.2-1B-Instruct-GGUF",
             filename="Llama-3.2-1B-Instruct-Q5_K_S.gguf",
+            n_threads=16,
         )
+        self.sem = Semaphore(2)
         self.models = [
             Model(
                 id="meta-llama/Llama-3.2-1B-Instruct",
@@ -51,4 +51,5 @@ class AppState:
         return ", ".join(parts)
 
 
+load_dotenv()
 state = AppState()
