@@ -1,0 +1,10 @@
+(ssl_config) {
+	tls {
+		protocols tls1.2 tls1.3
+	}
+ }
+ 
+ https://nilai.sandbox.nilogy.xyz {
+	import ssl_config
+	reverse_proxy nilai:8443
+ }

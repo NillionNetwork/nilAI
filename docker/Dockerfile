@@ -1,16 +1,18 @@
 FROM python:3.12-slim
 
 COPY --link nilai /app/nilai
-COPY pyproject.toml uv.lock .env /app/
+COPY pyproject.toml uv.lock .env gunicorn.conf.py /app/
 
 WORKDIR /app
 
-RUN pip install uv
-RUN uv sync
+RUN apt-get update && \
+apt-get install build-essential certbot -y && \
+apt-get clean && \
+apt-get autoremove && \
+rm -rf /var/lib/apt/lists/* && \
+pip install uv && \
+uv sync
 
-EXPOSE 12345
+EXPOSE 8080 8443
 
-# ENTRYPOINT ["uv", "run", "fastapi", "run", "nilai/main.py"]
-# CMD ["--host", "0.0.0.0", "--port", "12345"]
-
-CMD ["uv", "run", "fastapi", "run", "nilai/main.py", "--host", "0.0.0.0", "--port", "12345"]
+CMD ["uv", "run", "gunicorn", "-c", "gunicorn.conf.py", "nilai.__main__:app"]

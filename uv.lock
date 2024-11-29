@@ -197,6 +197,15 @@ wheels = [
 ]
 
 [[package]]
+name = "diskcache"
+version = "5.6.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/3f/21/1c1ffc1a039ddcc459db43cc108658f32c57d271d7289a2794e401d0fdb6/diskcache-5.6.3.tar.gz", hash = "sha256:2c3a3fa2743d8535d832ec61c2054a1641f41775aa7c556758a109941e33e4fc", size = 67916 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3f/27/4570e78fc0bf5ea0ca45eb1de3818a23787af9b390c0b0a0033a1b8236f9/diskcache-5.6.3-py3-none-any.whl", hash = "sha256:5e31b2d5fbad117cc363ebaf6b689474db18a1f6438bc82358b024abd4c2ca19", size = 45550 },
+]
+
+[[package]]
 name = "dnspython"
 version = "2.7.0"
 source = { registry = "https://pypi.org/simple" }
@@ -441,6 +450,18 @@ wheels = [
 ]
 
 [[package]]
+name = "llama-cpp-python"
+version = "0.3.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "diskcache" },
+    { name = "jinja2" },
+    { name = "numpy" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/5f/0e/ff129005a33b955088fc7e4ecb57e5500b604fb97eca55ce8688dbe59680/llama_cpp_python-0.3.2.tar.gz", hash = "sha256:8fbf246a55a999f45015ed0d48f91b4ae04ae959827fac1cd6ac6ec65aed2e2f", size = 64964148 }
+
+[[package]]
 name = "markdown-it-py"
 version = "3.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -535,6 +556,7 @@ dependencies = [
     { name = "cryptography" },
     { name = "fastapi", extra = ["standard"] },
     { name = "gunicorn" },
+    { name = "llama-cpp-python" },
     { name = "python-dotenv" },
     { name = "sqlalchemy" },
     { name = "torch" },
@@ -557,6 +579,7 @@ requires-dist = [
     { name = "cryptography", specifier = ">=43.0.3" },
     { name = "fastapi", extras = ["standard"], specifier = ">=0.115.5" },
     { name = "gunicorn", specifier = ">=23.0.0" },
+    { name = "llama-cpp-python", specifier = ">=0.3.2" },
     { name = "python-dotenv", specifier = ">=1.0.1" },
     { name = "sqlalchemy", specifier = ">=2.0.36" },
     { name = "torch", specifier = ">=2.5.1" },

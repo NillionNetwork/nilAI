@@ -1,0 +1,4 @@
+services:
+  nilai:
+    ports:
+      - "8080:8080"

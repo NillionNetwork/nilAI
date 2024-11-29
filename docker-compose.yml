@@ -3,11 +3,8 @@ services:
     build: 
       context: .
       dockerfile: docker/Dockerfile
-    ports:
-      - "12345:12345"
     volumes:
       - ${PWD}/db/:/app/db/   # sqlite database for users
       - hugging_face_models:/root/.cache/huggingface  # cache models
-  
 volumes:
   hugging_face_models:

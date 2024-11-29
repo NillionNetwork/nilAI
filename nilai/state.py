@@ -1,31 +1,23 @@
-import os
 import time
+from asyncio import Semaphore
 
-import torch
 from dotenv import load_dotenv
-from transformers import pipeline
+from llama_cpp import Llama
 
 from nilai.crypto import generate_key_pair
 from nilai.model import Model
-
-# Load the .env file
-load_dotenv()
-
-# # Application State Initialization
-# torch.set_num_threads(1)
-# torch.set_num_interop_threads(1)
 
 
 class AppState:
     def __init__(self):
         self.private_key, self.public_key, self.verifying_key = generate_key_pair()
-        self.chat_pipeline = pipeline(
-            "text-generation",
-            model="meta-llama/Llama-3.2-1B-Instruct",
-            model_kwargs={"torch_dtype": torch.bfloat16},
-            device_map="auto",
-            token=os.getenv("HUGGINGFACE_API_TOKEN"),
+        self.chat_pipeline = Llama.from_pretrained(
+            repo_id="bartowski/Llama-3.2-1B-Instruct-GGUF",
+            filename="Llama-3.2-1B-Instruct-Q5_K_S.gguf",
+            n_threads=16,
+            verbose=False,
         )
+        self.sem = Semaphore(2)
         self.models = [
             Model(
                 id="meta-llama/Llama-3.2-1B-Instruct",
@@ -60,4 +52,5 @@ class AppState:
         return ", ".join(parts)
 
 
+load_dotenv()
 state = AppState()
