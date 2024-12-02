@@ -123,7 +123,7 @@ async def chat_completion(
     Generate a chat completion response from the AI model.
 
     - **req**: Chat completion request containing messages and model specifications
-    - **user**: Authenticated user information
+    - **user**: Authenticated user information (through X-API-Key header)
     - **Returns**: Full chat response with model output, usage statistics, and cryptographic signature
 
     ### Request Requirements
