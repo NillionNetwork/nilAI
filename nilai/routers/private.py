@@ -144,10 +144,10 @@ async def chat_completion(
     5. Cryptographically sign the response
 
     ### Potential HTTP Errors
-    - **400 Bad Request**: 
+    - **400 Bad Request**:
       - Missing messages list
       - No model specified
-    - **500 Internal Server Error**: 
+    - **500 Internal Server Error**:
       - Model fails to generate a response
 
     ### Example
