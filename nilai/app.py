@@ -4,7 +4,7 @@ from fastapi import Depends, FastAPI
 from nilai.auth import get_user
 from nilai.routers import private, public
 
-host = "nilai.sandbox.nilogy.com"
+host = "nilai.sandbox.nilogy.xyz"
 description = f"""
 An AI model serving platform powered by secure, confidential computing.
 
