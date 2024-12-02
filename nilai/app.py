@@ -4,14 +4,41 @@ from fastapi import Depends, FastAPI
 from nilai.auth import get_user
 from nilai.routers import private, public
 
+host = "nilai.sandbox.nilogy.com"
+description = f"""
+An AI model serving platform powered by secure, confidential computing.
+
+## Easy API Client Generation
+
+Want to use our API in your project? Great news! You can automatically generate a client library in just a few simple steps.
+
+### For Python Developers
+```bash
+# Install the OpenAPI generator
+pip install openapi-generator-cli
+
+# Generate your Python client
+openapi-generator-cli generate -i https://{host}/openapi.json -g python -o ./python-client
+```
+
+### For JavaScript/TypeScript Developers
+```bash
+# Install the OpenAPI generator
+npm install @openapitools/openapi-generator-cli -g
+
+# Generate your TypeScript client
+openapi-generator-cli generate -i https://{host}/openapi.json -o ./typescript-client
+```
+
+After generating, you'll have a fully functional client library that makes it easy to interact with our AI services. No more manual API request handling!
+"""
 app = FastAPI(
     title="NilAI",
-    description="An AI model serving platform based on TEE",
+    description=description,
     version="0.1.0",
     terms_of_service="https://nillion.com",
     contact={
         "name": "Nillion AI Support",
-        # "url": "https://nillion.com",
         "email": "jose.cabrero@nillion.com",
     },
     license_info={
@@ -21,23 +48,23 @@ app = FastAPI(
     openapi_tags=[
         {
             "name": "Attestation",
-            "description": "Retrieve attestation information",
+            "description": "Retrieve cryptographic attestation information for service verification",
         },
         {
             "name": "Chat",
-            "description": "Chat completion endpoint",
+            "description": "AI-powered chat completion endpoint for generating conversational responses",
         },
         {
             "name": "Health",
-            "description": "Health check endpoint",
+            "description": "System health and status monitoring endpoint",
         },
         {
             "name": "Model",
-            "description": "Model information",
+            "description": "Retrieve information about available AI models",
         },
         {
             "name": "Usage",
-            "description": "User token usage",
+            "description": "Track and retrieve user token consumption metrics",
         },
     ],
 )
