@@ -1,5 +1,7 @@
 services:
   nilai:
+    volumes:
+      - /dev/sev-guest:/dev/sev-guest # for AMD SEV
     networks:
       - proxy_net
   caddy:

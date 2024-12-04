@@ -262,6 +262,7 @@ class UserManager:
             return None
 
 
+__all__ = ["UserManager", "UserData"]
 # Example Usage
 if __name__ == "__main__":
     # Initialize the database
