@@ -1,9 +1,19 @@
 FROM python:3.12-slim
 
-ARG MODEL_PATH
-ARG MODEL_FILENAME
+# Download model from HuggingFace and set path to local dir
+ARG HUGGINGFACE_API_TOKEN
+ENV HUGGINGFACE_API_TOKEN=${HUGGINGFACE_API_TOKEN}
 
+ARG MODEL_PATH
 ENV MODEL_PATH=${MODEL_PATH}
+
+RUN pip install huggingface-hub[hf_transfer]
+ENV HF_HUB_ENABLE_HF_TRANSFER=1
+
+RUN huggingface-cli download $MODEL_PATH
+
+# Optionally set model filename
+ARG MODEL_FILENAME
 ENV MODEL_FILENAME=${MODEL_FILENAME}
 
 COPY --link nilai /app/nilai
