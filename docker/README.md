@@ -1,6 +1,11 @@
 
 ```shell
-docker build -t nillion/nilai:latest -f docker/Dockerfile .
+docker build \
+  --build-arg MODEL_PATH=meta-llama/Llama-3.2-1B-Instruct \
+  --build-arg MODEL_FILENAME=llama-3.2-1b-instruct.Q4_0.gguf \
+  --secret id=HUGGINGFACE_API_TOKEN \
+  -t nillion/nilai:latest \
+  -f docker/Dockerfile .
 
 
 docker run \
