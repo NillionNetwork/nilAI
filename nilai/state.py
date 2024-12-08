@@ -1,3 +1,4 @@
+import os
 import time
 from asyncio import Semaphore
 
@@ -11,9 +12,13 @@ from nilai.model import Model
 class AppState:
     def __init__(self):
         self.private_key, self.public_key, self.verifying_key = generate_key_pair()
+
+        model_path = os.environ["MODEL_PATH"]
+        model_filename = os.environ["MODEL_FILENAME"]
+
         self.chat_pipeline = Llama.from_pretrained(
-            repo_id="bartowski/Llama-3.2-1B-Instruct-GGUF",
-            filename="Llama-3.2-1B-Instruct-Q5_K_S.gguf",
+            repo_id=model_path,
+            filename=model_filename if model_filename else None,
             n_threads=16,
             verbose=False,
         )

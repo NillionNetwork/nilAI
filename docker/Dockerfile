@@ -1,5 +1,11 @@
 FROM python:3.12-slim
 
+ARG MODEL_PATH
+ARG MODEL_FILENAME
+
+ENV MODEL_PATH=${MODEL_PATH}
+ENV MODEL_FILENAME=${MODEL_FILENAME}
+
 COPY --link nilai /app/nilai
 COPY pyproject.toml uv.lock .env gunicorn.conf.py /app/
 
