@@ -10,6 +10,7 @@ FROM python:3.12-slim AS nilai
 COPY --link nilai /app/nilai
 COPY pyproject.toml uv.lock .env gunicorn.conf.py /app/
 COPY --from=sev /app/sev/libsevguest.so /app/nilai/sev/libsevguest.so
+COPY --from=sev /app/sev/libsevguest.h /app/nilai/sev/libsevguest.h
 
 WORKDIR /app
 

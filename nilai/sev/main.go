@@ -45,7 +45,7 @@ func Init() int {
 //export GetQuote
 func GetQuote(reportData *C.char) *C.char {
 	if reportData == nil {
-		return C.CString("reportData is nil")
+		return nil
 	}
 
 	// Convert reportData to a Go byte slice.
@@ -57,11 +57,10 @@ func GetQuote(reportData *C.char) *C.char {
 	// Get the quote using the provided QuoteProvider.
 	quote, err := client.GetQuoteProto(quoteProvider, reportDataBytes)
 	if err != nil {
-		return C.CString(fmt.Sprintf("failed to get quote: %v", err))
+		return nil
 	}
-
 	result := C.CString(quote.GetReport().String())
-	defer C.free(unsafe.Pointer(result))
+	//result := C.CString(quote.String())
 	return result
 }
 

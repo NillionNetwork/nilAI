@@ -1,7 +1,7 @@
 import os
 import base64
 import ctypes
-from ctypes import c_char_p, c_int, create_string_buffer
+from ctypes import c_char_p, c_int, c_void_p, create_string_buffer
 
 # Load the shared library
 lib = ctypes.CDLL(f"{os.path.dirname(os.path.abspath(__file__))}/libsevguest.so")
@@ -23,6 +23,7 @@ lib.GetQuote.argtypes = [c_char_p]
 lib.VerifyQuote.restype = c_int
 lib.VerifyQuote.argtypes = [c_char_p]
 
+lib.free.argtypes = [c_char_p]
 
 # Python wrapper functions
 def init():
@@ -55,14 +56,17 @@ def get_quote(report_data=None) -> str:
 
     # Get the quote
     quote_ptr = lib.GetQuote(report_buffer)
+    quote_str = ctypes.string_at(quote_ptr)
 
+    # We should be freeing the quote, but it turns out it raises an error.
+    # lib.free(quote_ptr)
     # Check if quote retrieval failed
     if quote_ptr is None:
         raise RuntimeError("Failed to get quote")
 
     # Convert quote to Python string
-    quote = base64.b64encode(quote_ptr)
-    return str(quote)
+    quote = base64.b64encode(quote_str)
+    return quote.decode("ascii")
 
 
 def verify_quote(quote: str) -> bool:
@@ -80,7 +84,7 @@ def verify_quote(quote: str) -> bool:
         quote = str(quote)
 
     # Convert to bytes
-    quote_bytes = base64.b64decode(quote)
+    quote_bytes = base64.b64decode(quote.encode("ascii"))
     quote_buffer = create_string_buffer(quote_bytes)
 
     # Verify quote
@@ -100,6 +104,7 @@ if __name__ == "__main__":
 
         # Get the quote
         quote = get_quote(report_data)
+        print(type(quote))
         print("Quote:", quote)
 
         if verify_quote(quote):

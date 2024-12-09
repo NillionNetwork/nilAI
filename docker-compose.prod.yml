@@ -1,5 +1,6 @@
 services:
   nilai:
+    privileged: true
     volumes:
       - /dev/sev-guest:/dev/sev-guest # for AMD SEV
     networks:
