@@ -1,4 +1,7 @@
 services:
   nilai:
+    privileged: true
     ports:
       - "8080:8080"
+    volumes:
+      - /dev/sev-guest:/dev/sev-guest # for AMD SEV

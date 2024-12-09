@@ -84,8 +84,8 @@ async def get_attestation(user: dict = Depends(get_user)) -> AttestationResponse
     """
     return AttestationResponse(
         verifying_key=state.verifying_key,
-        cpu_attestation="...",
-        gpu_attestation="...",
+        cpu_attestation=state.cpu_attestation,
+        gpu_attestation=state.gpu_attestation,
     )
 
 

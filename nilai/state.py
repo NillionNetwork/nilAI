@@ -8,6 +8,9 @@ from nilai.crypto import generate_key_pair
 from nilai.model import Model
 
 
+from nilai.sev.sev import init, get_quote
+
+
 class AppState:
     def __init__(self):
         self.private_key, self.public_key, self.verifying_key = generate_key_pair()
@@ -31,6 +34,22 @@ class AppState:
             )
         ]
         self._uptime = time.time()
+        self._cpu_quote = None
+        self._gpu_quote = None
+
+    @property
+    def cpu_attestation(self) -> str:
+        if self._cpu_quote is None:
+            try:
+                init()
+                self._cpu_quote = get_quote()
+            except RuntimeError:
+                self._cpu_quote = "<Non TEE CPU>"
+        return self._cpu_quote
+
+    @property
+    def gpu_attestation(self) -> str:
+        return "<No GPU>"
 
     @property
     def uptime(self):

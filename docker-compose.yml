@@ -3,6 +3,7 @@ services:
     build: 
       context: .
       dockerfile: docker/Dockerfile
+      target: nilai
     volumes:
       - ${PWD}/db/:/app/db/   # sqlite database for users
       - hugging_face_models:/root/.cache/huggingface  # cache models
