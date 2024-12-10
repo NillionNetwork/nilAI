@@ -2,7 +2,7 @@
 from fastapi import APIRouter
 
 # Internal libraries
-from nilai.model import HealthCheckResponse
+from nilai.nilai.api_model import HealthCheckResponse
 from nilai.state import state
 
 router = APIRouter()

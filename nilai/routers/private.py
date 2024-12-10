@@ -8,7 +8,7 @@ from nilai.crypto import sign_message
 from nilai.db import UserManager
 
 # Internal libraries
-from nilai.model import (
+from nilai.nilai.api_model import (
     AttestationResponse,
     ChatRequest,
     ChatResponse,
