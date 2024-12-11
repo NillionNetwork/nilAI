@@ -1,6 +1,14 @@
 version = 1
 requires-python = ">=3.12"
 
+[manifest]
+members = [
+    "nilai",
+    "nilai-api",
+    "nilai-common",
+    "nilai-models",
+]
+
 [[package]]
 name = "accelerate"
 version = "1.1.1"
@@ -552,16 +560,9 @@ name = "nilai"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "accelerate" },
-    { name = "cryptography" },
-    { name = "fastapi", extra = ["standard"] },
-    { name = "gunicorn" },
-    { name = "llama-cpp-python" },
-    { name = "python-dotenv" },
-    { name = "sqlalchemy" },
-    { name = "torch" },
-    { name = "transformers" },
-    { name = "uvicorn" },
+    { name = "nilai-api" },
+    { name = "nilai-common" },
+    { name = "nilai-models" },
 ]
 
 [package.dev-dependencies]
@@ -575,16 +576,9 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "accelerate", specifier = ">=1.1.1" },
-    { name = "cryptography", specifier = ">=43.0.3" },
-    { name = "fastapi", extras = ["standard"], specifier = ">=0.115.5" },
-    { name = "gunicorn", specifier = ">=23.0.0" },
-    { name = "llama-cpp-python", specifier = ">=0.3.2" },
-    { name = "python-dotenv", specifier = ">=1.0.1" },
-    { name = "sqlalchemy", specifier = ">=2.0.36" },
-    { name = "torch", specifier = ">=2.5.1" },
-    { name = "transformers", specifier = ">=4.46.3" },
-    { name = "uvicorn", specifier = ">=0.32.1" },
+    { name = "nilai-api", editable = "nilai-api" },
+    { name = "nilai-common", editable = "packages/nilai-common" },
+    { name = "nilai-models", editable = "nilai-models" },
 ]
 
 [package.metadata.requires-dev]
@@ -593,6 +587,75 @@ dev = [
     { name = "isort", specifier = ">=5.13.2" },
     { name = "pytest", specifier = ">=8.3.3" },
     { name = "ruff", specifier = ">=0.8.0" },
+    { name = "uvicorn", specifier = ">=0.32.1" },
+]
+
+[[package]]
+name = "nilai-api"
+version = "0.1.0"
+source = { editable = "nilai-api" }
+dependencies = [
+    { name = "accelerate" },
+    { name = "cryptography" },
+    { name = "fastapi", extra = ["standard"] },
+    { name = "gunicorn" },
+    { name = "httpx" },
+    { name = "nilai-common" },
+    { name = "python-dotenv" },
+    { name = "sqlalchemy" },
+    { name = "uvicorn" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "accelerate", specifier = ">=1.1.1" },
+    { name = "cryptography", specifier = ">=43.0.3" },
+    { name = "fastapi", extras = ["standard"], specifier = ">=0.115.5" },
+    { name = "gunicorn", specifier = ">=23.0.0" },
+    { name = "httpx", specifier = ">=0.27.2" },
+    { name = "nilai-common", editable = "packages/nilai-common" },
+    { name = "python-dotenv", specifier = ">=1.0.1" },
+    { name = "sqlalchemy", specifier = ">=2.0.36" },
+    { name = "uvicorn", specifier = ">=0.32.1" },
+]
+
+[[package]]
+name = "nilai-common"
+version = "0.1.0"
+source = { editable = "packages/nilai-common" }
+dependencies = [
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "pydantic", specifier = ">=2.10.1" }]
+
+[[package]]
+name = "nilai-models"
+version = "0.1.0"
+source = { editable = "nilai-models" }
+dependencies = [
+    { name = "accelerate" },
+    { name = "cryptography" },
+    { name = "fastapi", extra = ["standard"] },
+    { name = "gunicorn" },
+    { name = "llama-cpp-python" },
+    { name = "nilai-common" },
+    { name = "torch" },
+    { name = "transformers" },
+    { name = "uvicorn" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "accelerate", specifier = ">=1.1.1" },
+    { name = "cryptography", specifier = ">=43.0.3" },
+    { name = "fastapi", extras = ["standard"], specifier = ">=0.115.5" },
+    { name = "gunicorn", specifier = ">=23.0.0" },
+    { name = "llama-cpp-python", specifier = ">=0.3.2" },
+    { name = "nilai-common", editable = "packages/nilai-common" },
+    { name = "torch", specifier = ">=2.5.1" },
+    { name = "transformers", specifier = ">=4.46.3" },
     { name = "uvicorn", specifier = ">=0.32.1" },
 ]
 

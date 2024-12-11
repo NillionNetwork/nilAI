@@ -25,6 +25,7 @@ lib.VerifyQuote.argtypes = [c_char_p]
 
 lib.free.argtypes = [c_char_p]
 
+
 # Python wrapper functions
 def init():
     """Initialize the device and quote provider."""

@@ -42,7 +42,7 @@ class AttestationResponse(BaseModel):
     gpu_attestation: str  # Base64 encoded GPU attestation
 
 
-class Model(BaseModel):
+class ModelMetadata(BaseModel):
     id: str
     name: str
     version: str
@@ -56,3 +56,7 @@ class Model(BaseModel):
 class HealthCheckResponse(BaseModel):
     status: str
     uptime: str
+
+class ModelEndpoint(BaseModel):
+    url: str
+    metadata: ModelMetadata

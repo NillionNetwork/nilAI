@@ -1,22 +1,23 @@
 # Fast API and serving
 from base64 import b64encode
+import httpx
 
 from fastapi import APIRouter, Body, Depends, HTTPException
 
-from nilai.auth import get_user
-from nilai.crypto import sign_message
-from nilai.db import UserManager
+from nilai_api.auth import get_user
+from nilai_api.crypto import sign_message
+from nilai_api.db import UserManager
 
 # Internal libraries
-from nilai.nilai.api_model import (
+from nilai_common import (
     AttestationResponse,
     ChatRequest,
     ChatResponse,
     Message,
-    Model,
+    ModelMetadata,
     Usage,
 )
-from nilai.state import state
+from nilai_api.state import state
 
 router = APIRouter()
 
@@ -35,35 +36,7 @@ async def get_usage(user: dict = Depends(get_user)) -> Usage:
     usage = await get_usage(user)
     ```
     """
-    return Usage(**UserManager.get_token_usage(user["userid"]))
-
-
-@router.get("/v1/model-info", tags=["Model"])
-async def get_model_info(user: str = Depends(get_user)) -> dict:
-    """
-    Fetch detailed information about the current model.
-
-    - **user**: Authenticated user (used for authorization through X-API-Key header)
-    - **Returns**: Model metadata including name, version, and features
-
-    ### Metadata Includes
-    - `model_name`: Name of the current model
-    - `version`: Model version
-    - `supported_features`: List of model capabilities
-    - `license`: Licensing information
-
-    ### Example
-    ```python
-    # Retrieves current model information
-    model_info = await get_model_info(user)
-    ```
-    """
-    return {
-        "model_name": state.models[0].name,
-        "version": state.models[0].version,
-        "supported_features": state.models[0].supported_features,
-        "license": state.models[0].license,
-    }
+    return Usage(**UserManager.get_token_usage(user["userid"]))  # type: ignore
 
 
 @router.get("/v1/attestation/report", tags=["Attestation"])
@@ -90,7 +63,7 @@ async def get_attestation(user: dict = Depends(get_user)) -> AttestationResponse
 
 
 @router.get("/v1/models", tags=["Model"])
-async def get_models(user: dict = Depends(get_user)) -> dict[str, list[Model]]:
+async def get_models(user: dict = Depends(get_user)) -> list[ModelMetadata]:
     """
     List all available models in the system.
 
@@ -103,14 +76,14 @@ async def get_models(user: dict = Depends(get_user)) -> dict[str, list[Model]]:
     models = await get_models(user)
     ```
     """
-    return {"models": state.models}
+    return [endpoint.metadata for endpoint in state.models.values()]
 
 
 @router.post("/v1/chat/completions", tags=["Chat"])
 async def chat_completion(
     req: ChatRequest = Body(
         ChatRequest(
-            model=state.models[0].name,
+            model="Llama-3.2-1B-Instruct",
             messages=[
                 Message(role="system", content="You are a helpful assistant."),
                 Message(role="user", content="What is your name?"),
@@ -162,40 +135,45 @@ async def chat_completion(
     )
     response = await chat_completion(request, user)
     """
-    if not req.messages or len(req.messages) == 0:
-        raise HTTPException(status_code=400, detail="The 'messages' field is required.")
-    if not req.model:
-        raise HTTPException(status_code=400, detail="The 'model' field is required.")
 
-    # Combine messages into a single prompt
-    prompt = [
-        {
-            "role": msg.role,
-            "content": msg.content,
-        }
-        for msg in req.messages
-    ]
+    model_name = req.model
+    if model_name not in state.models:
+        raise HTTPException(status_code=400, detail=f"Invalid model name: {state.models.keys()}")
+    
+    model_url = state.models[model_name].url
 
-    # Generate response
-    generated: dict = state.chat_pipeline.create_chat_completion(prompt)
-    if not generated or len(generated) == 0:
-        raise HTTPException(status_code=500, detail="The model returned no output.")
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{model_url}/chat",
+                json=req.model_dump(),
+                timeout=60.0
+            )
+            response.raise_for_status()
+            model_response = ChatResponse.model_validate_json(response.content)
+    except httpx.HTTPStatusError as e:
+        # Forward the original error from the model
+        raise HTTPException(
+            status_code=e.response.status_code,
+            detail=e.response.json().get("detail", str(e))
+        )
+    except httpx.RequestError as e:
+        # Handle connection/timeout errors
+        raise HTTPException(
+            status_code=503,
+            detail=f"Error connecting to model service: {str(e)}"
+        )
 
-    response = ChatResponse(
-        signature="",
-        **generated,
-    )
-
-    response.model = req.model
-
+    # Update token usage
     UserManager.update_token_usage(
         user["userid"],
-        prompt_tokens=response.usage.prompt_tokens,
-        completion_tokens=response.usage.completion_tokens,
+        prompt_tokens=model_response.usage.prompt_tokens,
+        completion_tokens=model_response.usage.completion_tokens,
     )
-    # Sign the response
-    response_json = response.model_dump_json()
-    signature = sign_message(state.private_key, response_json)
-    response.signature = b64encode(signature).decode()
 
-    return response
+    # Sign the response
+    response_json = model_response.model_dump_json()
+    signature = sign_message(state.private_key, response_json)
+    model_response.signature = b64encode(signature).decode()
+
+    return model_response

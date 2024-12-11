@@ -1,11 +1,19 @@
 services:
-  nilai:
+  api:
     build: 
       context: .
       dockerfile: docker/Dockerfile
       target: nilai
     volumes:
       - ${PWD}/db/:/app/db/   # sqlite database for users
+  llama1Bcpu:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: llama1Bcpu
+      args:
+        MODEL_NAME: "llama1B"
+    volumes:
       - hugging_face_models:/root/.cache/huggingface  # cache models
 volumes:
   hugging_face_models:

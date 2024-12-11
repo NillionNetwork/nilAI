@@ -215,6 +215,7 @@ class UserManager:
                     logger.warning(f"User {userid} not found")
         except SQLAlchemyError as e:
             logger.error(f"Error updating token usage: {e}")
+            return None
 
     @staticmethod
     def get_all_users() -> Optional[List[UserData]]:

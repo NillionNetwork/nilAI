@@ -1,7 +1,7 @@
 from fastapi import HTTPException, Security, status
 from fastapi.security import APIKeyHeader
 
-from nilai.db import UserManager
+from nilai_api.db import UserManager
 
 UserManager.initialize_db()
 

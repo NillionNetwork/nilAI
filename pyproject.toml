@@ -8,16 +8,9 @@ authors = [
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "accelerate>=1.1.1",
-    "cryptography>=43.0.3",
-    "fastapi[standard]>=0.115.5",
-    "gunicorn>=23.0.0",
-    "llama-cpp-python>=0.3.2",
-    "python-dotenv>=1.0.1",
-    "sqlalchemy>=2.0.36",
-    "torch>=2.5.1",
-    "transformers>=4.46.3",
-    "uvicorn>=0.32.1",
+    "nilai-api",
+    "nilai-common",
+    "nilai-models",
 ]
 
 [dependency-groups]
@@ -35,3 +28,11 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages]
 find = { include = ["nilai"] }
+
+[tool.uv.workspace]
+members = ["nilai-models", "nilai-api", "packages/nilai-common"]
+
+[tool.uv.sources]
+nilai-common = { workspace = true }
+nilai-api = { workspace = true }
+nilai-models = { workspace = true }

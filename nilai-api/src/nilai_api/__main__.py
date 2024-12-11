@@ -1,6 +1,6 @@
 import uvicorn
 
-from nilai.app import app
+from nilai_api.app import app
 
 
 def run_uvicorn():
