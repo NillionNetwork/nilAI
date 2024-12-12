@@ -4,12 +4,12 @@ Copy the `.env.sample` to `.env` to and replace the value of the `HUGGINGFACE_AP
 
 For development environments:
 ```shell
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build nilai
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build api llama_1b_cpu etcd
 ```
 
 For production environments:
 ```shell
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build nilai
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build api llama_1b_cpu etcd
 ```
 
 ```

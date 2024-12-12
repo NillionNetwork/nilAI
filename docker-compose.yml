@@ -4,9 +4,11 @@ services:
     environment:
       - ALLOW_NONE_AUTHENTICATION=yes
       - ETCD_ADVERTISE_CLIENT_URLS=http://etcd:2379
-    ports:
-      - 2379:2379
-      - 2380:2380
+    # ports:
+    #   - 2379:2379
+    #   - 2380:2380
+    networks:
+      - backend_net
   api:
     build: 
       context: .
@@ -15,10 +17,10 @@ services:
     volumes:
       - ${PWD}/db/:/app/db/   # sqlite database for users
     environment:
-      - SVC_HOST=api
-      - SVC_PORT=8080
       - ETCD_HOST=etcd
       - ETCD_PORT=2379
+    networks:
+      - backend_net
   llama_1b_cpu:
     build:
       context: .
@@ -33,6 +35,11 @@ services:
       - ETCD_PORT=2379
     volumes:
       - hugging_face_models:/root/.cache/huggingface  # cache models
+    networks:
+      - backend_net
 
 volumes:
   hugging_face_models:
+
+networks:
+  backend_net:
