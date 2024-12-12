@@ -1,14 +1,13 @@
-from llama_cpp import Llama
 from fastapi import HTTPException
-
+from llama_cpp import Llama
+from nilai_common import ChatRequest, ChatResponse, Message, ModelMetadata
 from nilai_models.model import Model
-from nilai_common import ModelMetadata, ChatResponse, ChatRequest, Message
 
 
 class Llama1BCpu(Model):
     """
     A specific implementation of the Model base class for the Llama 1B CPU model.
-    
+
     This class provides:
     - Model initialization using llama_cpp
     - Chat completion functionality
@@ -20,7 +19,7 @@ class Llama1BCpu(Model):
         Initialize the Llama 1B model:
         1. Load the pre-trained model using llama_cpp
         2. Set up model metadata
-        
+
         Configuration details:
         - Uses a specific quantized model from Hugging Face
         - Configured for CPU inference
@@ -43,16 +42,15 @@ class Llama1BCpu(Model):
         super().__init__(
             ModelMetadata(
                 id="bartowski/Llama-3.2-1B-Instruct-GGUF",  # Unique identifier
-                name="Llama-3.2-1B-Instruct",              # Human-readable name
-                version="1.0",                             # Model version
+                name="Llama-3.2-1B-Instruct",  # Human-readable name
+                version="1.0",  # Model version
                 description="Llama is a large language model trained on supervised and unsupervised data.",
-                author="Meta-Llama",                       # Model creators
-                license="Apache 2.0",                      # Usage license
+                author="Meta-Llama",  # Model creators
+                license="Apache 2.0",  # Usage license
                 source="https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF",  # Model source
-                supported_features=["chat_completion"],    # Capabilities
-            )
+                supported_features=["chat_completion"],  # Capabilities
+            ),
         )
-
 
     async def chat_completion(
         self,
@@ -67,25 +65,29 @@ class Llama1BCpu(Model):
     ) -> ChatResponse:
         """
         Generate a chat completion using the Llama model.
-        
+
         Args:
             req (ChatRequest): The chat request containing conversation messages.
-        
+
         Returns:
             ChatResponse: The model's generated response.
-        
+
         Raises:
             ValueError: If the model fails to generate a response.
         """
         if not req.messages or len(req.messages) == 0:
-            raise HTTPException(status_code=400, detail="The 'messages' field is required.")
+            raise HTTPException(
+                status_code=400, detail="The 'messages' field is required."
+            )
         if not req.model:
-            raise HTTPException(status_code=400, detail="The 'model' field is required.")
+            raise HTTPException(
+                status_code=400, detail="The 'model' field is required."
+            )
         # Transform incoming messages into a format compatible with llama_cpp
         # Extracts role and content from each message
         prompt = [
             {
-                "role": msg.role,     # Preserve message role (system/user/assistant)
+                "role": msg.role,  # Preserve message role (system/user/assistant)
                 "content": msg.content,  # Preserve message content
             }
             for msg in req.messages

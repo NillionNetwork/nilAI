@@ -1,12 +1,14 @@
 # Fast API and serving
+import logging
+import os
 from base64 import b64encode
+
 import httpx
-
 from fastapi import APIRouter, Body, Depends, HTTPException
-
 from nilai_api.auth import get_user
 from nilai_api.crypto import sign_message
 from nilai_api.db import UserManager
+from nilai_api.state import state
 
 # Internal libraries
 from nilai_common import (
@@ -17,7 +19,8 @@ from nilai_common import (
     ModelMetadata,
     Usage,
 )
-from nilai_api.state import state
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -76,7 +79,8 @@ async def get_models(user: dict = Depends(get_user)) -> list[ModelMetadata]:
     models = await get_models(user)
     ```
     """
-    return [endpoint.metadata for endpoint in state.models.values()]
+    logger.info(f"Retrieving models for user {user['userid']} from pid {os.getpid()}")
+    return [endpoint.metadata for endpoint in (await state.models).values()]
 
 
 @router.post("/v1/chat/completions", tags=["Chat"])
@@ -137,17 +141,18 @@ async def chat_completion(
     """
 
     model_name = req.model
-    if model_name not in state.models:
-        raise HTTPException(status_code=400, detail=f"Invalid model name: {state.models.keys()}")
-    
-    model_url = state.models[model_name].url
+    models = await state.models
+    if model_name not in models:
+        raise HTTPException(
+            status_code=400, detail=f"Invalid model name: {models.keys()}"
+        )
+
+    model_url = models[model_name].url
 
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(
-                f"{model_url}/chat",
-                json=req.model_dump(),
-                timeout=60.0
+                f"{model_url}/chat", json=req.model_dump(), timeout=60.0
             )
             response.raise_for_status()
             model_response = ChatResponse.model_validate_json(response.content)
@@ -155,13 +160,12 @@ async def chat_completion(
         # Forward the original error from the model
         raise HTTPException(
             status_code=e.response.status_code,
-            detail=e.response.json().get("detail", str(e))
+            detail=e.response.json().get("detail", str(e)),
         )
     except httpx.RequestError as e:
         # Handle connection/timeout errors
         raise HTTPException(
-            status_code=503,
-            detail=f"Error connecting to model service: {str(e)}"
+            status_code=503, detail=f"Error connecting to model service: {str(e)}"
         )
 
     # Update token usage

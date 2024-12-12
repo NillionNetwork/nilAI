@@ -8,6 +8,7 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
+    "etcd3gw>=2.4.2",
     "pydantic>=2.10.1",
 ]
 

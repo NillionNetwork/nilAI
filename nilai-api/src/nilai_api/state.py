@@ -1,19 +1,15 @@
+import logging
 import time
-from asyncio import Semaphore, Lock as Mutex
+from asyncio import Semaphore
+from typing import Dict
 
 from dotenv import load_dotenv
-import httpx
-import logging
-
-from regex import P
-
 from nilai_api.crypto import generate_key_pair
-from nilai_common import ModelEndpoint, ModelMetadata
+from nilai_api.sev.sev import get_quote, init
+from nilai_common import ModelServiceDiscovery
+from nilai_common.api_model import ModelEndpoint
 
-
-from nilai_api.sev.sev import init, get_quote
-
-logger = logging.getLogger('uvicorn.error')
+logger = logging.getLogger("uvicorn.error")
 
 
 class AppState:
@@ -21,10 +17,7 @@ class AppState:
         self.private_key, self.public_key, self.verifying_key = generate_key_pair()
         self.sem = Semaphore(2)
 
-        self.model_mutex = Mutex()
-
-        self.models = {}
-
+        self.discovery_service = ModelServiceDiscovery()
         self._uptime = time.time()
         self._cpu_quote = None
         self._gpu_quote = None
@@ -62,51 +55,9 @@ class AppState:
 
         return ", ".join(parts)
 
-    async def add_endpoint(self, endpoint: ModelEndpoint):
-        async with self.model_mutex:
-            if endpoint.url in self.models:
-                logger.warning(f"Model {endpoint.url} already exists in the list of models.")
-                return
-            self.models[endpoint.metadata.name] = endpoint
-
-    async def remove_endpoint(self, model_name: str):
-        async with self.model_mutex:
-            if model_name not in self.models:
-                logger.warning(f"Model {model_name} not found in the list of models.")
-                return
-            del self.models[model_name]
-
-
-    async def update_endpoints(self):
-        async with self.model_mutex:
-            async with httpx.AsyncClient() as client:
-                for endpoint in self.models.values():
-                    print(endpoint.url)
-
-                    try:
-                        # Async HTTP GET request with 1 second timeout
-                        response = await client.get(endpoint.url + "/health", timeout=1.0)
-                        response.raise_for_status()
-
-                        model_info = ModelMetadata(**response.json())
-                        if model_info.name in self.models:
-                            logger.warning(
-                                f"Model {model_info.name} already exists in the list of models."
-                            )
-                            continue
-
-                        logger.info(f"Adding model {model_info.name} to the list of models.")
-
-                    except httpx.HTTPStatusError as e:
-                        logger.warning(
-                            f"Model {endpoint.name} with url: {endpoint.url} returned non-200 status code: {e.response.status_code}"
-                        )
-                    except httpx.ConnectError:
-                        print("Connection error")
-                    except httpx.TimeoutException:
-                        print("Timeout error")
-                    except httpx.RequestError:
-                        print("Request error")
+    @property
+    async def models(self) -> Dict[str, ModelEndpoint]:
+        return await self.discovery_service.discover_models()
 
 
 load_dotenv()

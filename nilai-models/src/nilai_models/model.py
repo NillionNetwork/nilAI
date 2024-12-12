@@ -1,24 +1,27 @@
 # nilai/models/model.py
-import httpx # For making HTTP requests
-from abc import ABC, abstractmethod  # Abstract Base Class to define interfaces
-from contextlib import asynccontextmanager # For managing async context
+import asyncio  # For making HTTP requests
+import logging
 import time  # For tracking uptime and time-related calculations
+from abc import ABC, abstractmethod  # Abstract Base Class to define interfaces
+from contextlib import asynccontextmanager  # For managing async context
+
 from fastapi import FastAPI  # Web framework for creating API endpoints
-from nilai_common import (
-    HealthCheckResponse,  # Custom response type for health checks
-    ModelEndpoint,        # Endpoint information for model registration
-    ModelMetadata,        # Metadata about the model
-    ChatResponse,         # Response type for chat completions
-    ChatRequest,          # Request type for chat interactions
-)
+from nilai_common import ChatRequest  # Request type for chat interactions
+from nilai_common import ChatResponse  # Response type for chat completions
+from nilai_common import HealthCheckResponse  # Custom response type for health checks
+from nilai_common import ModelEndpoint  # Endpoint information for model registration
+from nilai_common import ModelMetadata  # Metadata about the model
+from nilai_common import SETTINGS, ModelServiceDiscovery # Model service discovery and host settings
+
+logger = logging.getLogger(__name__)
 
 
 class Model(ABC):
     """
-    Abstract base class for AI models, providing a standardized interface 
+    Abstract base class for AI models, providing a standardized interface
     for model initialization, routing, and basic functionality.
 
-    This class serves as a blueprint for creating different AI model 
+    This class serves as a blueprint for creating different AI model
     implementations with consistent API endpoints and behaviors.
     """
 
@@ -31,34 +34,30 @@ class Model(ABC):
         """
         # Store the model's metadata for later retrieval
         self.metadata = metadata
-        
+        self.url = f"http://{SETTINGS["host"]}:{SETTINGS["port"]}"
+        self.endpoint = ModelEndpoint(url=self.url, metadata=self.metadata)
         # Record the start time for uptime tracking
         self._uptime = time.time()
         self.app = self.setup_app()
-
 
     def setup_app(self):
         @asynccontextmanager
         async def lifespan(app: FastAPI):
             # Load the model on the API
-            async with httpx.AsyncClient() as client:
-                url = "http://localhost:8000"
-                data = ModelEndpoint(
-                    url=url,
-                    metadata=self.metadata
-                )
-                response = await client.post(f"http://localhost:8080/internal/endpoints", json=data.model_dump())
-                print(response.text)
-                # if response.status_code != 200:
-                #     raise RuntimeError(f"Failed to connect to nilai-api: {response.text}")
+            discovery_service = ModelServiceDiscovery(
+                host=SETTINGS["etcd_host"], port=SETTINGS["etcd_port"]
+            )
+            lease = await discovery_service.register_model(self.endpoint)
+            asyncio.create_task(discovery_service.keep_alive(lease))
+            logger.info(f"Registered model endpoint: {self.endpoint}")
             yield
-            # Clean up resources if needed
-            pass
+            await discovery_service.unregister_model(self.endpoint.metadata.id)
+
         # Create a FastAPI application instance for the model
         self.app = FastAPI(lifespan=lifespan)
         self._setup_routes()
         return self.app
-    
+
     def get_app(self) -> FastAPI:
         """
         Retrieve the FastAPI application instance for the model.
@@ -67,7 +66,7 @@ class Model(ABC):
             FastAPI: The application instance associated with this model.
         """
         return self.app
-    
+
     def _setup_routes(self):
         """
         Set up standard routes for the model's API.
@@ -77,9 +76,10 @@ class Model(ABC):
         - /health: For checking the model's health status
         - /model: For retrieving model information
 
-        Intended to be called during model initialization or overridden 
+        Intended to be called during model initialization or overridden
         by child classes to add custom routes.
         """
+
         # Chat completion endpoint
         @self.app.post("/chat")
         async def chat(req: ChatRequest) -> ChatResponse:
@@ -95,7 +95,7 @@ class Model(ABC):
         async def model_info() -> ModelMetadata:
             print("model_info")
             return await self.model_info()
-    
+
     @abstractmethod
     async def chat_completion(self, req: ChatRequest) -> ChatResponse:
         """
@@ -142,12 +142,12 @@ class Model(ABC):
         Calculate and format the model's uptime in a human-readable format.
 
         Returns:
-            str: A formatted string representing the model's uptime 
+            str: A formatted string representing the model's uptime
                  (e.g., "2 days, 3 hours, 45 minutes").
         """
         # Calculate total elapsed time since initialization
         elapsed_time = time.time() - self._uptime
-        
+
         # Break down elapsed time into days, hours, minutes, seconds
         days, remainder = divmod(elapsed_time, 86400)
         hours, remainder = divmod(remainder, 3600)

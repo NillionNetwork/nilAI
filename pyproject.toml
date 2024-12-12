@@ -8,6 +8,7 @@ authors = [
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "etcd3>=0.12.0",
     "nilai-api",
     "nilai-common",
     "nilai-models",

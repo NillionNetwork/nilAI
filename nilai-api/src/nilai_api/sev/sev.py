@@ -1,7 +1,7 @@
-import os
 import base64
 import ctypes
-from ctypes import c_char_p, c_int, c_void_p, create_string_buffer
+import os
+from ctypes import c_char_p, c_int, create_string_buffer
 
 # Load the shared library
 lib = ctypes.CDLL(f"{os.path.dirname(os.path.abspath(__file__))}/libsevguest.so")
