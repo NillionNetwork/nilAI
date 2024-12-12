@@ -6,9 +6,9 @@ import os
 
 SETTINGS = {
     "host": os.getenv("SVC_HOST", "localhost"),
-    "port": os.getenv("SVC_PORT", 8080),
-    "db_hostname": os.getenv("ETCD_HOST", "localhost"),
-    "db_port": os.getenv("ETCD_PORT", 2379),
+    "port": os.getenv("SVC_PORT", 8000),
+    "etcd_host": os.getenv("ETCD_HOST", "localhost"),
+    "etcd_port": os.getenv("ETCD_PORT", 2379),
 }
 # if environment == "docker":
 #     config = "docker_settings.py"

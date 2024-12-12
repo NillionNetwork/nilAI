@@ -6,7 +6,7 @@ from typing import Dict
 from dotenv import load_dotenv
 from nilai_api.crypto import generate_key_pair
 from nilai_api.sev.sev import get_quote, init
-from nilai_common import ModelServiceDiscovery
+from nilai_common import ModelServiceDiscovery, SETTINGS
 from nilai_common.api_model import ModelEndpoint
 
 logger = logging.getLogger("uvicorn.error")
@@ -17,7 +17,7 @@ class AppState:
         self.private_key, self.public_key, self.verifying_key = generate_key_pair()
         self.sem = Semaphore(2)
 
-        self.discovery_service = ModelServiceDiscovery()
+        self.discovery_service = ModelServiceDiscovery(host=SETTINGS["etcd_host"], port=SETTINGS["etcd_port"])
         self._uptime = time.time()
         self._cpu_quote = None
         self._gpu_quote = None

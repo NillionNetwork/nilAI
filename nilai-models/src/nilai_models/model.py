@@ -81,17 +81,17 @@ class Model(ABC):
         """
 
         # Chat completion endpoint
-        @self.app.post("/chat")
+        @self.app.post("/v1/chat/completions")
         async def chat(req: ChatRequest) -> ChatResponse:
             return await self.chat_completion(req)
 
         # Health check endpoint
-        @self.app.get("/health")
+        @self.app.get("/v1/health")
         async def health() -> HealthCheckResponse:
             return await self.health_check()
 
         # Model information endpoint
-        @self.app.get("/model")
+        @self.app.get("/v1/models")
         async def model_info() -> ModelMetadata:
             print("model_info")
             return await self.model_info()

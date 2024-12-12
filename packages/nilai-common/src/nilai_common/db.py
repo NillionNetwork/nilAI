@@ -58,8 +58,6 @@ class ModelServiceDiscovery:
         discovered_models: Dict[str, ModelEndpoint] = {}
         for resp, other in model_range:
             try:
-                print(resp)
-                print(other)
                 model_endpoint = ModelEndpoint.model_validate_json(resp.decode("utf-8"))  # type: ignore
 
                 # Apply filters if provided

@@ -1,7 +1,7 @@
 # Fast API and serving
 from fastapi import Depends, FastAPI
 from nilai_api.auth import get_user
-from nilai_api.routers import internal, private, public
+from nilai_api.routers import private, public
 
 host = "nilai.sandbox.nilogy.xyz"
 description = f"""
@@ -71,4 +71,3 @@ app = FastAPI(
 
 app.include_router(public.router)
 app.include_router(private.router, dependencies=[Depends(get_user)])
-app.include_router(internal.router)
