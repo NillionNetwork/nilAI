@@ -1,8 +1,8 @@
 FROM python:3.12-slim AS nilai
 
 # Model path can be specified during build
-ARG MODEL_PATH=llama_1b_cpu
-ENV EXEC_PATH=nilai_models.models.${MODEL_PATH}:app
+ARG MODEL_NAME=llama_1b_cpu
+ENV EXEC_PATH=nilai_models.models.${MODEL_NAME}:app
 
 COPY --link . /app/
 
