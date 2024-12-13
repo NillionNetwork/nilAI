@@ -41,7 +41,7 @@ class Llama8BCpu(Model):
         # Provides comprehensive information about the model
         super().__init__(
             ModelMetadata(
-                id="bartowski/Meta-Llama-3-8B-Instruct-GGUF",  # Unique identifier
+                id="Llama-3.1-8B-Instruct",  # Unique identifier
                 name="Llama-3.1-8B-Instruct",  # Human-readable name
                 version="1.0",  # Model version
                 description="Llama is a large language model trained on supervised and unsupervised data.",

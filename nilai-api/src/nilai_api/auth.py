@@ -1,14 +1,16 @@
 from fastapi import HTTPException, Security, status
-from fastapi.security import APIKeyHeader
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from nilai_api.db import UserManager
 
 UserManager.initialize_db()
 
-api_key_header = APIKeyHeader(name="X-API-Key")
+bearer_scheme = HTTPBearer()
 
 
-def get_user(api_key_header: str = Security(api_key_header)):
-    user = UserManager.check_api_key(api_key_header)
+def get_user(credentials: HTTPAuthorizationCredentials = Security(bearer_scheme)):
+    token = credentials.credentials
+    print(token)
+    user = UserManager.check_api_key(token)
     if user:
         return user
     raise HTTPException(

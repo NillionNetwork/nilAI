@@ -31,7 +31,7 @@ class ModelServiceDiscovery:
         lease = self.client.lease(self.lease_ttl)
 
         # Prepare the key and value
-        key = f"{prefix}/{model_endpoint.metadata.name}"
+        key = f"{prefix}/{model_endpoint.metadata.id}"
         value = model_endpoint.model_dump_json()
 
         # Put the key-value pair with the lease
@@ -71,10 +71,9 @@ class ModelServiceDiscovery:
                 ):
                     continue
 
-                discovered_models[model_endpoint.metadata.name] = model_endpoint
+                discovered_models[model_endpoint.metadata.id] = model_endpoint
             except Exception as e:
                 print(f"Error parsing model endpoint: {e}")
-
         return discovered_models
 
     async def get_model(
@@ -149,7 +148,7 @@ async def main():
     )
     print("FOUND: ", len(discovered_models))
     for model in discovered_models.values():
-        print(f"Discovered Model: {model.metadata.name}")
+        print(f"Discovered Model: {model.metadata.id}")
         print(f"URL: {model.url}")
         print(f"Supported Features: {model.metadata.supported_features}")
 
@@ -161,7 +160,7 @@ async def main():
     )
     print("FOUND: ", len(discovered_models))
     for model in discovered_models.values():
-        print(f"Discovered Model: {model.metadata.name}")
+        print(f"Discovered Model: {model.metadata.id}")
         print(f"URL: {model.url}")
         print(f"Supported Features: {model.metadata.supported_features}")
 

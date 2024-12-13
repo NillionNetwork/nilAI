@@ -41,10 +41,10 @@ class SecretLlama1BCpu(Model):
         # Provides comprehensive information about the model
         super().__init__(
             ModelMetadata(
-                id="bartowski/Llama-3.2-1B-Instruct-GGUF",  # Unique identifier
+                id="CheesyLlama",  # Unique identifier
                 name="CheesyLlama",  # Human-readable name
                 version="1.0",  # Model version
-                description="Llama is a large language model trained on supervised and unsupervised data.",
+                description="Llama is a large language model trained on supervised and unsupervised cheese.",
                 author="Meta-Llama",  # Model creators
                 license="Apache 2.0",  # Usage license
                 source="https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF",  # Model source
