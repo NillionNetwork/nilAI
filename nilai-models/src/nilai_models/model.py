@@ -11,7 +11,10 @@ from nilai_common import ChatResponse  # Response type for chat completions
 from nilai_common import HealthCheckResponse  # Custom response type for health checks
 from nilai_common import ModelEndpoint  # Endpoint information for model registration
 from nilai_common import ModelMetadata  # Metadata about the model
-from nilai_common import SETTINGS, ModelServiceDiscovery # Model service discovery and host settings
+from nilai_common import (
+    SETTINGS,
+    ModelServiceDiscovery,
+)  # Model service discovery and host settings
 
 logger = logging.getLogger(__name__)
 
@@ -25,12 +28,13 @@ class Model(ABC):
     implementations with consistent API endpoints and behaviors.
     """
 
-    def __init__(self, metadata: ModelMetadata):
+    def __init__(self, metadata: ModelMetadata, prefix="/models"):
         """
         Initialize the model with its metadata and tracking information.
 
         Args:
             metadata (ModelMetadata): Detailed information about the model.
+            prefix (str): Optional prefix for hiding the model behind a subpath.
         """
         # Store the model's metadata for later retrieval
         self.metadata = metadata
@@ -39,6 +43,7 @@ class Model(ABC):
         # Record the start time for uptime tracking
         self._uptime = time.time()
         self.app = self.setup_app()
+        self.prefix = prefix
 
     def setup_app(self):
         @asynccontextmanager
@@ -47,7 +52,7 @@ class Model(ABC):
             discovery_service = ModelServiceDiscovery(
                 host=SETTINGS["etcd_host"], port=SETTINGS["etcd_port"]
             )
-            lease = await discovery_service.register_model(self.endpoint)
+            lease = await discovery_service.register_model(self.endpoint, self.prefix)
             asyncio.create_task(discovery_service.keep_alive(lease))
             logger.info(f"Registered model endpoint: {self.endpoint}")
             yield

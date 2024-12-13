@@ -19,7 +19,7 @@ class ModelServiceDiscovery:
         self.lease_ttl = lease_ttl
 
     async def register_model(
-        self, model_endpoint: ModelEndpoint, prefix: str = ""
+        self, model_endpoint: ModelEndpoint, prefix: str = "/models"
     ) -> Lease:
         """
         Register a model endpoint in etcd.
@@ -31,7 +31,7 @@ class ModelServiceDiscovery:
         lease = self.client.lease(self.lease_ttl)
 
         # Prepare the key and value
-        key = f"{prefix}/models/{model_endpoint.metadata.id}"
+        key = f"{prefix}/{model_endpoint.metadata.name}"
         value = model_endpoint.model_dump_json()
 
         # Put the key-value pair with the lease
@@ -43,7 +43,7 @@ class ModelServiceDiscovery:
         self,
         name: Optional[str] = None,
         feature: Optional[str] = None,
-        prefix: Optional[str] = "",
+        prefix: Optional[str] = "/models",
     ) -> Dict[str, ModelEndpoint]:
         """
         Discover models based on optional filters.
@@ -53,7 +53,8 @@ class ModelServiceDiscovery:
         :return: List of matching ModelEndpoints
         """
         # Get all model keys
-        model_range = self.client.get_prefix(f"{prefix}/models/")
+        model_range = self.client.get_prefix(f"{prefix}/")
+        self.client.get_prefix
 
         discovered_models: Dict[str, ModelEndpoint] = {}
         for resp, other in model_range:
@@ -75,6 +76,22 @@ class ModelServiceDiscovery:
                 print(f"Error parsing model endpoint: {e}")
 
         return discovered_models
+
+    async def get_model(
+        self, model_id: str, prefix: str = "/models"
+    ) -> Optional[ModelEndpoint]:
+        """
+        Get a model endpoint by ID.
+
+        :param model_id: ID of the model to retrieve
+        :return: ModelEndpoint if found, None otherwise
+        """
+        key = f"{prefix}/{model_id}"
+        value = self.client.get(key)
+        value = self.client.get(model_id) if not value else value
+        if value:
+            return ModelEndpoint.model_validate_json(value[0].decode("utf-8"))  # type: ignore
+        return None
 
     async def unregister_model(self, model_id: str):
         """

@@ -141,13 +141,13 @@ async def chat_completion(
     """
 
     model_name = req.model
-    models = await state.models
-    if model_name not in models:
+    endpoint = await state.get_model(model_name)
+    if endpoint is None:
         raise HTTPException(
-            status_code=400, detail=f"Invalid model name: {models.keys()}"
+            status_code=400, detail="Invalid model name, check /v1/models for options"
         )
 
-    model_url = models[model_name].url
+    model_url = endpoint.url
 
     try:
         async with httpx.AsyncClient() as client:
