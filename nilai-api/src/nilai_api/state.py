@@ -1,7 +1,7 @@
 import logging
 import time
 from asyncio import Semaphore
-from typing import Dict
+from typing import Dict, Optional
 
 from dotenv import load_dotenv
 from nilai_api.crypto import generate_key_pair
@@ -17,7 +17,9 @@ class AppState:
         self.private_key, self.public_key, self.verifying_key = generate_key_pair()
         self.sem = Semaphore(2)
 
-        self.discovery_service = ModelServiceDiscovery(host=SETTINGS["etcd_host"], port=SETTINGS["etcd_port"])
+        self.discovery_service = ModelServiceDiscovery(
+            host=SETTINGS["etcd_host"], port=SETTINGS["etcd_port"]
+        )
         self._uptime = time.time()
         self._cpu_quote = None
         self._gpu_quote = None
@@ -58,6 +60,9 @@ class AppState:
     @property
     async def models(self) -> Dict[str, ModelEndpoint]:
         return await self.discovery_service.discover_models()
+
+    async def get_model(self, model_id: str) -> Optional[ModelEndpoint]:
+        return await self.discovery_service.get_model(model_id)
 
 
 load_dotenv()
