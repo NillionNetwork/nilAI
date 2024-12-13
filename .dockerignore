@@ -3,4 +3,6 @@
 __pycache__
 nilai.egg-info
 dist
-db/users.sqlite
+db/*
+caddy/caddy_config
+caddy/caddy_data

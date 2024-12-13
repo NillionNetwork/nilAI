@@ -1,7 +1,7 @@
 # gunicorn.config.py
 
 # Bind to address and port
-bind = ["0.0.0.0:8000"]
+bind = "0.0.0.0:8000"
 
 # Set the number of workers (2)
 workers = 2

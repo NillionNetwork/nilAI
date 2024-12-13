@@ -16,7 +16,7 @@ RUN apt-get update && \
     pip install uv && \
     uv sync
 
-EXPOSE 8080 8443
+EXPOSE 8000
 
 # Use shell form to properly expand the environment variable
 CMD uv run gunicorn -c gunicorn.conf.py ${EXEC_PATH}

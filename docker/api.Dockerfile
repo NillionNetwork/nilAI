@@ -8,9 +8,8 @@ RUN go build -o libsevguest.so -buildmode=c-shared main.go
 FROM python:3.12-slim AS nilai
 
 COPY --link . /app/
-
-COPY --from=sev /app/sev/libsevguest.so /app/nilai/sev/libsevguest.so
-COPY --from=sev /app/sev/libsevguest.h /app/nilai/sev/libsevguest.h
+COPY --from=sev /app/sev/libsevguest.so /app/nilai-api/src/nilai_api/sev/libsevguest.so
+COPY --from=sev /app/sev/libsevguest.h /app/nilai-api/src/nilai_api/sev/libsevguest.h
 
 WORKDIR /app/nilai-api/
 
