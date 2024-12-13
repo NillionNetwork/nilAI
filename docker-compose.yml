@@ -14,6 +14,8 @@ services:
       context: .
       dockerfile: docker/api.Dockerfile
       target: nilai
+    depends_on:
+      - etcd
     volumes:
       - ${PWD}/db/:/app/db/   # sqlite database for users
     environment:
@@ -28,6 +30,8 @@ services:
       target: nilai
       args:
         MODEL_NAME: "llama_1b_cpu"
+    depends_on:
+      - etcd
     environment:
       - SVC_HOST=llama_1b_cpu
       - SVC_PORT=8000
@@ -44,8 +48,28 @@ services:
       target: nilai
       args:
         MODEL_NAME: "llama_8b_cpu"
+    depends_on:
+      - etcd
     environment:
       - SVC_HOST=llama_8b_cpu
+      - SVC_PORT=8000
+      - ETCD_HOST=etcd
+      - ETCD_PORT=2379
+    volumes:
+      - hugging_face_models:/root/.cache/huggingface  # cache models
+    networks:
+      - backend_net
+  secret_llama_1b_cpu:
+    build:
+      context: .
+      dockerfile: docker/model.Dockerfile
+      target: nilai
+      args:
+        MODEL_NAME: "secret_llama_1b_cpu"
+    depends_on:
+      - etcd
+    environment:
+      - SVC_HOST=secret_llama_1b_cpu
       - SVC_PORT=8000
       - ETCD_HOST=etcd
       - ETCD_PORT=2379
