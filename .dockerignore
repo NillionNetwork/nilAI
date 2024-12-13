@@ -1,0 +1,8 @@
+.venv
+.ruff_cache
+__pycache__
+nilai.egg-info
+dist
+db/*
+caddy/caddy_config
+caddy/caddy_data

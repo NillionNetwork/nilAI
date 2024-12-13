@@ -1,6 +1,7 @@
+import uuid
 from typing import List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class Message(BaseModel):
@@ -42,8 +43,8 @@ class AttestationResponse(BaseModel):
     gpu_attestation: str  # Base64 encoded GPU attestation
 
 
-class Model(BaseModel):
-    id: str
+class ModelMetadata(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
     version: str
     description: str
@@ -51,6 +52,11 @@ class Model(BaseModel):
     license: str
     source: str
     supported_features: List[str]
+
+
+class ModelEndpoint(BaseModel):
+    url: str
+    metadata: ModelMetadata
 
 
 class HealthCheckResponse(BaseModel):

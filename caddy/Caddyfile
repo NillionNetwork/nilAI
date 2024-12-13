@@ -6,5 +6,5 @@
  
  https://nilai.sandbox.nilogy.xyz {
 	import ssl_config
-	reverse_proxy nilai:8443
+	reverse_proxy api:8443
  }

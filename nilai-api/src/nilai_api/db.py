@@ -1,4 +1,5 @@
 import logging
+import os
 import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -16,9 +17,13 @@ logger = logging.getLogger(__name__)
 
 
 # Database configuration with better defaults and connection pooling
+def get_sqlite_path():
+    return f"sqlite:///{os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))}/db/users.sqlite"
+
+
 class DatabaseConfig:
     # Use environment variables in a real-world scenario
-    DATABASE_URL = "sqlite:///db/users.sqlite"
+    DATABASE_URL = get_sqlite_path()
     POOL_SIZE = 5
     MAX_OVERFLOW = 10
     POOL_TIMEOUT = 30
@@ -215,6 +220,7 @@ class UserManager:
                     logger.warning(f"User {userid} not found")
         except SQLAlchemyError as e:
             logger.error(f"Error updating token usage: {e}")
+            return None
 
     @staticmethod
     def get_all_users() -> Optional[List[UserData]]:

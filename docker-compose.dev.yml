@@ -1,5 +1,5 @@
 services:
-  nilai:
+  api:
     privileged: true
     ports:
       - "8080:8080"

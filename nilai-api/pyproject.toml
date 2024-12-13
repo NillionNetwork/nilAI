@@ -1,0 +1,29 @@
+[project]
+name = "nilai-api"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "José Cabrero-Holgueras", email = "jose.cabrero@nillion.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "accelerate>=1.1.1",
+    "cryptography>=44.0.0",
+    "fastapi[standard]>=0.115.5",
+    "gunicorn>=23.0.0",
+    "nilai-common",
+    "python-dotenv>=1.0.1",
+    "sqlalchemy>=2.0.36",
+    "uvicorn>=0.32.1",
+    "nilai-common",
+    "httpx>=0.27.2",
+]
+
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv.sources]
+nilai-common = { workspace = true }

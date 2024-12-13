@@ -5,10 +5,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-import nilai.db as db
+import nilai_api.db as db
 
 # Import the classes and functions to test
-from nilai.db import Base, UserManager
+from nilai_api.db import Base, UserManager
 
 
 @pytest.fixture(scope="function")
