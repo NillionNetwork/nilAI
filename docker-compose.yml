@@ -37,7 +37,22 @@ services:
       - hugging_face_models:/root/.cache/huggingface  # cache models
     networks:
       - backend_net
-
+  llama_8b_cpu:
+    build:
+      context: .
+      dockerfile: docker/model.Dockerfile
+      target: nilai
+      args:
+        MODEL_NAME: "llama_8b_cpu"
+    environment:
+      - SVC_HOST=llama_8b_cpu
+      - SVC_PORT=8000
+      - ETCD_HOST=etcd
+      - ETCD_PORT=2379
+    volumes:
+      - hugging_face_models:/root/.cache/huggingface  # cache models
+    networks:
+      - backend_net
 volumes:
   hugging_face_models:
 
