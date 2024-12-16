@@ -34,6 +34,7 @@ class Llama8BCpu(Model):
             repo_id="bartowski/Meta-Llama-3-8B-Instruct-GGUF",
             filename="Meta-Llama-3-8B-Instruct-Q5_K_M.gguf",
             n_threads=16,
+            n_ctx=2048,
             verbose=False,
         )
 
