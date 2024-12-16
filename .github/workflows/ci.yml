@@ -32,7 +32,14 @@ jobs:
       - name: Install dependencies
         run: |
           uv sync
-        
+
+      - name: Update dependencies cache
+        if: always() # Ensures cache is updated even if the install fails
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/uv
+          key: ${{ runner.os }}-uv-${{ hashFiles('**/pyproject.toml') }}
+          
       - name: Run Ruff format check
         run: uv run ruff format --check
 
