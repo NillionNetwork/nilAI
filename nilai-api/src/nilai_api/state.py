@@ -5,7 +5,7 @@ from typing import Dict, Optional
 
 from dotenv import load_dotenv
 from nilai_api.crypto import generate_key_pair
-from nilai_api.sev.sev import get_quote, init
+from nilai_api.sev.sev import sev
 from nilai_common import ModelServiceDiscovery, SETTINGS
 from nilai_common.api_model import ModelEndpoint
 
@@ -28,8 +28,8 @@ class AppState:
     def cpu_attestation(self) -> str:
         if self._cpu_quote is None:
             try:
-                init()
-                self._cpu_quote = get_quote()
+                sev.init()
+                self._cpu_quote = sev.get_quote()
             except RuntimeError:
                 self._cpu_quote = "<Non TEE CPU>"
         return self._cpu_quote

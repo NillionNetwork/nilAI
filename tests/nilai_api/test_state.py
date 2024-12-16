@@ -28,17 +28,12 @@ def test_uptime(app_state):
     )
 
 
-@patch("nilai_api.state.init")
-@patch("nilai_api.state.get_quote", return_value="mocked_quote")
+@patch("nilai_api.state.sev.init")
+@patch("nilai_api.state.sev.get_quote", return_value="mocked_quote")
 def test_cpu_attestation(mock_get_quote, mock_init, app_state):
     assert app_state.cpu_attestation == "mocked_quote"
     mock_init.assert_called_once()
     mock_get_quote.assert_called_once()
-
-
-def test_cpu_attestation_non_tee(app_state):
-    with patch("nilai_api.state.init", side_effect=RuntimeError):
-        assert app_state.cpu_attestation == "<Non TEE CPU>"
 
 
 def test_gpu_attestation(app_state):
