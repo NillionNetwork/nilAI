@@ -5,14 +5,14 @@ from nilai_models.model import Model
 from nilai_common import ModelMetadata, ChatRequest, ChatResponse, HealthCheckResponse, ModelEndpoint
 from tests import model_metadata, response, model_endpoint
 
-class TestModel(Model):
+class MyModel(Model):
     async def chat_completion(self, req: ChatRequest) -> ChatResponse:
         return response
 
 @pytest.fixture
 def model_instance():
     metadata = model_metadata
-    return TestModel(metadata)
+    return MyModel(metadata)
 
 @pytest.fixture
 def client(model_instance):
