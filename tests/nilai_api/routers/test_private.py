@@ -14,19 +14,9 @@ from nilai_api.app import app
 from nilai_api.db import UserManager
 from nilai_api.state import state
 
-client = TestClient(app)
-model_metadata = ModelMetadata(
-    id="ABC",  # Unique identifier
-    name="ABC",  # Human-readable name
-    version="1.0",  # Model version
-    description="Description",
-    author="Author",  # Model creators
-    license="License",  # Usage license
-    source="http://test-model-url",  # Model source
-    supported_features=["supported_feature"],  # Capabilities
-)
+from tests import model_metadata, model_endpoint
 
-model_endpoint = ModelEndpoint(url="http://test-model-url", metadata=model_metadata)
+client = TestClient(app)
 
 
 @pytest.mark.asyncio
