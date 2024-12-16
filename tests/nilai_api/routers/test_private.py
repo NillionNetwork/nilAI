@@ -3,8 +3,6 @@ from nilai_common.api_model import (
     ChatResponse,
     Choice,
     Message,
-    ModelEndpoint,
-    ModelMetadata,
     Usage,
 )
 import pytest

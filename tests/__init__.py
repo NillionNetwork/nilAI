@@ -1,4 +1,11 @@
-from nilai_common import ChatResponse, Choice, Message, ModelEndpoint, ModelMetadata, Usage
+from nilai_common import (
+    ChatResponse,
+    Choice,
+    Message,
+    ModelEndpoint,
+    ModelMetadata,
+    Usage,
+)
 
 model_metadata: ModelMetadata = ModelMetadata(
     id="ABC",  # Unique identifier
@@ -11,7 +18,9 @@ model_metadata: ModelMetadata = ModelMetadata(
     supported_features=["supported_feature"],  # Capabilities
 )
 
-model_endpoint: ModelEndpoint = ModelEndpoint(url="http://test-model-url", metadata=model_metadata)
+model_endpoint: ModelEndpoint = ModelEndpoint(
+    url="http://test-model-url", metadata=model_metadata
+)
 
 response: ChatResponse = ChatResponse(
     id="test-id",

@@ -2,6 +2,7 @@ import pytest
 from pydantic import ValidationError
 from nilai_common.api_model import ModelMetadata
 
+
 def test_model_metadata_creation():
     """Test creating a ModelMetadata instance."""
     metadata = ModelMetadata(
@@ -11,7 +12,7 @@ def test_model_metadata_creation():
         author="Test Author",
         license="MIT",
         source="https://example.com",
-        supported_features=["feature1", "feature2"]
+        supported_features=["feature1", "feature2"],
     )
 
     assert metadata.id is not None
@@ -23,6 +24,7 @@ def test_model_metadata_creation():
     assert metadata.source == "https://example.com"
     assert metadata.supported_features == ["feature1", "feature2"]
 
+
 def test_model_metadata_default_id():
     """Test that ModelMetadata generates a default UUID for id."""
     metadata = ModelMetadata(
@@ -32,11 +34,12 @@ def test_model_metadata_default_id():
         author="Test Author",
         license="MIT",
         source="https://example.com",
-        supported_features=["feature1", "feature2"]
+        supported_features=["feature1", "feature2"],
     )
 
     assert metadata.id is not None
     assert len(metadata.id) == 36  # UUID length
+
 
 def test_model_metadata_invalid_data():
     """Test creating ModelMetadata with invalid data."""
@@ -48,4 +51,4 @@ def test_model_metadata_invalid_data():
             author="",
             license="",
             source="",
-        ) # type: ignore
+        )  # type: ignore

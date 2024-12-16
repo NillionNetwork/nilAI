@@ -4,13 +4,15 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from nilai_common.discovery import ModelServiceDiscovery
 from nilai_common.api_model import ModelEndpoint, ModelMetadata
 
+
 @pytest.fixture
 def model_service_discovery():
-    with patch('nilai_common.discovery.Etcd3Client') as MockClient:
+    with patch("nilai_common.discovery.Etcd3Client") as MockClient:
         mock_client = MockClient.return_value
         discovery = ModelServiceDiscovery()
         discovery.client = mock_client
         yield discovery
+
 
 @pytest.fixture
 def model_endpoint():
@@ -27,6 +29,7 @@ def model_endpoint():
         url="http://test-model-service.example.com/predict", metadata=model_metadata
     )
 
+
 @pytest.mark.asyncio
 async def test_register_model(model_service_discovery, model_endpoint):
     lease_mock = MagicMock()
@@ -37,14 +40,15 @@ async def test_register_model(model_service_discovery, model_endpoint):
     model_service_discovery.client.put.assert_called_once_with(
         f"/models/{model_endpoint.metadata.id}",
         model_endpoint.model_dump_json(),
-        lease=lease_mock
+        lease=lease_mock,
     )
     assert lease == lease_mock
+
 
 @pytest.mark.asyncio
 async def test_discover_models(model_service_discovery, model_endpoint):
     model_service_discovery.client.get_prefix.return_value = [
-        (model_endpoint.model_dump_json().encode('utf-8'), None)
+        (model_endpoint.model_dump_json().encode("utf-8"), None)
     ]
 
     discovered_models = await model_service_discovery.discover_models()
@@ -53,19 +57,27 @@ async def test_discover_models(model_service_discovery, model_endpoint):
     assert model_endpoint.metadata.id in discovered_models
     assert discovered_models[model_endpoint.metadata.id] == model_endpoint
 
+
 @pytest.mark.asyncio
 async def test_get_model(model_service_discovery, model_endpoint):
-    model_service_discovery.client.get.return_value = (model_endpoint.model_dump_json().encode('utf-8'), None)
+    model_service_discovery.client.get.return_value = (
+        model_endpoint.model_dump_json().encode("utf-8"),
+        None,
+    )
 
     model = await model_service_discovery.get_model(model_endpoint.metadata.id)
 
     assert model == model_endpoint
 
+
 @pytest.mark.asyncio
 async def test_unregister_model(model_service_discovery, model_endpoint):
     await model_service_discovery.unregister_model(model_endpoint.metadata.id)
 
-    model_service_discovery.client.delete.assert_called_once_with(f"/models/{model_endpoint.metadata.id}")
+    model_service_discovery.client.delete.assert_called_once_with(
+        f"/models/{model_endpoint.metadata.id}"
+    )
+
 
 @pytest.mark.asyncio
 async def test_keep_alive(model_service_discovery):

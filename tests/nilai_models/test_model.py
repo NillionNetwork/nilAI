@@ -1,22 +1,26 @@
-from nilai_common.api_model import Choice, Message, Usage
+from nilai_common.api_model import Message
 import pytest
 from fastapi.testclient import TestClient
 from nilai_models.model import Model
-from nilai_common import ModelMetadata, ChatRequest, ChatResponse, HealthCheckResponse, ModelEndpoint
-from tests import model_metadata, response, model_endpoint
+from nilai_common import ChatRequest, ChatResponse
+from tests import model_metadata, response
+
 
 class MyModel(Model):
     async def chat_completion(self, req: ChatRequest) -> ChatResponse:
         return response
+
 
 @pytest.fixture
 def model_instance():
     metadata = model_metadata
     return MyModel(metadata)
 
+
 @pytest.fixture
 def client(model_instance):
     return TestClient(model_instance.get_app())
+
 
 def test_model_info(client):
     response = client.get("/v1/models")
@@ -26,6 +30,7 @@ def test_model_info(client):
     assert data["name"] == "ABC"
     assert data["description"] == "Description"
 
+
 def test_health_check(client):
     response = client.get("/v1/health")
     assert response.status_code == 200
@@ -33,13 +38,14 @@ def test_health_check(client):
     assert data["status"] == "healthy"
     assert "uptime" in data
 
+
 def test_chat_completion(client):
     request = ChatRequest(
         model="ABC",
         messages=[
             Message(role="system", content="You are a helpful assistant"),
-            Message(role="user", content="Hello, who are you?")
-        ]
+            Message(role="user", content="Hello, who are you?"),
+        ],
     )
     response = client.post("/v1/chat/completions", json=request.model_dump())
     assert response.status_code == 200
