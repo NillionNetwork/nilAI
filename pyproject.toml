@@ -17,9 +17,11 @@ dependencies = [
 dev = [
     "black>=24.10.0",
     "isort>=5.13.2",
+    "pytest-mock>=3.14.0",
     "pytest>=8.3.3",
     "ruff>=0.8.0",
     "uvicorn>=0.32.1",
+    "pytest-asyncio>=0.25.0",
 ]
 
 [build-system]

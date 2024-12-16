@@ -22,7 +22,7 @@ class AppState:
         )
         self._uptime = time.time()
         self._cpu_quote = None
-        self._gpu_quote = None
+        self._gpu_quote = "<No GPU>"
 
     @property
     def cpu_attestation(self) -> str:
@@ -36,7 +36,7 @@ class AppState:
 
     @property
     def gpu_attestation(self) -> str:
-        return "<No GPU>"
+        return self._gpu_quote
 
     @property
     def uptime(self):
