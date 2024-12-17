@@ -1,18 +1,14 @@
-from unittest.mock import AsyncMock
-from nilai_common.api_model import (
-    ChatResponse,
-    Choice,
-    Message,
-    Usage,
-)
-import pytest
 import asyncio
+from unittest.mock import AsyncMock
+
+import pytest
 from fastapi.testclient import TestClient
 from nilai_api.app import app
 from nilai_api.db import UserManager
 from nilai_api.state import state
+from nilai_common.api_model import ChatResponse, Choice, Message, Usage
 
-from tests import model_metadata, model_endpoint
+from tests import model_endpoint, model_metadata
 
 client = TestClient(app)
 

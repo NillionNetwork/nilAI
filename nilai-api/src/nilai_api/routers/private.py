@@ -2,9 +2,11 @@
 import logging
 import os
 from base64 import b64encode
+from typing import AsyncGenerator, Union
 
 import httpx
 from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from nilai_api.auth import get_user
 from nilai_api.crypto import sign_message
 from nilai_api.db import UserManager
@@ -83,7 +85,7 @@ async def get_models(user: dict = Depends(get_user)) -> list[ModelMetadata]:
     return [endpoint.metadata for endpoint in (await state.models).values()]
 
 
-@router.post("/v1/chat/completions", tags=["Chat"])
+@router.post("/v1/chat/completions", tags=["Chat"], response_model=None)
 async def chat_completion(
     req: ChatRequest = Body(
         ChatRequest(
@@ -95,7 +97,7 @@ async def chat_completion(
         )
     ),
     user: dict = Depends(get_user),
-) -> ChatResponse:
+) -> Union[ChatResponse, StreamingResponse]:
     """
     Generate a chat completion response from the AI model.
 
@@ -148,6 +150,40 @@ async def chat_completion(
         )
 
     model_url = endpoint.url
+
+    if req.stream:
+        # Forwarding Streamed Responses
+        async def stream_response() -> AsyncGenerator[str, None]:
+            try:
+                async with httpx.AsyncClient() as client:
+                    async with client.stream(
+                        "POST",
+                        f"{model_url}/v1/chat/completions",
+                        json=req.model_dump(),
+                        timeout=60.0,
+                    ) as response:
+                        response.raise_for_status()  # Raise an error for invalid status codes
+
+                        # Process the streamed response chunks
+                        async for chunk in response.aiter_lines():
+                            if chunk:  # Skip empty lines
+                                yield f"{chunk}\n"
+            except httpx.HTTPStatusError as e:
+                raise HTTPException(
+                    status_code=e.response.status_code,
+                    detail=e.response.json().get("detail", str(e)),
+                )
+            except httpx.RequestError as e:
+                raise HTTPException(
+                    status_code=503,
+                    detail=f"Error connecting to model service: {str(e)}",
+                )
+
+        # Return the streaming response
+        return StreamingResponse(
+            stream_response(),
+            media_type="text/event-stream",  # Ensure client interprets as Server-Sent Events
+        )
 
     try:
         async with httpx.AsyncClient() as client:

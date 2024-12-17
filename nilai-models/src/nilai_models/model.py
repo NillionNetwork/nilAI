@@ -13,10 +13,10 @@ from nilai_common import ChatResponse  # Response type for chat completions
 from nilai_common import HealthCheckResponse  # Custom response type for health checks
 from nilai_common import ModelEndpoint  # Endpoint information for model registration
 from nilai_common import ModelMetadata  # Metadata about the model
-from nilai_common import (
+from nilai_common import (  # Model service discovery and host settings
     SETTINGS,
     ModelServiceDiscovery,
-)  # Model service discovery and host settings
+)
 
 logger = logging.getLogger(__name__)
 

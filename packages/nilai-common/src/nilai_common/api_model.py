@@ -12,6 +12,26 @@ class Message(BaseModel):
 class ChatRequest(BaseModel):
     model: str
     messages: List[Message]
+    temperature: Optional[float] = 0.2
+    max_tokens: Optional[int] = None
+    stream: Optional[bool] = False
+
+
+class ChoiceChunkContent(BaseModel):
+    content: Optional[str]
+
+
+class ChoiceChunk(BaseModel):
+    """Choice chunk."""
+
+    index: int
+    delta: ChoiceChunkContent
+
+
+class ChatCompletionChunk(BaseModel):
+    """Chat completion chunk."""
+
+    choices: List[ChoiceChunk]
 
 
 class Choice(BaseModel):

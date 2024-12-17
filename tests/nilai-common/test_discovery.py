@@ -1,8 +1,9 @@
-import pytest
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
-from nilai_common.discovery import ModelServiceDiscovery
+
+import pytest
 from nilai_common.api_model import ModelEndpoint, ModelMetadata
+from nilai_common.discovery import ModelServiceDiscovery
 
 
 @pytest.fixture

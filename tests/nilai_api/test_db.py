@@ -1,14 +1,13 @@
 import uuid
 
-import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
-
 import nilai_api.db as db
+import pytest
 
 # Import the classes and functions to test
 from nilai_api.db import Base, UserManager
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 
 @pytest.fixture(scope="function")

@@ -27,7 +27,7 @@ docker build -t nillion/nilai-models:latest -f docker/model.Dockerfile --build-a
 
 ## Running etcd
 
-```
+```sh
 docker run -d --name etcd-server \
     --publish 2379:2379 \
     --publish 2380:2380 \

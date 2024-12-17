@@ -1,8 +1,9 @@
+from unittest.mock import AsyncMock
+
 import pytest
 from fastapi import HTTPException
-from unittest.mock import AsyncMock
+from nilai_common import ChatRequest, ChatResponse, Message
 from nilai_models.models.llama_1b_cpu.llama_1b_cpu import Llama1BCpu
-from nilai_common import ChatRequest, Message, ChatResponse
 
 from tests import response as RESPONSE
 

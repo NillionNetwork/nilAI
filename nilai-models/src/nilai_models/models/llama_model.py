@@ -1,4 +1,7 @@
+import json
+import logging
 from typing import Any, Generator
+
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
 from nilai_common import ChatRequest, ChatResponse, Message
@@ -69,33 +72,43 @@ class LlamaCppModel(Model):
         if req.stream:
 
             def generate() -> Generator[str, Any, None]:
-                # Create a generator for the streamed output
-                for output in self.model.create_chat_completion(
-                    prompt,  # type: ignore
-                    stream=True,
-                    temperature=req.temperature if req.temperature else 0.2,
-                    max_tokens=req.max_tokens,
-                ):
-                    # Extract delta content from output
-                    choices = output.get("choices", [])  # type: ignore
-                    if not choices or "delta" not in choices[0]:
-                        continue  # Skip invalid chunks
-                    # Extract delta
-                    delta = choices[0]["delta"]
-                    chunk = ChoiceChunk(
-                        index=delta.get("index", 0),
-                        delta=ChoiceChunkContent(content=delta.get("content", "")),
-                    )  # Create a ChoiceChunk
-                    completion_chunk = ChatCompletionChunk(choices=[chunk])
-                    yield f"data: {completion_chunk.model_dump_json()}\n\n"  # Stream the chunk
+                try:
+                    # Create a generator for the streamed output
+                    for output in self.model.create_chat_completion(
+                        prompt,  # type: ignore
+                        stream=True,
+                        temperature=req.temperature if req.temperature else 0.2,
+                        max_tokens=req.max_tokens,
+                    ):
+                        # Extract delta content from output
+                        choices = output.get("choices", [])  # type: ignore
+                        if not choices or "delta" not in choices[0]:
+                            continue  # Skip invalid chunks
+                        # Extract delta
+                        delta = choices[0]["delta"]
+                        chunk = ChoiceChunk(
+                            index=delta.get("index", 0),
+                            delta=ChoiceChunkContent(content=delta.get("content", "")),
+                        )  # Create a ChoiceChunk
+                        completion_chunk = ChatCompletionChunk(choices=[chunk])
+                        yield f"data: {completion_chunk.model_dump_json()}\n\n"  # Stream the chunk
 
-                yield "data: [DONE]\n\n"
+                    yield "data: [DONE]\n\n"
+                except Exception as e:
+                    logging.error("An error occurred: %s", str(e))
+                    yield f"data: {json.dumps({'error': 'Internal error occurred!'})}\n\n"
 
             # Return the streamed response with headers
             return StreamingResponse(generate(), media_type="text/event-stream")
 
         # Non-streaming (regular) chat completion
-        generation: dict = self.model.create_chat_completion(prompt)  # type: ignore
+        try:
+            generation: dict = self.model.create_chat_completion(prompt)  # type: ignore
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail="The prompt size exceeds the maximum limit of 2048 tokens.",
+            )
         if not generation or len(generation) == 0:
             raise ValueError("The model returned no output.")
 
