@@ -1,5 +1,5 @@
 from fastapi import HTTPException, Security, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from nilai_api.db import UserManager
 
 UserManager.initialize_db()

@@ -1,7 +1,7 @@
 import base64
 import ctypes
-import os
 import logging
+import os
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -43,6 +43,9 @@ class SEVGuest:
         if not self.lib:
             logger.warning("SEV library not loaded, running in mock mode")
             return True
+        if self.lib.Init() != 0:
+            self.lib = None
+            return False
         return self.lib.Init() == 0
 
     def get_quote(self, report_data: Optional[bytes] = None) -> str:

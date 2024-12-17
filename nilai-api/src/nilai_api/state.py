@@ -6,7 +6,7 @@ from typing import Dict, Optional
 from dotenv import load_dotenv
 from nilai_api.crypto import generate_key_pair
 from nilai_api.sev.sev import sev
-from nilai_common import ModelServiceDiscovery, SETTINGS
+from nilai_common import SETTINGS, ModelServiceDiscovery
 from nilai_common.api_model import ModelEndpoint
 
 logger = logging.getLogger("uvicorn.error")

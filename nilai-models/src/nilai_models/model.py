@@ -4,17 +4,19 @@ import logging
 import time  # For tracking uptime and time-related calculations
 from abc import ABC, abstractmethod  # Abstract Base Class to define interfaces
 from contextlib import asynccontextmanager  # For managing async context
+from typing import Union  # For type hinting
 
 from fastapi import FastAPI  # Web framework for creating API endpoints
+from fastapi.responses import StreamingResponse
 from nilai_common import ChatRequest  # Request type for chat interactions
 from nilai_common import ChatResponse  # Response type for chat completions
 from nilai_common import HealthCheckResponse  # Custom response type for health checks
 from nilai_common import ModelEndpoint  # Endpoint information for model registration
 from nilai_common import ModelMetadata  # Metadata about the model
-from nilai_common import (
+from nilai_common import (  # Model service discovery and host settings
     SETTINGS,
     ModelServiceDiscovery,
-)  # Model service discovery and host settings
+)
 
 logger = logging.getLogger(__name__)
 
@@ -85,9 +87,8 @@ class Model(ABC):
         by child classes to add custom routes.
         """
 
-        # Chat completion endpoint
-        @self.app.post("/v1/chat/completions")
-        async def chat(req: ChatRequest) -> ChatResponse:
+        @self.app.post("/v1/chat/completions", response_model=None)
+        async def chat(req: ChatRequest) -> Union[ChatResponse, StreamingResponse]:
             return await self.chat_completion(req)
 
         # Health check endpoint
@@ -98,11 +99,12 @@ class Model(ABC):
         # Model information endpoint
         @self.app.get("/v1/models")
         async def model_info() -> ModelMetadata:
-            print("model_info")
             return await self.model_info()
 
     @abstractmethod
-    async def chat_completion(self, req: ChatRequest) -> ChatResponse:
+    async def chat_completion(
+        self, req: ChatRequest
+    ) -> ChatResponse | StreamingResponse:
         """
         Abstract method for generating chat completions.
 

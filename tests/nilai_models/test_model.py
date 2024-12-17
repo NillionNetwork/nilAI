@@ -1,8 +1,9 @@
-from nilai_common.api_model import Message
 import pytest
 from fastapi.testclient import TestClient
-from nilai_models.model import Model
 from nilai_common import ChatRequest, ChatResponse
+from nilai_common.api_model import Message
+from nilai_models.model import Model
+
 from tests import model_metadata, response
 
 

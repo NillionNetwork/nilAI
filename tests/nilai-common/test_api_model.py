@@ -1,6 +1,6 @@
 import pytest
-from pydantic import ValidationError
 from nilai_common.api_model import ModelMetadata
+from pydantic import ValidationError
 
 
 def test_model_metadata_creation():

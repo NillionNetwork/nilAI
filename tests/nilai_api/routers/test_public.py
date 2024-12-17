@@ -1,6 +1,6 @@
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from nilai_api.routers.public import router
-from fastapi import FastAPI
 
 app = FastAPI()
 app.include_router(router)
