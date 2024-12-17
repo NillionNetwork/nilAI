@@ -12,11 +12,15 @@ dependencies = [
     "cryptography>=44.0.0",
     "fastapi[standard]>=0.115.5",
     "gunicorn>=23.0.0",
+    "langchain-community>=0.3.12",
+    "langchain>=0.3.12",
     "llama-cpp-python>=0.3.2",
     "nilai-common",
     "torch>=2.5.1",
     "transformers>=4.46.3",
     "uvicorn>=0.32.1",
+    "langchain-core>=0.3.25",
+    "tiktoken>=0.8.0",
 ]
 
 [build-system]
