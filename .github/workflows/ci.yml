@@ -17,11 +17,11 @@ jobs:
         with:
           enable-cache: true
           cache-dependency-glob: "**/pyproject.toml"
-          
+
       - name: Cache dependencies
         uses: actions/cache@v3
         with:
-          path: ~/.cache/uv
+          path: ${{ env.UV_CACHE_DIR }}
           key: ${{ runner.os }}-uv-${{ hashFiles('**/pyproject.toml') }}
           restore-keys: |
             ${{ runner.os }}-uv-
