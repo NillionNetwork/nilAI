@@ -6,3 +6,4 @@ dist
 db/*
 caddy/caddy_config
 caddy/caddy_data
+tests/

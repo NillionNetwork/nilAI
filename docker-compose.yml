@@ -1,21 +1,28 @@
+version: '3.8'
+
 services:
   etcd:
     image: 'bitnami/etcd:latest'
     environment:
       - ALLOW_NONE_AUTHENTICATION=yes
       - ETCD_ADVERTISE_CLIENT_URLS=http://etcd:2379
-    # ports:
-    #   - 2379:2379
-    #   - 2380:2380
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
     networks:
       - backend_net
+
   api:
     build: 
       context: .
       dockerfile: docker/api.Dockerfile
       target: nilai
     depends_on:
-      - etcd
+      etcd:
+        condition: service_healthy
     volumes:
       - ${PWD}/db/:/app/db/   # sqlite database for users
     environment:
@@ -23,6 +30,7 @@ services:
       - ETCD_PORT=2379
     networks:
       - backend_net
+
   llama_1b_cpu:
     build:
       context: .
@@ -31,7 +39,8 @@ services:
       args:
         MODEL_NAME: "llama_1b_cpu"
     depends_on:
-      - etcd
+      etcd:
+        condition: service_healthy
     environment:
       - SVC_HOST=llama_1b_cpu
       - SVC_PORT=8000
@@ -41,6 +50,7 @@ services:
       - hugging_face_models:/root/.cache/huggingface  # cache models
     networks:
       - backend_net
+
   llama_8b_cpu:
     build:
       context: .
@@ -49,7 +59,8 @@ services:
       args:
         MODEL_NAME: "llama_8b_cpu"
     depends_on:
-      - etcd
+      etcd:
+        condition: service_healthy
     environment:
       - SVC_HOST=llama_8b_cpu
       - SVC_PORT=8000
@@ -59,6 +70,7 @@ services:
       - hugging_face_models:/root/.cache/huggingface  # cache models
     networks:
       - backend_net
+
   secret_llama_1b_cpu:
     build:
       context: .
@@ -67,7 +79,8 @@ services:
       args:
         MODEL_NAME: "secret_llama_1b_cpu"
     depends_on:
-      - etcd
+      etcd:
+        condition: service_healthy
     environment:
       - SVC_HOST=secret_llama_1b_cpu
       - SVC_PORT=8000
@@ -77,6 +90,7 @@ services:
       - hugging_face_models:/root/.cache/huggingface  # cache models
     networks:
       - backend_net
+
 volumes:
   hugging_face_models:
 
