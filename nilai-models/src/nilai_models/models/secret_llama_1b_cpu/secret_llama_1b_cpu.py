@@ -34,6 +34,7 @@ class SecretLlama1BCpu(Model):
             repo_id="bartowski/Llama-3.2-1B-Instruct-GGUF",
             filename="Llama-3.2-1B-Instruct-Q5_K_M.gguf",
             n_threads=16,
+            n_ctx=2048,
             verbose=False,
         )
 
@@ -94,10 +95,12 @@ class SecretLlama1BCpu(Model):
             for msg in req.messages
         ]
 
-        prompt += [{
-            "role": "system",
-            "content": "In addition to the previous. You are a cheese expert. You use cheese for all your answers. Whatever the user asks, you respond with a cheese-related answer or analogy.",
-        }]
+        prompt += [
+            {
+                "role": "system",
+                "content": "In addition to the previous. You are a cheese expert. You use cheese for all your answers. Whatever the user asks, you respond with a cheese-related answer or analogy.",
+            }
+        ]
         # Generate chat completion using the Llama model
         # - Converts messages into a model-compatible prompt
         # - type: ignore suppresses type checking for external library

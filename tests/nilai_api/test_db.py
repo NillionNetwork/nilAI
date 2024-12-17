@@ -79,8 +79,8 @@ class TestUserManager:
         # Verify user can be retrieved
         retrieved_user_tokens = user_manager.get_user_token_usage(user_data["userid"])
         assert retrieved_user_tokens is not None
-        assert retrieved_user_tokens["input_tokens"] == 0
-        assert retrieved_user_tokens["generated_tokens"] == 0
+        assert retrieved_user_tokens["prompt_tokens"] == 0
+        assert retrieved_user_tokens["completion_tokens"] == 0
 
     def test_check_api_key(self, user_manager):
         """Test API key validation."""
@@ -89,7 +89,8 @@ class TestUserManager:
 
         # Check valid API key
         user_name = user_manager.check_api_key(user_data["apikey"])
-        assert user_name == "Check API User"
+        assert user_name["name"] == "Check API User"
+        assert user_name["userid"] == user_data["userid"]
 
         # Check invalid API key
         invalid_result = user_manager.check_api_key("invalid-api-key")
@@ -102,24 +103,24 @@ class TestUserManager:
 
         # Update token usage
         user_manager.update_token_usage(
-            user_data["userid"], input_tokens=100, generated_tokens=50
+            user_data["userid"], prompt_tokens=100, completion_tokens=50
         )
 
         # Verify token usage
         token_usage = user_manager.get_user_token_usage(user_data["userid"])
         assert token_usage is not None
-        assert token_usage["input_tokens"] == 100
-        assert token_usage["generated_tokens"] == 50
+        assert token_usage["prompt_tokens"] == 100
+        assert token_usage["completion_tokens"] == 50
 
         # Update again to check cumulative effect
         user_manager.update_token_usage(
-            user_data["userid"], input_tokens=50, generated_tokens=25
+            user_data["userid"], prompt_tokens=50, completion_tokens=25
         )
 
         token_usage = user_manager.get_user_token_usage(user_data["userid"])
         assert token_usage is not None
-        assert token_usage["input_tokens"] == 150
-        assert token_usage["generated_tokens"] == 75
+        assert token_usage["prompt_tokens"] == 150
+        assert token_usage["completion_tokens"] == 75
 
     def test_get_all_users(self, user_manager):
         """Test retrieving all users."""

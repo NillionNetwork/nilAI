@@ -1,0 +1,40 @@
+name: Python Tests
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main"] # Adjust branches as needed
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: "**/pyproject.toml"
+
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.UV_CACHE_DIR }}
+          key: ${{ runner.os }}-uv-${{ hashFiles('**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-
+
+      - name: Install dependencies
+        run: |
+          uv sync
+          
+      - name: Run Ruff format check
+        run: uv run ruff format --check
+
+      - name: Run Ruff linting
+        run: uv run ruff check
+      
+      - name: Run tests
+        run: uv run pytest -v

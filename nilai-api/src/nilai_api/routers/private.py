@@ -30,7 +30,7 @@ async def get_usage(user: dict = Depends(get_user)) -> Usage:
     """
     Retrieve the current token usage for the authenticated user.
 
-    - **user**: Authenticated user information (through X-API-Key header)
+    - **user**: Authenticated user information (through HTTP Bearer header)
     - **Returns**: Usage statistics for the user's token consumption
 
     ### Example
@@ -47,7 +47,7 @@ async def get_attestation(user: dict = Depends(get_user)) -> AttestationResponse
     """
     Generate a cryptographic attestation report.
 
-    - **user**: Authenticated user information (through X-API-Key header)
+    - **user**: Authenticated user information (through HTTP Bearer header)
     - **Returns**: Attestation details for service verification
 
     ### Attestation Details
@@ -70,7 +70,7 @@ async def get_models(user: dict = Depends(get_user)) -> list[ModelMetadata]:
     """
     List all available models in the system.
 
-    - **user**: Authenticated user information (through X-API-Key header)
+    - **user**: Authenticated user information (through HTTP Bearer header)
     - **Returns**: Dictionary of available models
 
     ### Example
@@ -100,7 +100,7 @@ async def chat_completion(
     Generate a chat completion response from the AI model.
 
     - **req**: Chat completion request containing messages and model specifications
-    - **user**: Authenticated user information (through X-API-Key header)
+    - **user**: Authenticated user information (through HTTP Bearer header)
     - **Returns**: Full chat response with model output, usage statistics, and cryptographic signature
 
     ### Request Requirements

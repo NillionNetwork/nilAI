@@ -2,6 +2,7 @@ from nilai_common.api_model import (
     AttestationResponse,
     ChatRequest,
     ChatResponse,
+    Choice,
     HealthCheckResponse,
     Message,
     ModelEndpoint,
@@ -9,12 +10,13 @@ from nilai_common.api_model import (
     Usage,
 )
 from nilai_common.config import SETTINGS
-from nilai_common.db import ModelServiceDiscovery
+from nilai_common.discovery import ModelServiceDiscovery
 
 __all__ = [
     "Message",
     "ChatRequest",
     "ChatResponse",
+    "Choice",
     "ModelMetadata",
     "Usage",
     "AttestationResponse",
