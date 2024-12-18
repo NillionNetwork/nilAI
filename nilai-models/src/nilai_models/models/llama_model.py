@@ -1,6 +1,7 @@
+import asyncio
 import json
 import logging
-from typing import Any, Generator
+from typing import AsyncGenerator
 
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
@@ -71,15 +72,20 @@ class LlamaCppModel(Model):
         # Streaming response logic
         if req.stream:
 
-            def generate() -> Generator[str, Any, None]:
+            async def generate() -> AsyncGenerator[str, None]:
                 try:
                     # Create a generator for the streamed output
-                    for output in self.model.create_chat_completion(
-                        prompt,  # type: ignore
-                        stream=True,
-                        temperature=req.temperature if req.temperature else 0.2,
-                        max_tokens=req.max_tokens,
-                    ):
+                    loop = asyncio.get_event_loop()
+                    output_generator = await loop.run_in_executor(
+                        None,
+                        lambda: self.model.create_chat_completion(
+                            prompt,  # type: ignore
+                            stream=True,
+                            temperature=req.temperature if req.temperature else 0.2,
+                            max_tokens=req.max_tokens,
+                        ),
+                    )
+                    for output in output_generator:
                         # Extract delta content from output
                         choices = output.get("choices", [])  # type: ignore
                         if not choices or "delta" not in choices[0]:
@@ -92,6 +98,7 @@ class LlamaCppModel(Model):
                         )  # Create a ChoiceChunk
                         completion_chunk = ChatCompletionChunk(choices=[chunk])
                         yield f"data: {completion_chunk.model_dump_json()}\n\n"  # Stream the chunk
+                        await asyncio.sleep(0)  # Add an await to return inmediately
 
                     yield "data: [DONE]\n\n"
                 except Exception as e:
