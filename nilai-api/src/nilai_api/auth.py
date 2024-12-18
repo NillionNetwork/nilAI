@@ -9,7 +9,6 @@ bearer_scheme = HTTPBearer()
 
 def get_user(credentials: HTTPAuthorizationCredentials = Security(bearer_scheme)):
     token = credentials.credentials
-    print(token)
     user = UserManager.check_api_key(token)
     if user:
         return user
