@@ -86,7 +86,6 @@ class LlamaCppModel(Model):
                         ),
                     )
                     for output in output_generator:
-
                         # Extract delta content from output
                         choices = output.get("choices", [])  # type: ignore
                         if not choices or "delta" not in choices[0]:
