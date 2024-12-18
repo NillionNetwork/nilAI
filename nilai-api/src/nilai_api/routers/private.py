@@ -169,7 +169,9 @@ async def chat_completion(
                         async for chunk in response.aiter_lines():
                             if chunk:  # Skip empty lines
                                 yield f"{chunk}\n"
-                                await asyncio.sleep(0)  # Add an await to return inmediately
+                                await asyncio.sleep(
+                                    0
+                                )  # Add an await to return inmediately
             except httpx.HTTPStatusError as e:
                 raise HTTPException(
                     status_code=e.response.status_code,

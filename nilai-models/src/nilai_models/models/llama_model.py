@@ -1,7 +1,7 @@
 import asyncio
 import json
 import logging
-from typing import Any, AsyncGenerator, Generator
+from typing import AsyncGenerator
 
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
@@ -72,7 +72,7 @@ class LlamaCppModel(Model):
         # Streaming response logic
         if req.stream:
 
-            async def generate()-> AsyncGenerator[str, None]:
+            async def generate() -> AsyncGenerator[str, None]:
                 try:
                     # Create a generator for the streamed output
                     loop = asyncio.get_event_loop()
@@ -83,7 +83,7 @@ class LlamaCppModel(Model):
                             stream=True,
                             temperature=req.temperature if req.temperature else 0.2,
                             max_tokens=req.max_tokens,
-                        )
+                        ),
                     )
                     for output in output_generator:
                         # Extract delta content from output
