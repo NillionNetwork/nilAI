@@ -161,7 +161,7 @@ async def chat_completion(
                         "POST",
                         f"{model_url}/v1/chat/completions",
                         json=req.model_dump(),
-                        timeout=60.0,
+                        timeout=None,
                     ) as response:
                         response.raise_for_status()  # Raise an error for invalid status codes
 
@@ -192,7 +192,7 @@ async def chat_completion(
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(
-                f"{model_url}/v1/chat/completions", json=req.model_dump(), timeout=60.0
+                f"{model_url}/v1/chat/completions", json=req.model_dump(), timeout=None
             )
             response.raise_for_status()
             model_response = ChatResponse.model_validate_json(response.content)

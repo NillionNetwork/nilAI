@@ -7,11 +7,12 @@ from nilai_models.models.llama_1b_cpu.llama_1b_cpu import Llama1BCpu
 
 from tests import response as RESPONSE
 
+model = Llama1BCpu()
+
 
 @pytest.fixture
 def llama_model(mocker):
     """Fixture to provide a Llama1BCpu instance for testing."""
-    model = Llama1BCpu()
     mocker.patch.object(model, "chat_completion", new_callable=AsyncMock)
     return model
 

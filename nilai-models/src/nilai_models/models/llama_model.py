@@ -82,7 +82,7 @@ class LlamaCppModel(Model):
                             prompt,  # type: ignore
                             stream=True,
                             temperature=req.temperature if req.temperature else 0.2,
-                            max_tokens=req.max_tokens,
+                            max_tokens=req.max_tokens if req.max_tokens else 2048,
                         ),
                     )
                     for output in output_generator:
@@ -110,7 +110,11 @@ class LlamaCppModel(Model):
 
         # Non-streaming (regular) chat completion
         try:
-            generation: dict = self.model.create_chat_completion(prompt)  # type: ignore
+            generation: dict = self.model.create_chat_completion(
+                prompt,
+                temperature=req.temperature if req.temperature else 0.2,
+                max_tokens=req.max_tokens if req.max_tokens else 2048,
+            )  # type: ignore
         except ValueError:
             raise HTTPException(
                 status_code=400,
