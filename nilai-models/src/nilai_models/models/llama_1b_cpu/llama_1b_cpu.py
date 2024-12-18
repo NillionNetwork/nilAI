@@ -26,7 +26,7 @@ class Llama1BCpu(LlamaCppModel):
                 repo_id="bartowski/Llama-3.2-1B-Instruct-GGUF",
                 filename="Llama-3.2-1B-Instruct-Q5_K_S.gguf",
                 n_threads=16,
-                n_ctx=2048,
+                n_ctx=128 * 1024,
                 verbose=False,
             ),
             metadata=ModelMetadata(

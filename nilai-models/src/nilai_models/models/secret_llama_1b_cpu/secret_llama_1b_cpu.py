@@ -27,7 +27,7 @@ class SecretLlama1BCpu(LlamaCppModel):
                 repo_id="bartowski/Llama-3.2-1B-Instruct-GGUF",
                 filename="Llama-3.2-1B-Instruct-Q5_K_S.gguf",
                 n_threads=16,
-                n_ctx=2048,
+                n_ctx=128 * 1024,
                 verbose=False,
             ),
             metadata=ModelMetadata(
@@ -40,7 +40,7 @@ class SecretLlama1BCpu(LlamaCppModel):
                 source="https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF",  # Model source
                 supported_features=["chat_completion"],  # Capabilities
             ),
-            prefix="d01fe399-8dc2-4c74-acde-ff649802f437",
+            prefix="nillion/",
         )
 
     async def chat_completion(
