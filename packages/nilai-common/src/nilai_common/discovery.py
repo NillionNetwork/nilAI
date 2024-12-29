@@ -2,6 +2,11 @@ import asyncio
 import logging
 from typing import Dict, Optional
 
+from asyncio import CancelledError
+from datetime import datetime
+from tenacity import retry, wait_exponential, stop_after_attempt
+
+
 from etcd3gw import Lease
 from etcd3gw.client import Etcd3Client
 from nilai_common.api_model import ModelEndpoint, ModelMetadata
@@ -19,8 +24,22 @@ class ModelServiceDiscovery:
         :param port: etcd server port
         :param lease_ttl: Lease time for endpoint registration (in seconds)
         """
-        self.client = Etcd3Client(host=host, port=port)
+        self.host = host
+        self.port = port
         self.lease_ttl = lease_ttl
+        self.initialize()
+
+        self.is_healthy = True
+        self.last_refresh = None
+        self.max_retries = 3
+        self.base_delay = 1
+        self._shutdown = False
+
+    def initialize(self):
+        """
+        Initialize the etcd client.
+        """
+        self.client = Etcd3Client(host=self.host, port=self.port)
 
     async def register_model(
         self, model_endpoint: ModelEndpoint, prefix: str = "/models"
@@ -105,19 +124,35 @@ class ModelServiceDiscovery:
         key = f"/models/{model_id}"
         self.client.delete(key)
 
-    async def keep_alive(self, lease: Lease):
-        """
-        Keep the model registration lease alive.
+    @retry(wait=wait_exponential(multiplier=1, min=4, max=10),
+           stop=stop_after_attempt(3))
+    async def _refresh_lease(self, lease):
+        lease.refresh()
+        self.last_refresh = datetime.now()
+        self.is_healthy = True
 
-        :param lease_id: Lease ID to keep alive
-        """
-        while True:
-            try:
-                lease.refresh()
-                await asyncio.sleep(self.lease_ttl // 2)
-            except Exception as e:
-                logger.error(f"Lease keepalive failed: {e}")
-                break
+    async def keep_alive(self, lease):
+        """Keep the model registration lease alive with graceful shutdown."""
+        try:
+            while not self._shutdown:
+                try:
+                    await self._refresh_lease(lease)
+                    await asyncio.sleep(self.lease_ttl // 2)
+                except Exception as e:
+                    self.is_healthy = False
+                    logger.error(f"Lease keepalive failed: {e}")
+                    try:
+                        self.initialize()
+                        lease.client = self.client
+                    except Exception as init_error:
+                        logger.error(f"Reinitialization failed: {init_error}")
+                        await asyncio.sleep(self.base_delay)
+        except CancelledError:
+            logger.info("Lease keepalive task cancelled, shutting down...")
+            self._shutdown = True
+            raise
+        finally:
+            self.is_healthy = False
 
 
 # Example usage
