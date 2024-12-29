@@ -1,10 +1,14 @@
 import asyncio
+import logging
 from typing import Dict, Optional
 
 from etcd3gw import Lease
 from etcd3gw.client import Etcd3Client
 from nilai_common.api_model import ModelEndpoint, ModelMetadata
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class ModelServiceDiscovery:
     def __init__(self, host: str = "localhost", port: int = 2379, lease_ttl: int = 60):
@@ -73,7 +77,7 @@ class ModelServiceDiscovery:
 
                 discovered_models[model_endpoint.metadata.id] = model_endpoint
             except Exception as e:
-                print(f"Error parsing model endpoint: {e}")
+                logger.error(f"Error parsing model endpoint: {e}")
         return discovered_models
 
     async def get_model(
@@ -112,7 +116,7 @@ class ModelServiceDiscovery:
                 lease.refresh()
                 await asyncio.sleep(self.lease_ttl // 2)
             except Exception as e:
-                print(f"Lease keepalive failed: {e}")
+                logger.error(f"Lease keepalive failed: {e}")
                 break
 
 
@@ -146,11 +150,11 @@ async def main():
     discovered_models = await service_discovery.discover_models(
         name="Image Classification", feature="image_classification"
     )
-    print("FOUND: ", len(discovered_models))
+    logger.info(f"FOUND: {len(discovered_models)}")
     for model in discovered_models.values():
-        print(f"Discovered Model: {model.metadata.id}")
-        print(f"URL: {model.url}")
-        print(f"Supported Features: {model.metadata.supported_features}")
+        logger.info(f"Discovered Model: {model.metadata.id}")
+        logger.info(f"URL: {model.url}")
+        logger.info(f"Supported Features: {model.metadata.supported_features}")
 
     # Optional: Keep the service running
     await asyncio.sleep(10)  # Keep running for an hour
@@ -158,11 +162,11 @@ async def main():
     discovered_models = await service_discovery.discover_models(
         name="Image Classification", feature="image_classification"
     )
-    print("FOUND: ", len(discovered_models))
+    logger.info(f"FOUND: {len(discovered_models)}")
     for model in discovered_models.values():
-        print(f"Discovered Model: {model.metadata.id}")
-        print(f"URL: {model.url}")
-        print(f"Supported Features: {model.metadata.supported_features}")
+        logger.info(f"Discovered Model: {model.metadata.id}")
+        logger.info(f"URL: {model.url}")
+        logger.info(f"Supported Features: {model.metadata.supported_features}")
 
     # Cleanup
     await service_discovery.unregister_model(model_endpoint.metadata.id)
