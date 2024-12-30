@@ -15,6 +15,7 @@ from nilai_common.api_model import ModelEndpoint, ModelMetadata
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 class ModelServiceDiscovery:
     def __init__(self, host: str = "localhost", port: int = 2379, lease_ttl: int = 60):
         """
@@ -124,8 +125,9 @@ class ModelServiceDiscovery:
         key = f"/models/{model_id}"
         self.client.delete(key)
 
-    @retry(wait=wait_exponential(multiplier=1, min=4, max=10),
-           stop=stop_after_attempt(3))
+    @retry(
+        wait=wait_exponential(multiplier=1, min=4, max=10), stop=stop_after_attempt(3)
+    )
     async def _refresh_lease(self, lease):
         lease.refresh()
         self.last_refresh = datetime.now()

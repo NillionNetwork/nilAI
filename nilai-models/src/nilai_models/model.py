@@ -52,29 +52,30 @@ class Model(ABC):
         async def lifespan(app: FastAPI):
             discovery_service = None
             keep_alive_task = None
-            
+
             try:
                 # Initialize discovery service
                 discovery_service = ModelServiceDiscovery(
-                    host=SETTINGS["etcd_host"], 
-                    port=SETTINGS["etcd_port"]
+                    host=SETTINGS["etcd_host"], port=SETTINGS["etcd_port"]
                 )
-                
+
                 # Validate model metadata
                 if not self.endpoint or not self.endpoint.metadata:
                     raise ValueError("Invalid model metadata")
-                
+
                 # Register model and start keepalive
                 logger.info(f"Registering model: {self.endpoint.metadata.id}")
-                lease = await discovery_service.register_model(self.endpoint, self.prefix)
+                lease = await discovery_service.register_model(
+                    self.endpoint, self.prefix
+                )
                 keep_alive_task = asyncio.create_task(
                     discovery_service.keep_alive(lease),
-                    name=f"keepalive_{self.endpoint.metadata.id}"
+                    name=f"keepalive_{self.endpoint.metadata.id}",
                 )
-                
+
                 logger.info(f"Model registered successfully: {self.endpoint}")
                 yield
-                
+
             except Exception as e:
                 logger.error(f"Failed to initialize model service: {e}")
                 raise
@@ -86,13 +87,16 @@ class Model(ABC):
                         await keep_alive_task
                     except asyncio.CancelledError:
                         pass
-                
+
                 if discovery_service:
                     try:
-                        await discovery_service.unregister_model(self.endpoint.metadata.id)
+                        await discovery_service.unregister_model(
+                            self.endpoint.metadata.id
+                        )
                         logger.info(f"Model unregistered: {self.endpoint.metadata.id}")
                     except Exception as e:
                         logger.error(f"Error unregistering model: {e}")
+
         # Create a FastAPI application instance for the model
         self.app = FastAPI(lifespan=lifespan)
         self._setup_routes()
