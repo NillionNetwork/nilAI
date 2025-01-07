@@ -3,7 +3,9 @@ name = "nilai"
 version = "0.1.0"
 description = ""
 authors = [
-    { name = "José Cabrero-Holgueras", email = "jose.cabrero@nillion.com" }
+    { name = "José Cabrero-Holgueras", email = "jose.cabrero@nillion.com" },
+    { name = "Manuel Santos", email = "manuel.santos@nillion.com" },
+    { name = "Dimitris Mouris", email = "dimitris@nillion.com" }
 ]
 readme = "README.md"
 requires-python = ">=3.12"
@@ -11,6 +13,8 @@ dependencies = [
     "nilai-api",
     "nilai-common",
     "nilai-models",
+    "nilql==0.0.0a2",
+    "nilrag==0.1.0",
 ]
 
 [dependency-groups]

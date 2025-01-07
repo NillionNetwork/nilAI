@@ -15,6 +15,7 @@ class ChatRequest(BaseModel):
     temperature: Optional[float] = 0.2
     max_tokens: Optional[int] = 2048
     stream: Optional[bool] = False
+    nilrag: Optional[dict] = {}
 
 
 class ChoiceChunkContent(BaseModel):

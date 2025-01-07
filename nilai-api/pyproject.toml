@@ -4,7 +4,9 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 authors = [
-    { name = "José Cabrero-Holgueras", email = "jose.cabrero@nillion.com" }
+    { name = "José Cabrero-Holgueras", email = "jose.cabrero@nillion.com" },
+    { name = "Manuel Santos", email = "manuel.santos@nillion.com" },
+    { name = "Dimitris Mouris", email = "dimitris@nillion.com" }
 ]
 requires-python = ">=3.12"
 dependencies = [
@@ -13,11 +15,13 @@ dependencies = [
     "fastapi[standard]>=0.115.5",
     "gunicorn>=23.0.0",
     "nilai-common",
+    "numpy>=2.2.0",
     "python-dotenv>=1.0.1",
     "sqlalchemy>=2.0.36",
     "uvicorn>=0.32.1",
-    "nilai-common",
     "httpx>=0.27.2",
+    "nilql==0.0.0a2",
+    "nilrag==0.1.0"
 ]
 
 
