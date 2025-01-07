@@ -20,7 +20,9 @@ class Llama8BGpu(Model):
             gpu_memory_utilization=0.95,
             tensor_parallel_size=torch.cuda.device_count(),
         )
-        self.tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.1-8B-Instruct")
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            "meta-llama/Llama-3.1-8B-Instruct"
+        )
 
         self.sampling_params = SamplingParams(
             temperature=0.7,
