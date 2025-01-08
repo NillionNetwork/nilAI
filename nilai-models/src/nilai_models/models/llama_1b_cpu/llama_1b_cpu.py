@@ -40,7 +40,7 @@ class Llama1BCpu(LlamaCppModel):
                 supported_features=["chat_completion", "streaming"],  # Added streaming
             ),
         )
-        
+
     def load_models(self):
         """
         Load the model(s) required for the service.
@@ -48,7 +48,7 @@ class Llama1BCpu(LlamaCppModel):
         This method is called during model initialization to load the
         specific model(s) required for the service at service startup.
         """
-        pass 
+        pass
 
 
 # FastAPI app instance

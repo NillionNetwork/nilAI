@@ -5,8 +5,16 @@ from fastapi import HTTPException
 from transformers import AutoTokenizer
 from vllm import LLM, SamplingParams, RequestOutput
 from fastapi.responses import StreamingResponse
-from nilai_common import ChatRequest, ChatResponse, Message, ModelMetadata, Usage, Choice
+from nilai_common import (
+    ChatRequest,
+    ChatResponse,
+    Message,
+    ModelMetadata,
+    Usage,
+    Choice,
+)
 from nilai_models.model import Model
+
 
 class Llama8BGpu(Model):
     """
@@ -94,13 +102,12 @@ class Llama8BGpu(Model):
         prompt = self.tokenizer.apply_chat_template(
             conversation, tokenize=False, add_generation_prompt=True
         )
-        
+
         sampling_params = SamplingParams(
             temperature=req.temperature if req.temperature else 0.7,
             top_p=req.top_p if req.top_p else 0.95,
             max_tokens=req.max_tokens if req.max_tokens else 1024,
         )
-
 
         # Non-streaming (regular) chat completion
         try:

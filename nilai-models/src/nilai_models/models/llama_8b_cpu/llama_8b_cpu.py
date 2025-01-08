@@ -51,7 +51,7 @@ class Llama8BCpu(LlamaCppModel):
                 supported_features=["chat_completion"],  # Capabilities
             ),
         )
-    
+
     def load_models(self):
         """
         Load the model(s) required for the service.
@@ -59,7 +59,8 @@ class Llama8BCpu(LlamaCppModel):
         This method is called during model initialization to load the
         specific model(s) required for the service at service startup.
         """
-        pass 
+        pass
+
 
 # Create and expose the FastAPI app for this Llama model
 # - Calls get_app() from the base Model class
