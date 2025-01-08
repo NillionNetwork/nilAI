@@ -4,7 +4,7 @@
 	}
  }
  
- https://nilai.sandbox.nilogy.xyz {
+ https://gpu.nilai.sandbox.nilogy.xyz {
 	import ssl_config
 	reverse_proxy api:8443
  }

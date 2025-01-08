@@ -36,6 +36,16 @@ services:
       target: nilai
       args:
         MODEL_NAME: "llama_8b_gpu"
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    env_file:
+      - .env
     depends_on:
       etcd:
         condition: service_healthy

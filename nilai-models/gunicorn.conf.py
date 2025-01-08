@@ -4,10 +4,10 @@
 bind = "0.0.0.0:8000"
 
 # Set the number of workers (2)
-workers = 2
+workers = 1
 
 # Set the number of threads per worker (16)
-threads = 16
+threads = 4
 
 # Set the timeout (120 seconds)
 timeout = 120
