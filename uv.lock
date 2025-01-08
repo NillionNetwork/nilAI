@@ -641,8 +641,6 @@ dependencies = [
     { name = "nilai-api" },
     { name = "nilai-common" },
     { name = "nilai-models" },
-    { name = "nilql" },
-    { name = "nilrag" },
 ]
 
 [package.dependency-groups]
@@ -661,8 +659,6 @@ requires-dist = [
     { name = "nilai-api", editable = "nilai-api" },
     { name = "nilai-common", editable = "packages/nilai-common" },
     { name = "nilai-models", editable = "nilai-models" },
-    { name = "nilql", specifier = "==0.0.0a2" },
-    { name = "nilrag", specifier = "==0.1.0" },
 ]
 
 [package.metadata.dependency-groups]
@@ -703,8 +699,8 @@ requires-dist = [
     { name = "gunicorn", specifier = ">=23.0.0" },
     { name = "httpx", specifier = ">=0.27.2" },
     { name = "nilai-common", editable = "packages/nilai-common" },
-    { name = "nilql", specifier = "==0.0.0a2" },
-    { name = "nilrag", specifier = "==0.1.0" },
+    { name = "nilql", specifier = ">=0.0.0a2" },
+    { name = "nilrag", specifier = ">=0.1.0" },
     { name = "numpy", specifier = ">=2.2.0" },
     { name = "python-dotenv", specifier = ">=1.0.1" },
     { name = "sqlalchemy", specifier = ">=2.0.36" },

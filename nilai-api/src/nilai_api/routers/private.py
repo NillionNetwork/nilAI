@@ -172,32 +172,6 @@ async def chat_completion(
         5. Ask NilDB to return top k chunks.
         6. Append top results to LLM query
         """
-
-        """
-        nilrag = {
-            "nodes": [
-                {
-                    "url": "https://nildb-node-a50d.sandbox.app-cluster.sandbox.nilogy.xyz/api/v1",
-                    "bearer_token": "eyJhbGciOiJFUzI1NksiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJkaWQ6bmlsOnRlc3RuZXQ6bmlsbGlvbjFxaHF1eXQyMGVxMHZ1dGp6dzZ2NnprNzUyeTZteTRrcnhjbW5uMiIsImF1ZCI6ImRpZDpuaWw6dGVzdG5ldDpuaWxsaW9uMTVsY2p4Z2FmZ3ZzNDByeXB2cXU3M2dmdng2cGt4N3VnZGphNTBkIiwiZXhwIjoxODM2MjYxMjQ0fQ.sD2qaAtQvgaULz83Twl9d5SUDzKncHgDtGwkgQRpn_O3lfIjvCYpsMKtXCcFEOtUXI2uSJEVnMgtl_VQ4ZdJPw",
-                    "schema_id": "6aa651af-7762-4aaa-9089-82f8eab16201",
-                    "diff_query_id": "dfcee886-231d-4a9d-9bdd-857f74a72964"
-                },
-                {
-                    "url": "https://nildb-node-dvml.sandbox.app-cluster.sandbox.nilogy.xyz/api/v1",
-                    "bearer_token": "eyJhbGciOiJFUzI1NksiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJkaWQ6bmlsOnRlc3RuZXQ6bmlsbGlvbjFxaHF1eXQyMGVxMHZ1dGp6dzZ2NnprNzUyeTZteTRrcnhjbW5uMiIsImF1ZCI6ImRpZDpuaWw6dGVzdG5ldDpuaWxsaW9uMWRmaDQ0Y3M0aDJ6ZWs1dmh6eGtmdmQ5dzI4czVxNWNkZXBkdm1sIiwiZXhwIjoxODM2MjYxMjQ0fQ.vynYhTfQPW4CJjPKnoGI0QAnAufr0_rJmcHPq1yr0G8vHqyW94Ufucv3C5WMpBKXiBDHJq0gx5oy_JtliQ_hRg",
-                    "schema_id": "6aa651af-7762-4aaa-9089-82f8eab16201",
-                    "diff_query_id": "dfcee886-231d-4a9d-9bdd-857f74a72964"
-                },
-                {
-                    "url": "https://nildb-node-guue.sandbox.app-cluster.sandbox.nilogy.xyz/api/v1",
-                    "bearer_token": "eyJhbGciOiJFUzI1NksiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJkaWQ6bmlsOnRlc3RuZXQ6bmlsbGlvbjFxaHF1eXQyMGVxMHZ1dGp6dzZ2NnprNzUyeTZteTRrcnhjbW5uMiIsImF1ZCI6ImRpZDpuaWw6dGVzdG5ldDpuaWxsaW9uMTl0MGdlZm03cHI2eGprcTJzajQwZjByczd3em5sZGdmZzRndXVlIiwiZXhwIjoxODM2MjYxMjQ0fQ.z3anygLccSxoVwDskAjXsYZwHQCeNvPW4laKWQXqv5uOIoeWuhr4OyVmpTo_BanrOhY0FyksL_11KqKGD-B37g",
-                    "schema_id": "6aa651af-7762-4aaa-9089-82f8eab16201",
-                    "diff_query_id": "dfcee886-231d-4a9d-9bdd-857f74a72964"
-                }
-            ]
-        }
-        
-        """
         try:
             logger.info("Rag is starting.")
             # Step 1: Initialization
