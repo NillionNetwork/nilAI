@@ -59,6 +59,35 @@ services:
     networks:
       - backend_net
 
+  llama_1b_gpu:
+    build:
+      context: .
+      dockerfile: docker/model.Dockerfile
+      target: nilai
+      args:
+        MODEL_NAME: "llama_1b_gpu"
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    env_file:
+      - .env
+    depends_on:
+      etcd:
+        condition: service_healthy
+    environment:
+      - SVC_HOST=llama_1b_gpu
+      - SVC_PORT=8000
+      - ETCD_HOST=etcd
+      - ETCD_PORT=2379
+    volumes:
+      - hugging_face_models:/root/.cache/huggingface  # cache models
+    networks:
+      - backend_net
 volumes:
   hugging_face_models:
 
