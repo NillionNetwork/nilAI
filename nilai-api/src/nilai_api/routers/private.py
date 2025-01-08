@@ -173,7 +173,7 @@ async def chat_completion(
         6. Append top results to LLM query
         """
         try:
-            logger.info("Rag is starting.")
+            logger.debug("Rag is starting.")
             # Step 1: Initialization
             # Get NilDB instance from request
             nodes = []
@@ -276,11 +276,10 @@ async def chat_completion(
                 # If no system message exists, add one
                 req.messages.insert(0, Message(role="system", content=relevant_context))
 
-            logger.info("System message updated with relevant context.")
-            logger.info(f"Message sent: {req.messages}")
+            logger.debug("System message updated with relevant context:\n {req.messages}")
 
         except Exception as e:
-            logger.error("An error occurred: %s", str(e))
+            logger.error("An error occurred within nilrag: %s", str(e))
             raise HTTPException(status_code=500, detail=str(e))
 
     if req.stream:
