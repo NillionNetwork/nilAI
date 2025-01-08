@@ -28,7 +28,7 @@ from nilai_common import (
 from nilrag.util import (
     decrypt_float_list,
     encrypt_float_list,
-    generate_embeddings_huggingface, 
+    generate_embeddings_huggingface,
     group_shares_by_id,
 )
 
@@ -185,16 +185,17 @@ async def chat_completion(
                         org=None,
                         bearer_token=node_data.get("bearer_token"),
                         schema_id=node_data.get("schema_id"),
-                        diff_query_id=node_data.get("diff_query_id")
+                        diff_query_id=node_data.get("diff_query_id"),
                     )
                 )
             nilDB = nilrag.NilDB(nodes)
 
             # Initialize secret keys
             num_parties = len(nilDB.nodes)
-            additive_key = nilql.secret_key({'nodes': [{}] * num_parties}, {'sum': True})
-            xor_key = nilql.secret_key({'nodes': [{}] * num_parties}, {'store': True})
-
+            additive_key = nilql.secret_key(
+                {"nodes": [{}] * num_parties}, {"sum": True}
+            )
+            xor_key = nilql.secret_key({"nodes": [{}] * num_parties}, {"store": True})
 
             # Step 2: Secret share query
             logger.debug("Secret sharing query and sending to NilDB...")
@@ -207,18 +208,15 @@ async def chat_completion(
             query_embedding = generate_embeddings_huggingface([query])[0]
             nilql_query_embedding = encrypt_float_list(additive_key, query_embedding)
 
-
             # Step 3: Ask NilDB to compute the differences
             logger.debug("Requesting computation from NilDB...")
             difference_shares = nilDB.diff_query_execute(nilql_query_embedding)
-
 
             # Step 4: Compute distances and sort
             logger.debug("Compute distances and sort...")
             # 4.1 Group difference shares by ID
             difference_shares_by_id = group_shares_by_id(
-                difference_shares,
-                lambda share: share['difference']
+                difference_shares, lambda share: share["difference"]
             )
             # 4.2 Transpose the lists for each _id
             difference_shares_by_id = {
@@ -228,36 +226,32 @@ async def chat_completion(
             # 4.3 Decrypt and compute distances
             reconstructed = [
                 {
-                    '_id': id, 
-            
-                    'distances': np.linalg.norm(decrypt_float_list(additive_key, difference_shares))
-                } 
+                    "_id": id,
+                    "distances": np.linalg.norm(
+                        decrypt_float_list(additive_key, difference_shares)
+                    ),
+                }
                 for id, difference_shares in difference_shares_by_id.items()
             ]
             # 4.4 Sort id list based on the corresponding distances
-            sorted_ids = sorted(reconstructed, key=lambda x: x['distances'])
+            sorted_ids = sorted(reconstructed, key=lambda x: x["distances"])
 
-
-            # Step 5: Query the top k 
+            # Step 5: Query the top k
             logger.debug("Query top k chunks...")
             top_k = 2
-            top_k_ids = [item['_id'] for item in sorted_ids[:top_k]]
-            
+            top_k_ids = [item["_id"] for item in sorted_ids[:top_k]]
+
             # 5.1 Query top k
             chunk_shares = nilDB.chunk_query_execute(top_k_ids)
-            
+
             # 5.2 Group chunk shares by ID
             chunk_shares_by_id = group_shares_by_id(
-                chunk_shares,
-                lambda share: b64decode(share['chunk'])
+                chunk_shares, lambda share: b64decode(share["chunk"])
             )
 
             # 5.3 Decrypt chunks
             top_results = [
-                {
-                    '_id': id, 
-                    'distances': nilql.decrypt(xor_key, chunk_shares)
-                } 
+                {"_id": id, "distances": nilql.decrypt(xor_key, chunk_shares)}
                 for id, chunk_shares in chunk_shares_by_id.items()
             ]
 
@@ -270,13 +264,17 @@ async def chat_completion(
             # Step 7: Update system message
             for message in req.messages:
                 if message.role == "system":
-                    message.content += relevant_context  # Append the context to the system message
+                    message.content += (
+                        relevant_context  # Append the context to the system message
+                    )
                     break
             else:
                 # If no system message exists, add one
                 req.messages.insert(0, Message(role="system", content=relevant_context))
 
-            logger.debug("System message updated with relevant context:\n {req.messages}")
+            logger.debug(
+                "System message updated with relevant context:\n {req.messages}"
+            )
 
         except Exception as e:
             logger.error("An error occurred within nilrag: %s", str(e))
