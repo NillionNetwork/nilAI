@@ -42,6 +42,15 @@ class SecretLlama1BCpu(LlamaCppModel):
             ),
             prefix="nillion/",
         )
+        
+    def load_models(self):
+        """
+        Load the model(s) required for the service.
+
+        This method is called during model initialization to load the
+        specific model(s) required for the service at service startup.
+        """
+        pass 
 
     async def chat_completion(
         self,
