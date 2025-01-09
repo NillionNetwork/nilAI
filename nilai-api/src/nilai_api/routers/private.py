@@ -2,7 +2,7 @@
 import logging
 import os
 import asyncio
-from base64 import b64encode, b64decode
+from base64 import b64encode
 from typing import AsyncGenerator, Union
 import numpy as np
 
@@ -246,7 +246,7 @@ async def chat_completion(
 
             # 5.2 Group chunk shares by ID
             chunk_shares_by_id = group_shares_by_id(
-                chunk_shares, lambda share: b64decode(share["chunk"])
+                chunk_shares, lambda share: share["chunk"]
             )
 
             # 5.3 Decrypt chunks
@@ -273,7 +273,7 @@ async def chat_completion(
                 req.messages.insert(0, Message(role="system", content=relevant_context))
 
             logger.debug(
-                "System message updated with relevant context:\n {req.messages}"
+                f"System message updated with relevant context:\n {req.messages}"
             )
 
         except Exception as e:
