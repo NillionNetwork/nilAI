@@ -1,9 +1,15 @@
 import uuid
 import time
 import torch
+import logging
+import json
+import asyncio
+from typing import AsyncGenerator
+from vllm.engine.async_llm_engine import AsyncLLMEngine
+from vllm.engine.arg_utils import AsyncEngineArgs
 from fastapi import HTTPException
 from transformers import AutoTokenizer
-from vllm import LLM, SamplingParams, RequestOutput
+from vllm import SamplingParams, RequestOutput
 from fastapi.responses import StreamingResponse
 from nilai_common import (
     ChatRequest,
@@ -12,6 +18,9 @@ from nilai_common import (
     ModelMetadata,
     Usage,
     Choice,
+    ChatCompletionChunk,
+    ChoiceChunk,
+    ChoiceChunkContent,
 )
 from nilai_models.model import Model
 
@@ -44,12 +53,13 @@ class Llama8BGpu(Model):
         This method is called during model initialization to load the
         specific model(s) required for the service at service startup.
         """
-        self.model = LLM(
+        engine_args = AsyncEngineArgs(
             model="meta-llama/Llama-3.1-8B-Instruct",
             gpu_memory_utilization=0.6,
             max_model_len=60624,
             tensor_parallel_size=torch.cuda.device_count(),
         )
+        self.llm_engine = AsyncLLMEngine.from_engine_args(engine_args)
         self.tokenizer = AutoTokenizer.from_pretrained(
             "meta-llama/Llama-3.1-8B-Instruct"
         )
@@ -84,12 +94,6 @@ class Llama8BGpu(Model):
                 status_code=400, detail="The 'model' field is required."
             )
 
-        # Streaming response logic
-        if req.stream:
-            raise HTTPException(
-                status_code=400, detail="Streaming is not supported for this model."
-            )
-
         # Transform incoming messages to llama_cpp-compatible format
         conversation = [
             {
@@ -109,15 +113,45 @@ class Llama8BGpu(Model):
             max_tokens=req.max_tokens if req.max_tokens else 1024,
         )
 
+        if req.stream:
+
+            async def generate() -> AsyncGenerator[str, None]:
+                try:
+                    previous_generated_len = 0
+                    async for chunk in self.llm_engine.generate(
+                        prompt,
+                        sampling_params=sampling_params,
+                        request_id=str(uuid.uuid4()),
+                    ):  # Generate chunks
+                        current_text = chunk.outputs[0].text
+
+                        # Get only new tokens by slicing from previous length
+                        new_text = current_text[previous_generated_len:]
+                        # print(new_tokens, end='', flush=True)
+                        previous_generated_len = len(current_text)
+                        chunk = ChoiceChunk(
+                            index=0,
+                            delta=ChoiceChunkContent(content=new_text),
+                        )  # Create a ChoiceChunk
+                        completion_chunk = ChatCompletionChunk(choices=[chunk])
+                        yield f"data: {completion_chunk.model_dump_json()}\n\n"  # Stream the chunk
+                        await asyncio.sleep(0)  # Add an await to return inmediately
+
+                    yield "data: [DONE]\n\n"
+                except Exception as e:
+                    logging.error("An error occurred: %s", str(e))
+                    yield f"data: {json.dumps({'error': 'Internal error occurred!'})}\n\n"
+
+            # Return the streamed response with headers
+            return StreamingResponse(generate(), media_type="text/event-stream")
         # Non-streaming (regular) chat completion
         try:
-            generation: RequestOutput = self.model.generate(
-                prompt,  # type: ignore
-                sampling_params=sampling_params,
-            )  # type: ignore
-            print(generation)
-            generation = generation[0].outputs[0].text
-            print(generation)
+            generation: RequestOutput = None
+            async for request_output in self.llm_engine.generate(
+                prompt, sampling_params=sampling_params, request_id=str(uuid.uuid4())
+            ):
+                generation = request_output
+            generation = generation.outputs[0].text
         except ValueError:
             raise HTTPException(
                 status_code=400,
