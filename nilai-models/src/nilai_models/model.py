@@ -40,7 +40,7 @@ class Model(ABC):
         """
         # Store the model's metadata for later retrieval
         self.metadata = metadata
-        self.url = f"http://{SETTINGS["host"]}:{SETTINGS["port"]}"
+        self.url = f"http://{SETTINGS['host']}:{SETTINGS['port']}"
         self.endpoint = ModelEndpoint(url=self.url, metadata=self.metadata)
         # Record the start time for uptime tracking
         self._uptime = time.time()
