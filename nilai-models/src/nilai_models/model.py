@@ -40,7 +40,7 @@ class Model(ABC):
         """
         # Store the model's metadata for later retrieval
         self.metadata = metadata
-        self.url = f"http://{SETTINGS["host"]}:{SETTINGS["port"]}"
+        self.url = f"http://{SETTINGS['host']}:{SETTINGS['port']}"
         self.endpoint = ModelEndpoint(url=self.url, metadata=self.metadata)
         # Record the start time for uptime tracking
         self._uptime = time.time()
@@ -54,6 +54,8 @@ class Model(ABC):
             keep_alive_task = None
 
             try:
+                # Load models
+                self.load_models()
                 # Initialize discovery service
                 discovery_service = ModelServiceDiscovery(
                     host=SETTINGS["etcd_host"], port=SETTINGS["etcd_port"]
@@ -101,6 +103,15 @@ class Model(ABC):
         self.app = FastAPI(lifespan=lifespan)
         self._setup_routes()
         return self.app
+
+    def load_models(self):
+        """
+        Load the model(s) required for the service.
+
+        This method should be overridden by child classes to load
+        the specific model(s) required for the service.
+        """
+        pass
 
     def get_app(self) -> FastAPI:
         """

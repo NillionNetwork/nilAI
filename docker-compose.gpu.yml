@@ -1,0 +1,95 @@
+services:
+  etcd:
+    image: 'bitnami/etcd:latest'
+    environment:
+      - ALLOW_NONE_AUTHENTICATION=yes
+      - ETCD_ADVERTISE_CLIENT_URLS=http://etcd:2379
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      - backend_net
+
+  api:
+    build: 
+      context: .
+      dockerfile: docker/api.Dockerfile
+      target: nilai
+    depends_on:
+      etcd:
+        condition: service_healthy
+    volumes:
+      - ${PWD}/db/:/app/db/   # sqlite database for users
+    environment:
+      - ETCD_HOST=etcd
+      - ETCD_PORT=2379
+    networks:
+      - backend_net
+
+  llama_8b_gpu:
+    build:
+      context: .
+      dockerfile: docker/model.Dockerfile
+      target: nilai
+      args:
+        MODEL_NAME: "llama_8b_gpu"
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    env_file:
+      - .env
+    depends_on:
+      etcd:
+        condition: service_healthy
+    environment:
+      - SVC_HOST=llama_8b_gpu
+      - SVC_PORT=8000
+      - ETCD_HOST=etcd
+      - ETCD_PORT=2379
+    volumes:
+      - hugging_face_models:/root/.cache/huggingface  # cache models
+    networks:
+      - backend_net
+
+  llama_1b_gpu:
+    build:
+      context: .
+      dockerfile: docker/model.Dockerfile
+      target: nilai
+      args:
+        MODEL_NAME: "llama_1b_gpu"
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    env_file:
+      - .env
+    depends_on:
+      etcd:
+        condition: service_healthy
+    environment:
+      - SVC_HOST=llama_1b_gpu
+      - SVC_PORT=8000
+      - ETCD_HOST=etcd
+      - ETCD_PORT=2379
+    volumes:
+      - hugging_face_models:/root/.cache/huggingface  # cache models
+    networks:
+      - backend_net
+volumes:
+  hugging_face_models:
+
+networks:
+  backend_net:
