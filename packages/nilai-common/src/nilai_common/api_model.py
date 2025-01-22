@@ -3,15 +3,30 @@ from typing import List, Optional, Literal
 
 from openai.types.chat import ChatCompletion, ChatCompletionMessage
 from openai.types.chat.chat_completion import Choice as OpenaAIChoice
-from openai.types import CompletionUsage
+from openai.types.chat.chat_completion import CompletionUsage
 from pydantic import BaseModel, Field
+
+
+__all__ = [
+    "Message",
+    "Choice",
+    "ChatRequest",
+    "CompletionUsage",
+    "SignedChatCompletion",
+    "AttestationResponse",
+    "ModelMetadata",
+    "ModelEndpoint",
+    "HealthCheckResponse",
+]
 
 
 class Message(ChatCompletionMessage):
     role: Literal["system", "user", "assistant"]
 
+
 class Choice(OpenaAIChoice):
     pass
+
 
 class ChatRequest(BaseModel):
     model: str
@@ -21,23 +36,6 @@ class ChatRequest(BaseModel):
     max_tokens: Optional[int] = 2048
     stream: Optional[bool] = False
     nilrag: Optional[dict] = {}
-
-
-class ChoiceChunkContent(BaseModel):
-    content: Optional[str]
-
-
-class ChoiceChunk(BaseModel):
-    """Choice chunk."""
-
-    index: int
-    delta: ChoiceChunkContent
-
-
-class ChatCompletionChunk(BaseModel):
-    """Chat completion chunk."""
-
-    choices: List[ChoiceChunk]
 
 
 class SignedChatCompletion(ChatCompletion):
