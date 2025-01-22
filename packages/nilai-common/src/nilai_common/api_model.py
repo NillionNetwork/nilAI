@@ -3,16 +3,15 @@ from typing import List, Optional, Literal
 
 from openai.types.chat import ChatCompletion, ChatCompletionMessage
 from openai.types.chat.chat_completion import Choice as OpenaAIChoice
+from openai.types import CompletionUsage
 from pydantic import BaseModel, Field
 
 
 class Message(ChatCompletionMessage):
     role: Literal["system", "user", "assistant"]
 
-
 class Choice(OpenaAIChoice):
     pass
-
 
 class ChatRequest(BaseModel):
     model: str
