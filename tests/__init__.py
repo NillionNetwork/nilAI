@@ -1,10 +1,10 @@
 from nilai_common import (
-    ChatResponse,
-    Choice,
+    SignedChatCompletion,
     Message,
     ModelEndpoint,
     ModelMetadata,
     Usage,
+    Choice,
 )
 
 model_metadata: ModelMetadata = ModelMetadata(
@@ -22,16 +22,16 @@ model_endpoint: ModelEndpoint = ModelEndpoint(
     url="http://test-model-url", metadata=model_metadata
 )
 
-response: ChatResponse = ChatResponse(
+response: SignedChatCompletion = SignedChatCompletion(
     id="test-id",
-    object="test-object",
+    object="chat.completion",
     model="test-model",
     created=123456,
     choices=[
         Choice(
             index=0,
-            message=Message(role="test-role", content="test-content"),
-            finish_reason="test-finish-reason",
+            message=Message(role="assistant", content="test-content"),
+            finish_reason="stop",
             logprobs={"test-logprobs": "test-value"},
         )
     ],

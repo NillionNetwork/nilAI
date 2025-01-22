@@ -13,82 +13,68 @@ services:
     networks:
       - backend_net
 
-  api:
-    build: 
-      context: .
-      dockerfile: docker/api.Dockerfile
-      target: nilai
-    depends_on:
-      etcd:
-        condition: service_healthy
-    volumes:
-      - ${PWD}/db/:/app/db/   # sqlite database for users
-    environment:
-      - ETCD_HOST=etcd
-      - ETCD_PORT=2379
-    networks:
-      - backend_net
-
-  llama_1b_cpu:
+  llama_8b_gpu:
     build:
       context: .
-      dockerfile: docker/model.Dockerfile
-      target: nilai
-      args:
-        MODEL_NAME: "llama_1b_cpu"
+      dockerfile: docker/vllm.Dockerfile
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     depends_on:
       etcd:
         condition: service_healthy
+    command: >
+      --model meta-llama/Llama-3.1-8B-Instruct
+      --gpu-memory-utilization 0.5 
+      --max-model-len 10000 
+      --tensor-parallel-size 1
     environment:
-      - SVC_HOST=llama_1b_cpu
+      - SVC_HOST=llama_8b_gpu
       - SVC_PORT=8000
       - ETCD_HOST=etcd
       - ETCD_PORT=2379
+    env_file:
+      - .env
     volumes:
       - hugging_face_models:/root/.cache/huggingface  # cache models
     networks:
       - backend_net
-
-  llama_8b_cpu:
+  llama_1b_gpu:
     build:
       context: .
-      dockerfile: docker/model.Dockerfile
-      target: nilai
-      args:
-        MODEL_NAME: "llama_8b_cpu"
+      dockerfile: docker/vllm.Dockerfile
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     depends_on:
       etcd:
         condition: service_healthy
+    command: >
+      --model meta-llama/Llama-3.2-1B-Instruct
+      --gpu-memory-utilization 0.2 
+      --max-model-len 10000 
+      --tensor-parallel-size 1
     environment:
-      - SVC_HOST=llama_8b_cpu
+      - SVC_HOST=llama_1b_gpu
       - SVC_PORT=8000
       - ETCD_HOST=etcd
       - ETCD_PORT=2379
+    env_file:
+      - .env
     volumes:
       - hugging_face_models:/root/.cache/huggingface  # cache models
     networks:
       - backend_net
-
-  secret_llama_1b_cpu:
-    build:
-      context: .
-      dockerfile: docker/model.Dockerfile
-      target: nilai
-      args:
-        MODEL_NAME: "secret_llama_1b_cpu"
-    depends_on:
-      etcd:
-        condition: service_healthy
-    environment:
-      - SVC_HOST=secret_llama_1b_cpu
-      - SVC_PORT=8000
-      - ETCD_HOST=etcd
-      - ETCD_PORT=2379
-    volumes:
-      - hugging_face_models:/root/.cache/huggingface  # cache models
-    networks:
-      - backend_net
-
 volumes:
   hugging_face_models:
 
