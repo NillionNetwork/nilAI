@@ -1,12 +1,14 @@
 import logging
 import os
+import dotenv
 import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Dict, Generator, List, Optional
 
 import sqlalchemy
-from sqlalchemy import Column, Integer, String, create_engine
+from datetime import datetime
+from sqlalchemy import Column, ForeignKey, Integer, String, DateTime, Text, create_engine
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import QueuePool
@@ -15,15 +17,19 @@ from sqlalchemy.pool import QueuePool
 
 logger = logging.getLogger(__name__)
 
-
-# Database configuration with better defaults and connection pooling
-def get_sqlite_path():
-    return f"sqlite:///{os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))}/db/users.sqlite"
-
+dotenv.load_dotenv()
+DATABASE_URL = sqlalchemy.engine.url.URL.create(
+    drivername="postgresql+pg8000",
+    username=os.getenv("DB_USER", "postgres"),
+    password=os.getenv("DB_PASS", ""),
+    host=os.getenv("DB_HOST", "localhost"),
+    port=int(os.getenv("DB_PORT", 5432)),
+    database=os.getenv("DB_NAME", "nilai_users")
+)
 
 class DatabaseConfig:
     # Use environment variables in a real-world scenario
-    DATABASE_URL = get_sqlite_path()
+    DATABASE_URL = DATABASE_URL
     POOL_SIZE = 5
     MAX_OVERFLOW = 10
     POOL_TIMEOUT = 30
@@ -57,13 +63,32 @@ class User(Base):
 
     userid = Column(String(36), primary_key=True, index=True)
     name = Column(String(100), nullable=False)
+    email = Column(String(255), unique=True, nullable=False, index=True)  # New email column
     apikey = Column(String(36), unique=True, nullable=False, index=True)
     prompt_tokens = Column(Integer, default=0, nullable=False)
     completion_tokens = Column(Integer, default=0, nullable=False)
     queries = Column(Integer, default=0, nullable=False)
+    signup_date = Column(DateTime, default=datetime.now(), nullable=False)
+    last_activity = Column(DateTime, nullable=True)
 
     def __repr__(self):
-        return f"<User(userid={self.userid}, name={self.name})>"
+        return f"<User(userid={self.userid}, name={self.name}, email={self.email})>"
+
+
+# New QueryLog Model for tracking individual queries
+class QueryLog(Base):
+    __tablename__ = "query_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    userid = Column(String(36), ForeignKey("users.userid"), nullable=False, index=True)
+    query_timestamp = Column(DateTime, default=datetime.now(), nullable=False)
+    model = Column(Text, nullable=False)
+    prompt_tokens = Column(Integer, nullable=False)
+    completion_tokens = Column(Integer, nullable=False)
+    total_tokens = Column(Integer, nullable=False)
+
+    def __repr__(self):
+        return f"<QueryLog(userid={self.userid}, query_timestamp={self.query_timestamp}, total_tokens={self.total_tokens})>"
 
 
 @dataclass
@@ -106,7 +131,7 @@ class UserManager:
             inspector = sqlalchemy.inspect(engine)
 
             # Check if the 'users' table already exists
-            if not inspector.has_table("users"):
+            if not inspector.has_table("users") or not inspector.has_table("query_logs"):
                 # Create all tables that do not exist
                 Base.metadata.create_all(bind=engine)
                 logger.info("Database tables created successfully.")
@@ -127,9 +152,28 @@ class UserManager:
     def generate_api_key() -> str:
         """Generate a unique API key."""
         return str(uuid.uuid4())
+    
+    @staticmethod
+    def update_last_activity(userid: str):
+        """
+        Update the last activity timestamp for a user.
+
+        Args:
+            userid (str): User's unique ID
+        """
+        try:
+            with get_db_session() as session:
+                user = session.query(User).filter(User.userid == userid).first()
+                if user:
+                    user.last_activity = datetime.now()  # type: ignore
+                    logger.info(f"Updated last activity for user {userid}")
+                else:
+                    logger.warning(f"User {userid} not found")
+        except SQLAlchemyError as e:
+            logger.error(f"Error updating last activity: {e}")
 
     @staticmethod
-    def insert_user(name: str) -> Dict[str, str]:
+    def insert_user(name: str, email: str) -> Dict[str, str]:
         """
         Insert a new user into the database.
 
@@ -144,12 +188,40 @@ class UserManager:
 
         try:
             with get_db_session() as session:
-                user = User(userid=userid, name=name, apikey=apikey)
+                user = User(userid=userid, name=name, email=email, apikey=apikey)
                 session.add(user)
                 logger.info(f"User {name} added successfully.")
                 return {"userid": userid, "apikey": apikey}
         except SQLAlchemyError as e:
             logger.error(f"Error inserting user: {e}")
+            raise
+
+    @staticmethod
+    def log_query(userid: str, model: str, prompt_tokens: int, completion_tokens: int):
+        """
+        Log a user's query.
+
+        Args:
+            userid (str): User's unique ID
+            model (str): The model that generated the response
+            prompt_tokens (int): Number of input tokens used
+            completion_tokens (int): Number of tokens in the generated response
+        """
+        total_tokens = prompt_tokens + completion_tokens
+
+        try:
+            with get_db_session() as session:
+                query_log = QueryLog(
+                    userid=userid,
+                    model=model,
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    total_tokens=total_tokens,
+                )
+                session.add(query_log)
+                logger.info(f"Query logged for user {userid} with total tokens {total_tokens}.")
+        except SQLAlchemyError as e:
+            logger.error(f"Error logging query: {e}")
             raise
 
     @staticmethod
@@ -299,3 +371,12 @@ if __name__ == "__main__":
     )
     usage = UserManager.get_user_token_usage(bob["userid"])
     print(f"Bob's token usage: {usage}")
+
+    # Log a query
+    UserManager.log_query(
+        userid=bob["userid"],
+        prompt="What is the weather like today?",
+        response="It is sunny and 25 degrees.",
+        prompt_tokens=8,
+        completion_tokens=7,
+    )

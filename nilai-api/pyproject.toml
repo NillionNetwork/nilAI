@@ -23,6 +23,8 @@ dependencies = [
     "nilrag>=0.1.2",
     "nilql>=0.0.0a3",
     "openai>=1.59.9",
+    #"psycopg2-binary>=2.9.10",
+    "pg8000>=1.31.2",
 ]
 
 

@@ -318,6 +318,12 @@ async def chat_completion(
                             prompt_tokens=chunk.usage.prompt_tokens,
                             completion_tokens=chunk.usage.completion_tokens,
                         )
+                        UserManager.log_query(
+                            user["userid"],
+                            model=req.model,
+                            prompt_tokens=chunk.usage.prompt_tokens,
+                            completion_tokens=chunk.usage.completion_tokens,
+                        )
                     else:
                         data = chunk.model_dump_json(exclude_unset=True)
                         yield f"data: {data}\n\n"
