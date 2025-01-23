@@ -24,8 +24,9 @@ DATABASE_URL = sqlalchemy.engine.url.URL.create(
     password=os.getenv("DB_PASS", ""),
     host=os.getenv("DB_HOST", "localhost"),
     port=int(os.getenv("DB_PORT", 5432)),
-    database=os.getenv("DB_NAME", "nilai_users")
+    database=os.getenv("DB_NAME", "nilai_users"),
 )
+
 
 class DatabaseConfig:
     DATABASE_URL = DATABASE_URL
@@ -33,6 +34,7 @@ class DatabaseConfig:
     MAX_OVERFLOW = 10
     POOL_TIMEOUT = 30
     POOL_RECYCLE = 3600  # Reconnect after 1 hour
+
 
 # Create base and engine with improved configuration
 Base = sqlalchemy.orm.declarative_base()
@@ -55,6 +57,7 @@ AsyncSessionLocal = sessionmaker(
     expire_on_commit=False,
 )
 
+
 # Enhanced User Model with additional constraints and validation
 class User(Base):
     __tablename__ = "users"
@@ -72,6 +75,7 @@ class User(Base):
     def __repr__(self):
         return f"<User(userid={self.userid}, name={self.name}, email={self.email})>"
 
+
 # New QueryLog Model for tracking individual queries
 class QueryLog(Base):
     __tablename__ = "query_logs"
@@ -87,6 +91,7 @@ class QueryLog(Base):
     def __repr__(self):
         return f"<QueryLog(userid={self.userid}, query_timestamp={self.query_timestamp}, total_tokens={self.total_tokens})>"
 
+
 @dataclass
 class UserData:
     userid: str
@@ -95,6 +100,7 @@ class UserData:
     input_tokens: int
     generated_tokens: int
     queries: int
+
 
 # Async context manager for database sessions
 @asynccontextmanager
@@ -111,6 +117,7 @@ async def get_db_session() -> "Generator[AsyncSession, Any, Any]":
     finally:
         await session.close()
 
+
 class UserManager:
     @staticmethod
     async def initialize_db() -> bool:
@@ -123,11 +130,16 @@ class UserManager:
         try:
             async with engine.begin() as conn:
                 # Create an inspector to check existing tables
-                inspector = await conn.run_sync(lambda sync_conn: sqlalchemy.inspect(sync_conn))
+                inspector = await conn.run_sync(
+                    lambda sync_conn: sqlalchemy.inspect(sync_conn)
+                )
 
                 # Check if the 'users' table already exists
-                if not await conn.run_sync(lambda sync_conn: inspector.has_table("users")) or \
-                   not await conn.run_sync(lambda sync_conn: inspector.has_table("query_logs")):
+                if not await conn.run_sync(
+                    lambda sync_conn: inspector.has_table("users")
+                ) or not await conn.run_sync(
+                    lambda sync_conn: inspector.has_table("query_logs")
+                ):
                     # Create all tables that do not exist
                     await conn.run_sync(Base.metadata.create_all)
                     logger.info("Database tables created successfully.")
@@ -148,7 +160,7 @@ class UserManager:
     def generate_api_key() -> str:
         """Generate a unique API key."""
         return str(uuid.uuid4())
-    
+
     @staticmethod
     async def update_last_activity(userid: str):
         """
@@ -196,7 +208,9 @@ class UserManager:
             raise
 
     @staticmethod
-    async def log_query(userid: str, model: str, prompt_tokens: int, completion_tokens: int):
+    async def log_query(
+        userid: str, model: str, prompt_tokens: int, completion_tokens: int
+    ):
         """
         Log a user's query.
 
@@ -219,7 +233,9 @@ class UserManager:
                 )
                 session.add(query_log)
                 await session.commit()
-                logger.info(f"Query logged for user {userid} with total tokens {total_tokens}.")
+                logger.info(
+                    f"Query logged for user {userid} with total tokens {total_tokens}."
+                )
         except SQLAlchemyError as e:
             logger.error(f"Error logging query: {e}")
             raise
@@ -237,7 +253,9 @@ class UserManager:
         """
         try:
             async with get_db_session() as session:
-                user = await session.execute(sqlalchemy.select(User).filter(User.apikey == api_key))
+                user = await session.execute(
+                    sqlalchemy.select(User).filter(User.apikey == api_key)
+                )
                 user = user.scalar_one_or_none()
                 return {"name": user.name, "userid": user.userid} if user else None
         except SQLAlchemyError as e:
@@ -245,7 +263,9 @@ class UserManager:
             return None
 
     @staticmethod
-    async def update_token_usage(userid: str, prompt_tokens: int, completion_tokens: int):
+    async def update_token_usage(
+        userid: str, prompt_tokens: int, completion_tokens: int
+    ):
         """
         Update token usage for a specific user.
 
@@ -345,7 +365,9 @@ class UserManager:
             logger.error(f"Error retrieving token usage: {e}")
             return None
 
+
 __all__ = ["UserManager", "UserData"]
+
 
 # Example Usage
 async def main():
@@ -364,7 +386,9 @@ async def main():
     print(f"API key validation: {user_name}")
 
     # Update and retrieve token usage
-    await UserManager.update_token_usage(bob["userid"], prompt_tokens=50, completion_tokens=20)
+    await UserManager.update_token_usage(
+        bob["userid"], prompt_tokens=50, completion_tokens=20
+    )
     usage = await UserManager.get_user_token_usage(bob["userid"])
     print(f"Bob's token usage: {usage}")
 
@@ -376,7 +400,9 @@ async def main():
         completion_tokens=7,
     )
 
+
 if __name__ == "__main__":
     # Run the example
     import asyncio
+
     asyncio.run(main())
