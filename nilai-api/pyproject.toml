@@ -25,6 +25,8 @@ dependencies = [
     "openai>=1.59.9",
     #"psycopg2-binary>=2.9.10",
     "pg8000>=1.31.2",
+    "asyncpg>=0.30.0",
+    "greenlet>=3.1.1",
 ]
 
 
