@@ -13,7 +13,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 
 For production environments:
 ```shell
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.gpu.yml -f docker-compose.prod.yml up -d --build
 ```
 
 ## Manual Deployment

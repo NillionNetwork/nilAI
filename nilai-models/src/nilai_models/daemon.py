@@ -14,7 +14,7 @@ from nilai_common import (  # Model service discovery and host settings
 logger = logging.getLogger(__name__)
 
 
-async def get_metadata(num_retries=10):
+async def get_metadata(num_retries=30):
     """Fetch model metadata from model
     service and return as ModelMetadata object"""
     current_retries = 0
