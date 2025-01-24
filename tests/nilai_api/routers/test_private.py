@@ -3,19 +3,9 @@ from unittest.mock import AsyncMock
 
 import pytest
 from fastapi.testclient import TestClient
-from nilai_api.app import app
-from nilai_api.db import UserManager
+
 from nilai_api.state import state
 from tests import model_endpoint, model_metadata, response as RESPONSE
-
-client = TestClient(app)
-
-# @pytest.fixture(scope='session', autouse=True)
-# def event_loop():
-#     loop = asyncio.new_event_loop()
-#     asyncio.set_event_loop(loop)
-#     yield loop
-#     loop.close()
 
 
 @pytest.mark.asyncio
@@ -30,6 +20,8 @@ def mock_user():
 
 @pytest.fixture
 def mock_user_manager(mocker):
+    from nilai_api.db import UserManager
+
     mocker.patch.object(
         UserManager,
         "get_token_usage",
@@ -74,6 +66,7 @@ def mock_user_manager(mocker):
     mocker.patch.object(UserManager, "initialize_db")
     mocker.patch.object(UserManager, "log_query")
     mocker.patch.object(UserManager, "update_last_activity")
+    return UserManager
 
 
 @pytest.fixture
@@ -100,6 +93,14 @@ def mock_state(mocker, event_loop):
     return state
 
 
+@pytest.fixture
+def client(mock_user_manager):
+    from nilai_api.app import app
+
+    with TestClient(app) as client:
+        yield client
+
+
 # Example test
 @pytest.mark.asyncio
 async def test_models_property(mock_state):
@@ -110,7 +111,7 @@ async def test_models_property(mock_state):
     assert models == {"ABC": model_endpoint}
 
 
-def test_get_usage(mock_user, mock_user_manager, mock_state):
+def test_get_usage(mock_user, mock_user_manager, mock_state, client):
     response = client.get("/v1/usage", headers={"Authorization": "Bearer test-api-key"})
     assert response.status_code == 200
     assert response.json() == {
@@ -123,7 +124,7 @@ def test_get_usage(mock_user, mock_user_manager, mock_state):
     }
 
 
-def test_get_attestation(mock_user, mock_user_manager, mock_state):
+def test_get_attestation(mock_user, mock_user_manager, mock_state, client):
     response = client.get(
         "/v1/attestation/report", headers={"Authorization": "Bearer test-api-key"}
     )
@@ -135,7 +136,7 @@ def test_get_attestation(mock_user, mock_user_manager, mock_state):
     }
 
 
-def test_get_models(mock_user, mock_user_manager, mock_state):
+def test_get_models(mock_user, mock_user_manager, mock_state, client):
     response = client.get(
         "/v1/models", headers={"Authorization": "Bearer test-api-key"}
     )
@@ -143,7 +144,7 @@ def test_get_models(mock_user, mock_user_manager, mock_state):
     assert response.json() == [model_metadata.model_dump()]
 
 
-def test_chat_completion(mock_user, mock_state, mock_user_manager, mocker):
+def test_chat_completion(mock_user, mock_state, mock_user_manager, mocker, client):
     mocker.patch("openai.api_key", new="test-api-key")
     # Mock the response from the OpenAI API
     from openai.types.chat import ChatCompletion

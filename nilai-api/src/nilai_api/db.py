@@ -38,24 +38,37 @@ class DatabaseConfig:
 
 # Create base and engine with improved configuration
 Base = sqlalchemy.orm.declarative_base()
-engine = create_async_engine(
-    DatabaseConfig.DATABASE_URL,
-    poolclass=AsyncAdaptedQueuePool,
-    pool_size=DatabaseConfig.POOL_SIZE,
-    max_overflow=DatabaseConfig.MAX_OVERFLOW,
-    pool_timeout=DatabaseConfig.POOL_TIMEOUT,
-    pool_recycle=DatabaseConfig.POOL_RECYCLE,
-    echo=False,  # Set to True for SQL logging during development
-)
 
-# Create async session factory
-AsyncSessionLocal = sessionmaker(
-    bind=engine,
-    class_=AsyncSession,
-    autocommit=False,
-    autoflush=False,
-    expire_on_commit=False,
-)
+_engine: Optional[sqlalchemy.ext.asyncio.AsyncEngine] = None
+_SessionLocal: Optional[sessionmaker] = None
+
+
+def get_engine() -> sqlalchemy.ext.asyncio.AsyncEngine:
+    global _engine
+    if _engine is None:
+        _engine = create_async_engine(
+            DatabaseConfig.DATABASE_URL,
+            poolclass=AsyncAdaptedQueuePool,
+            pool_size=DatabaseConfig.POOL_SIZE,
+            max_overflow=DatabaseConfig.MAX_OVERFLOW,
+            pool_timeout=DatabaseConfig.POOL_TIMEOUT,
+            pool_recycle=DatabaseConfig.POOL_RECYCLE,
+            echo=False,  # Set to True for SQL logging during development
+        )
+    return _engine
+
+
+def get_sessionmaker() -> sessionmaker:
+    global _SessionLocal
+    if _SessionLocal is None:
+        _SessionLocal = sessionmaker(
+            bind=get_engine(),
+            class_=AsyncSession,
+            autocommit=False,
+            autoflush=False,
+            expire_on_commit=False,
+        )
+    return _SessionLocal
 
 
 # Enhanced User Model with additional constraints and validation
@@ -106,7 +119,7 @@ class UserData:
 @asynccontextmanager
 async def get_db_session() -> "Generator[AsyncSession, Any, Any]":
     """Provide a transactional scope for database operations."""
-    session = AsyncSessionLocal()
+    session = get_sessionmaker()
     try:
         yield session
         await session.commit()
@@ -128,7 +141,7 @@ class UserManager:
             bool: True if tables were created, False if tables already existed
         """
         try:
-            async with engine.begin() as conn:
+            async with get_engine().begin() as conn:
                 # Create an inspector to check existing tables
                 inspector = await conn.run_sync(
                     lambda sync_conn: sqlalchemy.inspect(sync_conn)
