@@ -1,12 +1,31 @@
 import uuid
-from typing import List, Optional
+from typing import List, Optional, Literal
 
+from openai.types.chat import ChatCompletion, ChatCompletionMessage
+from openai.types.chat.chat_completion import Choice as OpenaAIChoice
+from openai.types.chat.chat_completion import CompletionUsage
 from pydantic import BaseModel, Field
 
 
-class Message(BaseModel):
-    role: str
-    content: str
+__all__ = [
+    "Message",
+    "Choice",
+    "ChatRequest",
+    "CompletionUsage",
+    "SignedChatCompletion",
+    "AttestationResponse",
+    "ModelMetadata",
+    "ModelEndpoint",
+    "HealthCheckResponse",
+]
+
+
+class Message(ChatCompletionMessage):
+    role: Literal["system", "user", "assistant"]
+
+
+class Choice(OpenaAIChoice):
+    pass
 
 
 class ChatRequest(BaseModel):
@@ -19,43 +38,7 @@ class ChatRequest(BaseModel):
     nilrag: Optional[dict] = {}
 
 
-class ChoiceChunkContent(BaseModel):
-    content: Optional[str]
-
-
-class ChoiceChunk(BaseModel):
-    """Choice chunk."""
-
-    index: int
-    delta: ChoiceChunkContent
-
-
-class ChatCompletionChunk(BaseModel):
-    """Chat completion chunk."""
-
-    choices: List[ChoiceChunk]
-
-
-class Choice(BaseModel):
-    index: int
-    message: Message
-    finish_reason: str
-    logprobs: Optional[dict]
-
-
-class Usage(BaseModel):
-    prompt_tokens: int
-    completion_tokens: int
-    total_tokens: int
-
-
-class ChatResponse(BaseModel):
-    id: str
-    object: str
-    created: int
-    model: str
-    choices: List[Choice]
-    usage: Usage
+class SignedChatCompletion(ChatCompletion):
     signature: str
 
 

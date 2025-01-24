@@ -6,9 +6,7 @@ from fastapi.testclient import TestClient
 from nilai_api.app import app
 from nilai_api.db import UserManager
 from nilai_api.state import state
-from nilai_common.api_model import ChatResponse, Choice, Message, Usage
-
-from tests import model_endpoint, model_metadata
+from tests import model_endpoint, model_metadata, response as RESPONSE
 
 client = TestClient(app)
 
@@ -102,6 +100,9 @@ def test_get_usage(mock_user, mock_user_manager):
         "prompt_tokens": 100,
         "completion_tokens": 50,
         "total_tokens": 150,
+        "completion_tokens_details": None,
+        "prompt_tokens_details": None,
+        "queries": 10,
     }
 
 
@@ -126,26 +127,18 @@ def test_get_models(mock_user, mock_user_manager, mock_state):
 
 
 def test_chat_completion(mock_user, mock_state, mock_user_manager, mocker):
-    response = ChatResponse(
-        id="test-id",
-        object="test-object",
-        model="test-model",
-        created=123456,
-        choices=[
-            Choice(
-                index=0,
-                message=Message(role="test-role", content="test-content"),
-                finish_reason="test-finish-reason",
-                logprobs={"test-logprobs": "test-value"},
-            )
-        ],
-        usage=Usage(prompt_tokens=100, completion_tokens=50, total_tokens=150),
-        signature="test-signature",
-    )
+    mocker.patch("openai.api_key", new="test-api-key")
+    # Mock the response from the OpenAI API
+    from openai.types.chat import ChatCompletion
+
+    data = RESPONSE.dict()
+    data.pop("signature")
+    response_data = ChatCompletion(**data)
     mocker.patch(
-        "httpx.AsyncClient.post",
-        return_value=mocker.Mock(status_code=200, content=response.model_dump_json()),
+        "openai._base_client.SyncAPIClient._request", return_value=response_data
     )
+
+    # Mock client.post behavior
     response = client.post(
         "/v1/chat/completions",
         json={
@@ -157,10 +150,14 @@ def test_chat_completion(mock_user, mock_state, mock_user_manager, mocker):
         },
         headers={"Authorization": "Bearer test-api-key"},
     )
+
+    # Assertions
     assert response.status_code == 200
     assert "usage" in response.json()
     assert response.json()["usage"] == {
         "prompt_tokens": 100,
         "completion_tokens": 50,
         "total_tokens": 150,
+        "completion_tokens_details": None,
+        "prompt_tokens_details": None,
     }

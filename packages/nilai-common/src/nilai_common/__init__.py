@@ -1,16 +1,13 @@
 from nilai_common.api_model import (
     AttestationResponse,
     ChatRequest,
-    ChatResponse,
-    ChatCompletionChunk,
-    ChoiceChunkContent,
-    ChoiceChunk,
+    SignedChatCompletion,
     Choice,
     HealthCheckResponse,
     Message,
     ModelEndpoint,
     ModelMetadata,
-    Usage,
+    CompletionUsage as Usage,
 )
 from nilai_common.config import SETTINGS
 from nilai_common.discovery import ModelServiceDiscovery
@@ -18,7 +15,7 @@ from nilai_common.discovery import ModelServiceDiscovery
 __all__ = [
     "Message",
     "ChatRequest",
-    "ChatResponse",
+    "SignedChatCompletion",
     "Choice",
     "ChoiceChunk",
     "ChoiceChunkContent",

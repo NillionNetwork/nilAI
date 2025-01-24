@@ -1,26 +1,25 @@
 # Fast API and serving
 import logging
 import os
-import asyncio
 from base64 import b64encode
-from typing import AsyncGenerator, Union
+from typing import AsyncGenerator, Union, List
 import numpy as np
 
 import nilql
 import nilrag
-import httpx
 from fastapi import APIRouter, Body, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from nilai_api.auth import get_user
 from nilai_api.crypto import sign_message
 from nilai_api.db import UserManager
 from nilai_api.state import state
+from openai import OpenAI
 
 # Internal libraries
 from nilai_common import (
     AttestationResponse,
     ChatRequest,
-    ChatResponse,
+    SignedChatCompletion,
     Message,
     ModelMetadata,
     Usage,
@@ -79,7 +78,7 @@ async def get_attestation(user: dict = Depends(get_user)) -> AttestationResponse
 
 
 @router.get("/v1/models", tags=["Model"])
-async def get_models(user: dict = Depends(get_user)) -> list[ModelMetadata]:
+async def get_models(user: dict = Depends(get_user)) -> List[ModelMetadata]:
     """
     List all available models in the system.
 
@@ -94,13 +93,22 @@ async def get_models(user: dict = Depends(get_user)) -> list[ModelMetadata]:
     """
     logger.info(f"Retrieving models for user {user['userid']} from pid {os.getpid()}")
     return [endpoint.metadata for endpoint in (await state.models).values()]
+    # result = [Model(
+    #     id = endpoint.metadata.id,
+    #     created = 0,
+    #     object = "model",
+    #     owned_by = endpoint.metadata.author,
+    #     data = endpoint.metadata.dict(),
+    # ) for endpoint in (await state.models).values()]
+
+    # return result[0]
 
 
 @router.post("/v1/chat/completions", tags=["Chat"], response_model=None)
 async def chat_completion(
     req: ChatRequest = Body(
         ChatRequest(
-            model="Llama-3.2-1B-Instruct",
+            model="meta-llama/Llama-3.2-1B-Instruct",
             messages=[
                 Message(role="system", content="You are a helpful assistant."),
                 Message(role="user", content="What is your name?"),
@@ -108,7 +116,7 @@ async def chat_completion(
         )
     ),
     user: dict = Depends(get_user),
-) -> Union[ChatResponse, StreamingResponse]:
+) -> Union[SignedChatCompletion, StreamingResponse]:
     """
     Generate a chat completion response from the AI model.
 
@@ -144,7 +152,7 @@ async def chat_completion(
     ```python
     # Generate a chat completion
     request = ChatRequest(
-        model="Llama-3.2-1B-Instruct",
+        model="meta-llama/Llama-3.2-1B-Instruct",
         messages=[
             {"role": "system", "content": "You are a helpful assistant"},
             {"role": "user", "content": "Hello, who are you?"}
@@ -157,10 +165,17 @@ async def chat_completion(
     endpoint = await state.get_model(model_name)
     if endpoint is None:
         raise HTTPException(
-            status_code=400, detail="Invalid model name, check /v1/models for options"
+            status_code=400,
+            detail=f"Invalid model name {model_name}, check /v1/models for options",
         )
 
-    model_url = endpoint.url
+    model_url = endpoint.url + "/v1/"
+
+    logger.info(
+        f"Chat completion request for model {model_name} from user {user['userid']} on url: {model_url}"
+    )
+
+    client = OpenAI(base_url=model_url, api_key="<not-needed>")
 
     if req.nilrag:
         """
@@ -282,60 +297,49 @@ async def chat_completion(
 
     if req.stream:
         # Forwarding Streamed Responses
-        async def stream_response() -> AsyncGenerator[str, None]:
+        async def chat_completion_stream_generator() -> AsyncGenerator[str, None]:
             try:
-                async with httpx.AsyncClient() as client:
-                    async with client.stream(
-                        "POST",
-                        f"{model_url}/v1/chat/completions",
-                        json=req.model_dump(),
-                        timeout=None,
-                    ) as response:
-                        response.raise_for_status()  # Raise an error for invalid status codes
+                response = client.chat.completions.create(
+                    model=req.model,
+                    messages=req.messages,
+                    stream=req.stream,
+                    extra_body={
+                        "stream_options": {
+                            "include_usage": True,
+                            # "continuous_usage_stats": True,
+                        }
+                    },
+                )
 
-                        # Process the streamed response chunks
-                        async for chunk in response.aiter_lines():
-                            if chunk:  # Skip empty lines
-                                yield f"{chunk}\n"
-                                await asyncio.sleep(
-                                    0
-                                )  # Add an await to return inmediately
-            except httpx.HTTPStatusError as e:
-                raise HTTPException(
-                    status_code=e.response.status_code,
-                    detail=e.response.json().get("detail", str(e)),
-                )
-            except httpx.RequestError as e:
-                raise HTTPException(
-                    status_code=503,
-                    detail=f"Error connecting to model service: {str(e)}",
-                )
+                for chunk in response:
+                    if chunk.usage is not None:
+                        UserManager.update_token_usage(
+                            user["userid"],
+                            prompt_tokens=chunk.usage.prompt_tokens,
+                            completion_tokens=chunk.usage.completion_tokens,
+                        )
+                    else:
+                        data = chunk.model_dump_json(exclude_unset=True)
+                        yield f"data: {data}\n\n"
+
+            except Exception as e:
+                logger.error(f"Error streaming response: {e}")
+                return
 
         # Return the streaming response
         return StreamingResponse(
-            stream_response(),
+            chat_completion_stream_generator(),
             media_type="text/event-stream",  # Ensure client interprets as Server-Sent Events
         )
 
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{model_url}/v1/chat/completions", json=req.model_dump(), timeout=None
-            )
-            response.raise_for_status()
-            model_response = ChatResponse.model_validate_json(response.content)
-    except httpx.HTTPStatusError as e:
-        # Forward the original error from the model
-        raise HTTPException(
-            status_code=e.response.status_code,
-            detail=e.response.json().get("detail", str(e)),
-        )
-    except httpx.RequestError as e:
-        # Handle connection/timeout errors
-        raise HTTPException(
-            status_code=503, detail=f"Error connecting to model service: {str(e)}"
-        )
+    response = client.chat.completions.create(
+        model=req.model, messages=req.messages, stream=req.stream
+    )
 
+    model_response = SignedChatCompletion(
+        **response.dict(),
+        signature="",
+    )
     # Update token usage
     UserManager.update_token_usage(
         user["userid"],
