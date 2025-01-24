@@ -119,7 +119,7 @@ class UserData:
 @asynccontextmanager
 async def get_db_session() -> "Generator[AsyncSession, Any, Any]":
     """Provide a transactional scope for database operations."""
-    session = get_sessionmaker()
+    session = get_sessionmaker()()
     try:
         yield session
         await session.commit()
