@@ -1,7 +1,7 @@
 #
 # SPDX-FileCopyrightText: Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
-# 
+#
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
 #
@@ -44,8 +44,9 @@ from verifier.exceptions import (
     TimeoutError,
 )
 
+
 def is_non_fatal_issue(error):
-    """ The function to check if the given error is non fatal or not.
+    """The function to check if the given error is non fatal or not.
 
     Args:
         error (Exception): any exception that may be raised.
@@ -55,15 +56,17 @@ def is_non_fatal_issue(error):
                 False.
     """
 
-    if isinstance(error, type(NVMLError(NVML_ERROR_UNINITIALIZED))) or \
-       isinstance(error, type(NVMLError(NVML_ERROR_TIMEOUT))) or \
-       isinstance(error, type(NVMLError(NVML_ERROR_RESET_REQUIRED))) or \
-       isinstance(error, type(NVMLError(NVML_ERROR_IN_USE))) or \
-       isinstance(error, type(NVMLError(NVML_ERROR_MEMORY))) or \
-       isinstance(error, type(NVMLError(NVML_ERROR_NO_DATA))) or \
-       isinstance(error, type(NVMLError(NVML_ERROR_INSUFFICIENT_RESOURCES))) or \
-       isinstance(error, NonceMismatchError) or \
-       isinstance(error, TimeoutError):
-       return True
+    if (
+        isinstance(error, type(NVMLError(NVML_ERROR_UNINITIALIZED)))
+        or isinstance(error, type(NVMLError(NVML_ERROR_TIMEOUT)))
+        or isinstance(error, type(NVMLError(NVML_ERROR_RESET_REQUIRED)))
+        or isinstance(error, type(NVMLError(NVML_ERROR_IN_USE)))
+        or isinstance(error, type(NVMLError(NVML_ERROR_MEMORY)))
+        or isinstance(error, type(NVMLError(NVML_ERROR_NO_DATA)))
+        or isinstance(error, type(NVMLError(NVML_ERROR_INSUFFICIENT_RESOURCES)))
+        or isinstance(error, NonceMismatchError)
+        or isinstance(error, TimeoutError)
+    ):
+        return True
 
     return False

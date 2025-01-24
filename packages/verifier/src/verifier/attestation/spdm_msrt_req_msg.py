@@ -1,7 +1,7 @@
 #
 # SPDX-FileCopyrightText: Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
-# 
+#
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
 #
@@ -31,8 +31,9 @@
 from verifier.config import info_log
 from verifier.exceptions import ParsingError
 
+
 class SpdmMeasurementRequestMessage:
-    """ Class representing the SPDM GET_MEASUREMENT request message.
+    """Class representing the SPDM GET_MEASUREMENT request message.
     Following is the expected structure of the MEASUREMENTS request message in DMTF's SPDM 1.1 spec.
     OFFSET   - FIELD                   - SIZE(in bytes)
     0        - SPDMVersion             - 1
@@ -42,25 +43,26 @@ class SpdmMeasurementRequestMessage:
     4        - Nonce                   - 32
     36       - SlotIDParam             - 1
     """
+
     FieldSize = {
-        "SPDMVersion"         : 1,
-        "RequestResponseCode" : 1,
-        "Param1"              : 1,
-        "Param2"              : 1,
-        "Nonce"               : 32,
-        "SlotIDParam"         : 1,
+        "SPDMVersion": 1,
+        "RequestResponseCode": 1,
+        "Param1": 1,
+        "Param2": 1,
+        "Nonce": 32,
+        "SlotIDParam": 1,
     }
 
     def get_spdm_version(self):
-        """ Fetches the spdm version field of the object of SpdmMeasurementRequestMessage.
+        """Fetches the spdm version field of the object of SpdmMeasurementRequestMessage.
 
         Returns:
             [bytes]: the spdm version.
         """
         return self.SPDMVersion
-    
+
     def set_spdm_version(self, value):
-        """ Sets the spdm version field of the object representing the SPDM GET_MEASUREMENT request.
+        """Sets the spdm version field of the object representing the SPDM GET_MEASUREMENT request.
 
         Args:
             value (bytes): the spdm version.
@@ -68,15 +70,15 @@ class SpdmMeasurementRequestMessage:
         self.SPDMVersion = value
 
     def get_request_response_code(self):
-        """ Fetches the RequestResponseCode field of the object representing the SPDM GET_MEASUREMENT request.
+        """Fetches the RequestResponseCode field of the object representing the SPDM GET_MEASUREMENT request.
 
         Returns:
             [bytes]: the RequestResponseCode
         """
         return self.RequestResponseCode
-    
+
     def set_request_response_code(self, value):
-        """ Sets the RequestResponseCode field of the object representing the SPDM GET_MEASUREMENT request.
+        """Sets the RequestResponseCode field of the object representing the SPDM GET_MEASUREMENT request.
 
         Args:
             value (bytes): the RequestResponse value.
@@ -84,15 +86,15 @@ class SpdmMeasurementRequestMessage:
         self.RequestResponseCode = value
 
     def get_param1(self):
-        """ Fetches the Param1 field of the object representing the SPDM GET_MEASUREMENT request.
+        """Fetches the Param1 field of the object representing the SPDM GET_MEASUREMENT request.
 
         Returns:
             [bytes]: the Param1 value.
         """
         return self.Param1
-    
+
     def set_param1(self, value):
-        """ Sets the Param1 field of the object representing the SPDM GET_MEASUREMENT request.
+        """Sets the Param1 field of the object representing the SPDM GET_MEASUREMENT request.
 
         Args:
             value (bytes): the Param1 value.
@@ -100,7 +102,7 @@ class SpdmMeasurementRequestMessage:
         self.Param1 = value
 
     def get_param2(self):
-        """ Fetches the Param2 field of the object representing the SPDM GET_MEASUREMENT request.
+        """Fetches the Param2 field of the object representing the SPDM GET_MEASUREMENT request.
 
         Returns:
             [bytes]: the Param2 value
@@ -108,7 +110,7 @@ class SpdmMeasurementRequestMessage:
         return self.Param2
 
     def set_param2(self, value):
-        """ Sets the Param2 field of the object representing the SPDM GET_MEASUREMENT request.
+        """Sets the Param2 field of the object representing the SPDM GET_MEASUREMENT request.
 
         Args:
             value (bytes): the Param2 value.
@@ -116,15 +118,15 @@ class SpdmMeasurementRequestMessage:
         self.Param2 = value
 
     def get_nonce(self):
-        """ Fetches the Nonce field of the object representing the SPDM GET_MEASUREMENT request.
+        """Fetches the Nonce field of the object representing the SPDM GET_MEASUREMENT request.
 
         Returns:
             [bytes]: the nonce value.
         """
         return self.Nonce
-    
+
     def set_nonce(self, value):
-        """ Sets the Nonce field value of the object representing the SPDM GET_MEASUREMENT request.
+        """Sets the Nonce field value of the object representing the SPDM GET_MEASUREMENT request.
 
         Args:
             value (bytes): the nonce value.
@@ -132,7 +134,7 @@ class SpdmMeasurementRequestMessage:
         self.Nonce = value
 
     def get_slot_id_param(self):
-        """ Fetches the SlotIDParam field value of the object representing the SPDM GET_MEASUREMENT request.
+        """Fetches the SlotIDParam field value of the object representing the SPDM GET_MEASUREMENT request.
 
         Returns:
             [bytes]: SlotIDParam value.
@@ -140,7 +142,7 @@ class SpdmMeasurementRequestMessage:
         return self.SlotIDParam
 
     def set_slot_id_param(self, value):
-        """ Sets the SlotIDParam field value of the object representing the SPDM GET_MEASUREMENT request.
+        """Sets the SlotIDParam field value of the object representing the SPDM GET_MEASUREMENT request.
 
         Args:
             value (bytes): the SlotIDParam value.
@@ -148,7 +150,7 @@ class SpdmMeasurementRequestMessage:
         self.SlotIDParam = value
 
     def parse(self, request_data):
-        """ Parses the raw SPDM GET_MEASUREMENT request message.
+        """Parses the raw SPDM GET_MEASUREMENT request message.
 
         Args:
             request_data (bytes): the raw message data.
@@ -158,29 +160,31 @@ class SpdmMeasurementRequestMessage:
         """
         byte_index = 0
 
-        value = request_data[byte_index : byte_index + self.FieldSize['SPDMVersion']]
+        value = request_data[byte_index : byte_index + self.FieldSize["SPDMVersion"]]
         self.set_spdm_version(value)
-        byte_index = byte_index + self.FieldSize['SPDMVersion']
+        byte_index = byte_index + self.FieldSize["SPDMVersion"]
 
-        value = request_data[byte_index : byte_index + self.FieldSize['RequestResponseCode']]
+        value = request_data[
+            byte_index : byte_index + self.FieldSize["RequestResponseCode"]
+        ]
         self.set_request_response_code(value)
-        byte_index = byte_index + self.FieldSize['RequestResponseCode']
+        byte_index = byte_index + self.FieldSize["RequestResponseCode"]
 
-        value = request_data[byte_index : byte_index + self.FieldSize['Param1']]
+        value = request_data[byte_index : byte_index + self.FieldSize["Param1"]]
         self.set_param1(value)
-        byte_index = byte_index + self.FieldSize['Param1']
+        byte_index = byte_index + self.FieldSize["Param1"]
 
-        value = request_data[byte_index : byte_index + self.FieldSize['Param2']]
+        value = request_data[byte_index : byte_index + self.FieldSize["Param2"]]
         self.set_param2(value)
-        byte_index = byte_index + self.FieldSize['Param2']
+        byte_index = byte_index + self.FieldSize["Param2"]
 
-        value = request_data[byte_index : byte_index + self.FieldSize['Nonce']]
+        value = request_data[byte_index : byte_index + self.FieldSize["Nonce"]]
         self.set_nonce(value)
-        byte_index = byte_index + self.FieldSize['Nonce']
+        byte_index = byte_index + self.FieldSize["Nonce"]
 
-        value = request_data[byte_index : byte_index + self.FieldSize['SlotIDParam']]
+        value = request_data[byte_index : byte_index + self.FieldSize["SlotIDParam"]]
         self.set_slot_id_param(value)
-        byte_index = byte_index + self.FieldSize['SlotIDParam']
+        byte_index = byte_index + self.FieldSize["SlotIDParam"]
 
         if byte_index != len(request_data):
             err_msg = "Something went wrong during parsing the SPDM GET MEASUREMENT request message."
@@ -188,7 +192,7 @@ class SpdmMeasurementRequestMessage:
             raise ParsingError(err_msg)
 
     def print_obj(self, logger):
-        """ Prints all the field values of the object representing the SPDM GET_MEASUREMENT request.
+        """Prints all the field values of the object representing the SPDM GET_MEASUREMENT request.
 
         Args:
             logger (logging.Logger): the logger object.
@@ -201,8 +205,8 @@ class SpdmMeasurementRequestMessage:
         logger.debug(f"Nonce               : {self.Nonce.hex()}")
         logger.debug(f"SlotIDParam         : {self.SlotIDParam.hex()}")
 
-    def __init__(self,request_data):
-        """ The constructor method for the SpdmMeasurementRequestMessage class representing the SPDM GET_MEASUREMENT
+    def __init__(self, request_data):
+        """The constructor method for the SpdmMeasurementRequestMessage class representing the SPDM GET_MEASUREMENT
         request message.
 
         Args:
@@ -214,6 +218,6 @@ class SpdmMeasurementRequestMessage:
         self.RequestResponseCode = None
         self.Param1 = None
         self.Param2 = None
-        self.Nonce  = None
+        self.Nonce = None
         self.SlotIDParam = None
         self.parse(request_data)

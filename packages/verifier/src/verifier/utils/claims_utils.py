@@ -100,7 +100,14 @@ class ClaimsUtils:
 
     @staticmethod
     def create_detached_eat_claims(
-        attest_result: bool, gpu_claims_list, nonce, hwmodel, oemid, ueid, driver_warnings, vbios_warnings
+        attest_result: bool,
+        gpu_claims_list,
+        nonce,
+        hwmodel,
+        oemid,
+        ueid,
+        driver_warnings,
+        vbios_warnings,
     ):
         """Utility method to create detached EAT claims for a specific attestation token
 
@@ -129,7 +136,11 @@ class ClaimsUtils:
             gpu_claims["ueid"] = str(ueid.get(gpu_uuid, ""))
             gpu_claims["oemid"] = oemid.get(gpu_uuid, "")
             gpu_claims["iss"] = "LOCAL_GPU_VERIFIER"
-            warning = (driver_warnings.get(gpu_uuid, "") + " " + vbios_warnings.get(gpu_uuid, "")).strip()
+            warning = (
+                driver_warnings.get(gpu_uuid, "")
+                + " "
+                + vbios_warnings.get(gpu_uuid, "")
+            ).strip()
             if warning:
                 gpu_claims["x-nvidia-attestation-warning"] = warning
             gpu_claims_json = json.dumps(gpu_claims)

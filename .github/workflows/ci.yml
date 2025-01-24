@@ -34,7 +34,7 @@ jobs:
         run: uv run ruff format --check
 
       - name: Run Ruff linting
-        run: uv run ruff check
+        run: uv run ruff check --exclude packages/verifier/
       
       - name: Run tests
         run: uv run pytest -v

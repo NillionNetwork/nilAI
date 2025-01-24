@@ -9,7 +9,10 @@ from nilai_api.sev.sev import sev
 from nilai_common import SETTINGS, ModelServiceDiscovery
 from nilai_common.api_model import ModelEndpoint
 from verifier.cc_admin import collect_gpu_evidence, attest
-import secrets, json, base64
+import secrets
+import json
+import base64
+
 logger = logging.getLogger("uvicorn.error")
 
 
@@ -39,7 +42,6 @@ class AppState:
     def gpu_attestation(self) -> str:
         # Check if GPU is available
         try:
-
             nonce = secrets.token_bytes(32).hex()
             print(nonce, len(nonce))
             arguments_as_dictionary = {
@@ -56,12 +58,13 @@ class AppState:
                 "ocsp_cert_revocation_extension_driver_rim": None,
                 "ocsp_cert_revocation_extension_vbios_rim": None,
             }
-            evidence_list = collect_gpu_evidence(nonce,)
+            evidence_list = collect_gpu_evidence(
+                nonce,
+            )
             result, jwt_token = attest(arguments_as_dictionary, nonce, evidence_list)
-            self._gpu_quote = base64.b64encode(json.dumps({
-                "result": result,
-                "jwt_token": jwt_token
-            }).encode()).decode()
+            self._gpu_quote = base64.b64encode(
+                json.dumps({"result": result, "jwt_token": jwt_token}).encode()
+            ).decode()
             return self._gpu_quote
         except Exception as e:
             logging.error("Could not attest GPU: %s", e)

@@ -216,7 +216,9 @@ def collect_gpu_evidence(nonce: str, no_gpu_mode=False):
             if no_gpu_mode:
                 gpu_info_obj = NvmlHandlerTest(settings=BaseSettings)
             else:
-                gpu_info_obj = NvmlHandler(index=i, nonce=evidence_nonce, settings=BaseSettings)
+                gpu_info_obj = NvmlHandler(
+                    index=i, nonce=evidence_nonce, settings=BaseSettings
+                )
             evidence_list.append(gpu_info_obj)
         info_log.info("All GPU Evidences fetched successfully")
 
@@ -249,7 +251,9 @@ def collect_gpu_evidence_remote(nonce: str, no_gpu_mode=False):
     remote_evidence_list = []
     for gpu_info_obj in evidence_list:
         gpu_cert_chain = gpu_info_obj.get_attestation_cert_chain()
-        gpu_cert_chain_base64 = GpuCertificateChains.extract_gpu_cert_chain_base64(gpu_cert_chain)
+        gpu_cert_chain_base64 = GpuCertificateChains.extract_gpu_cert_chain_base64(
+            gpu_cert_chain
+        )
         evidence_bytes = gpu_info_obj.get_attestation_report()
         evidence_base64 = base64.b64encode(evidence_bytes).decode("utf-8")
         gpu_evidence = {
@@ -309,15 +313,21 @@ def attest(arguments_as_dictionary, nonce, gpu_evidence_list):
 
         # Set RIM service url
         if not arguments_as_dictionary["rim_service_url"] is None:
-            BaseSettings.set_rim_service_base_url(arguments_as_dictionary["rim_service_url"])
+            BaseSettings.set_rim_service_base_url(
+                arguments_as_dictionary["rim_service_url"]
+            )
         else:
             BaseSettings.set_thim_rim_service_base_url()
         info_log.debug(f"RIM service url: {BaseSettings.RIM_SERVICE_BASE_URL}")
 
         # Set OCSP service url
         if not arguments_as_dictionary["ocsp_service_url"] is None:
-            BaseSettings.set_ocsp_service_url(arguments_as_dictionary["ocsp_service_url"])
-            BaseSettings.OCSP_NONCE_ENABLED = arguments_as_dictionary.get("ocsp_nonce_enabled", False)
+            BaseSettings.set_ocsp_service_url(
+                arguments_as_dictionary["ocsp_service_url"]
+            )
+            BaseSettings.OCSP_NONCE_ENABLED = arguments_as_dictionary.get(
+                "ocsp_nonce_enabled", False
+            )
         else:
             BaseSettings.set_thim_ocsp_service_url()
         info_log.debug(
@@ -340,35 +350,53 @@ def attest(arguments_as_dictionary, nonce, gpu_evidence_list):
 
         # Set allow OCSP cert hold flag
         if arguments_as_dictionary["allow_hold_cert"] is not None:
-            BaseSettings.allow_hold_cert = BaseSettings.allow_hold_cert or arguments_as_dictionary["allow_hold_cert"]
+            BaseSettings.allow_hold_cert = (
+                BaseSettings.allow_hold_cert
+                or arguments_as_dictionary["allow_hold_cert"]
+            )
 
         # Set OCSP validity extension
         if arguments_as_dictionary["ocsp_validity_extension"] is not None:
-            BaseSettings.OCSP_VALIDITY_EXTENSION_HRS = max(0, arguments_as_dictionary["ocsp_validity_extension"])
+            BaseSettings.OCSP_VALIDITY_EXTENSION_HRS = max(
+                0, arguments_as_dictionary["ocsp_validity_extension"]
+            )
 
         # Set OCSP cert revoked extension
         if arguments_as_dictionary["ocsp_cert_revocation_extension_device"] is not None:
             BaseSettings.OCSP_CERT_REVOCATION_DEVICE_EXTENSION_HRS = max(
                 0, arguments_as_dictionary["ocsp_cert_revocation_extension_device"]
             )
-        if arguments_as_dictionary["ocsp_cert_revocation_extension_driver_rim"] is not None:
+        if (
+            arguments_as_dictionary["ocsp_cert_revocation_extension_driver_rim"]
+            is not None
+        ):
             BaseSettings.OCSP_CERT_REVOCATION_DRIVER_RIM_EXTENSION_HRS = max(
                 0, arguments_as_dictionary["ocsp_cert_revocation_extension_driver_rim"]
             )
-        if arguments_as_dictionary["ocsp_cert_revocation_extension_vbios_rim"] is not None:
+        if (
+            arguments_as_dictionary["ocsp_cert_revocation_extension_vbios_rim"]
+            is not None
+        ):
             BaseSettings.OCSP_CERT_REVOCATION_VBIOS_RIM_EXTENSION_HRS = max(
                 0, arguments_as_dictionary["ocsp_cert_revocation_extension_vbios_rim"]
             )
 
         # Set the RIM root certificate path
         if not arguments_as_dictionary["rim_root_cert"] is None:
-            BaseSettings.set_rim_root_certificate(arguments_as_dictionary["rim_root_cert"])
+            BaseSettings.set_rim_root_certificate(
+                arguments_as_dictionary["rim_root_cert"]
+            )
 
         # Log the arguments and BaseSettings
         base_settings_dict = dict(
             (k, v)
             for k, v in vars(BaseSettings).items()
-            if not (k.startswith("_") or callable(v) or k in dir(BaseSettings.__class__) or isinstance(v, classmethod))
+            if not (
+                k.startswith("_")
+                or callable(v)
+                or k in dir(BaseSettings.__class__)
+                or isinstance(v, classmethod)
+            )
         )
         event_log.debug(f"Arguments: {arguments_as_dictionary}")
         event_log.debug(f"BaseSettings: {base_settings_dict}")
@@ -381,12 +409,18 @@ def attest(arguments_as_dictionary, nonce, gpu_evidence_list):
                 event_log.debug(f"The architecture of the GPU with index {i} is HOPPER")
                 settings = HopperSettings()
 
-                HopperSettings.set_driver_rim_path(arguments_as_dictionary["driver_rim"])
+                HopperSettings.set_driver_rim_path(
+                    arguments_as_dictionary["driver_rim"]
+                )
                 HopperSettings.set_vbios_rim_path(arguments_as_dictionary["vbios_rim"])
 
                 if arguments_as_dictionary["test_no_gpu"]:
-                    HopperSettings.set_driver_rim_path(HopperSettings.TEST_NO_GPU_DRIVER_RIM_PATH)
-                    HopperSettings.set_vbios_rim_path(HopperSettings.TEST_NO_GPU_VBIOS_RIM_PATH)
+                    HopperSettings.set_driver_rim_path(
+                        HopperSettings.TEST_NO_GPU_DRIVER_RIM_PATH
+                    )
+                    HopperSettings.set_vbios_rim_path(
+                        HopperSettings.TEST_NO_GPU_VBIOS_RIM_PATH
+                    )
             else:
                 err_msg = "Unknown GPU architecture."
                 event_log.error(err_msg)
@@ -416,7 +450,9 @@ def attest(arguments_as_dictionary, nonce, gpu_evidence_list):
 
             # Parsing the attestation report.
             attestation_report_data = gpu_info_obj.get_attestation_report()
-            attestation_report_obj = AttestationReport(attestation_report_data, settings)
+            attestation_report_obj = AttestationReport(
+                attestation_report_data, settings
+            )
             settings.mark_attestation_report_parsed()
 
             info_log.info("\tValidating GPU certificate chains.")
@@ -438,25 +474,38 @@ def attest(arguments_as_dictionary, nonce, gpu_evidence_list):
                     .value
                 )
                 hwmodel[gpu_info_obj.get_uuid()] = common_name
-                ueid[gpu_info_obj.get_uuid()] = gpu_attestation_cert_chain[0].get_serial_number()
+                ueid[gpu_info_obj.get_uuid()] = gpu_attestation_cert_chain[
+                    0
+                ].get_serial_number()
 
             gpu_leaf_cert = gpu_attestation_cert_chain[0]
             event_log.debug("\t\tverifying attestation certificate chain.")
             cert_verification_status = CcAdminUtils.verify_gpu_certificate_chain(
                 gpu_attestation_cert_chain,
                 settings,
-                attestation_report_obj.get_response_message().get_opaque_data().get_data("OPAQUE_FIELD_ID_FWID").hex(),
+                attestation_report_obj.get_response_message()
+                .get_opaque_data()
+                .get_data("OPAQUE_FIELD_ID_FWID")
+                .hex(),
             )
 
             if not cert_verification_status:
-                err_msg = "\t\tGPU attestation report certificate chain validation failed."
+                err_msg = (
+                    "\t\tGPU attestation report certificate chain validation failed."
+                )
                 event_log.error(err_msg)
                 raise CertChainVerificationFailureError(err_msg)
             else:
-                info_log.info("\t\tGPU attestation report certificate chain validation successful.")
+                info_log.info(
+                    "\t\tGPU attestation report certificate chain validation successful."
+                )
 
-            cert_chain_revocation_status, gpu_attestation_warning = CcAdminUtils.ocsp_certificate_chain_validation(
-                gpu_attestation_cert_chain, settings, BaseSettings.Certificate_Chain_Verification_Mode.GPU_ATTESTATION
+            cert_chain_revocation_status, gpu_attestation_warning = (
+                CcAdminUtils.ocsp_certificate_chain_validation(
+                    gpu_attestation_cert_chain,
+                    settings,
+                    BaseSettings.Certificate_Chain_Verification_Mode.GPU_ATTESTATION,
+                )
             )
 
             if not cert_chain_revocation_status:
@@ -468,13 +517,15 @@ def attest(arguments_as_dictionary, nonce, gpu_evidence_list):
 
             info_log.info("\tAuthenticating attestation report")
             attestation_report_obj.print_obj(info_log)
-            attestation_report_verification_status = CcAdminUtils.verify_attestation_report(
-                attestation_report_obj=attestation_report_obj,
-                gpu_leaf_certificate=gpu_leaf_cert,
-                nonce=att_report_nonce_hex,
-                driver_version=driver_version,
-                vbios_version=vbios_version,
-                settings=settings,
+            attestation_report_verification_status = (
+                CcAdminUtils.verify_attestation_report(
+                    attestation_report_obj=attestation_report_obj,
+                    gpu_leaf_certificate=gpu_leaf_cert,
+                    nonce=att_report_nonce_hex,
+                    driver_version=driver_version,
+                    vbios_version=vbios_version,
+                    settings=settings,
+                )
             )
 
             if attestation_report_verification_status:
@@ -490,45 +541,76 @@ def attest(arguments_as_dictionary, nonce, gpu_evidence_list):
             info_log.info("\t\tAuthenticating Driver RIM")
 
             # Use local RIM file if provided, else fetch from RIM service
-            if arguments_as_dictionary.get("driver_rim") or arguments_as_dictionary["test_no_gpu"]:
-                info_log.info("\t\t\tUsing the local driver rim file : " + settings.DRIVER_RIM_PATH)
-                driver_rim = RIM(rim_name="driver", settings=settings, rim_path=settings.DRIVER_RIM_PATH)
+            if (
+                arguments_as_dictionary.get("driver_rim")
+                or arguments_as_dictionary["test_no_gpu"]
+            ):
+                info_log.info(
+                    "\t\t\tUsing the local driver rim file : "
+                    + settings.DRIVER_RIM_PATH
+                )
+                driver_rim = RIM(
+                    rim_name="driver",
+                    settings=settings,
+                    rim_path=settings.DRIVER_RIM_PATH,
+                )
             else:
                 info_log.info("\t\t\tFetching the driver RIM from the RIM service.")
                 driver_rim_file_id = CcAdminUtils.get_driver_rim_file_id(driver_version)
                 driver_rim_content = CcAdminUtils.fetch_rim_file(
                     driver_rim_file_id, BaseSettings.RIM_SERVICE_RETRY_COUNT
                 )
-                driver_rim = RIM(rim_name="driver", settings=settings, content=driver_rim_content)
+                driver_rim = RIM(
+                    rim_name="driver", settings=settings, content=driver_rim_content
+                )
                 try:
-                    driver_rim_manufacturer_id = driver_rim.get_manufacturer_id(driver_rim_content)
+                    driver_rim_manufacturer_id = driver_rim.get_manufacturer_id(
+                        driver_rim_content
+                    )
                 except Exception as error:
-                    event_log.error(f"Error while fetching manufacturer id from driver RIM : {error}")
+                    event_log.error(
+                        f"Error while fetching manufacturer id from driver RIM : {error}"
+                    )
                     driver_rim_manufacturer_id = None
                 oemid[gpu_info_obj.get_uuid()] = driver_rim_manufacturer_id
 
-            driver_rim_verification_status, gpu_driver_attestation_warning = driver_rim.verify(
-                version=driver_version, settings=settings
+            driver_rim_verification_status, gpu_driver_attestation_warning = (
+                driver_rim.verify(version=driver_version, settings=settings)
             )
-            gpu_driver_attestation_warning_list[gpu_info_obj.get_uuid()] = gpu_driver_attestation_warning
+            gpu_driver_attestation_warning_list[gpu_info_obj.get_uuid()] = (
+                gpu_driver_attestation_warning
+            )
 
             if driver_rim_verification_status:
                 settings.mark_driver_rim_signature_verified()
                 info_log.info("\t\t\tDriver RIM verification successful")
             else:
                 event_log.error("\t\t\tDriver RIM verification failed.")
-                raise RIMVerificationFailureError("\t\t\tDriver RIM verification failed.\n\t\t\tQuitting now.")
+                raise RIMVerificationFailureError(
+                    "\t\t\tDriver RIM verification failed.\n\t\t\tQuitting now."
+                )
 
             # performing the schema validation and signature verification of the vbios RIM.
             info_log.info("\t\tAuthenticating VBIOS RIM.")
-            if arguments_as_dictionary.get("vbios_rim") or arguments_as_dictionary["test_no_gpu"]:
-                info_log.info("\t\t\tUsing the local VBIOS rim file : " + settings.VBIOS_RIM_PATH)
-                driver_rim = RIM(rim_name="vbios", settings=settings, rim_path=settings.VBIOS_RIM_PATH)
+            if (
+                arguments_as_dictionary.get("vbios_rim")
+                or arguments_as_dictionary["test_no_gpu"]
+            ):
+                info_log.info(
+                    "\t\t\tUsing the local VBIOS rim file : " + settings.VBIOS_RIM_PATH
+                )
+                driver_rim = RIM(
+                    rim_name="vbios",
+                    settings=settings,
+                    rim_path=settings.VBIOS_RIM_PATH,
+                )
 
             else:
                 info_log.info("\t\t\tFetching the VBIOS RIM from the RIM service.")
                 project = (
-                    attestation_report_obj.get_response_message().get_opaque_data().get_data("OPAQUE_FIELD_ID_PROJECT")
+                    attestation_report_obj.get_response_message()
+                    .get_opaque_data()
+                    .get_data("OPAQUE_FIELD_ID_PROJECT")
                 )
                 project_sku = (
                     attestation_report_obj.get_response_message()
@@ -561,28 +643,40 @@ def attest(arguments_as_dictionary, nonce, gpu_evidence_list):
                 vbios_rim_content = CcAdminUtils.fetch_rim_file(
                     vbios_rim_file_id, BaseSettings.RIM_SERVICE_RETRY_COUNT
                 )
-                vbios_rim = RIM(rim_name="vbios", settings=settings, content=vbios_rim_content)
+                vbios_rim = RIM(
+                    rim_name="vbios", settings=settings, content=vbios_rim_content
+                )
 
             vbios_rim_verification_status, gpu_attestation_warning = vbios_rim.verify(
                 version=vbios_version, settings=settings
             )
-            gpu_vbios_attestation_warning_list[gpu_info_obj.get_uuid()] = gpu_attestation_warning
+            gpu_vbios_attestation_warning_list[gpu_info_obj.get_uuid()] = (
+                gpu_attestation_warning
+            )
 
             if vbios_rim_verification_status:
                 settings.mark_vbios_rim_signature_verified()
                 info_log.info("\t\t\tVBIOS RIM verification successful")
             else:
                 event_log.error("\t\tVBIOS RIM verification failed.")
-                raise RIMVerificationFailureError("\t\tVBIOS RIM verification failed.\n\tQuitting now.")
+                raise RIMVerificationFailureError(
+                    "\t\tVBIOS RIM verification failed.\n\tQuitting now."
+                )
 
-            verifier_obj = Verifier(attestation_report_obj, driver_rim, vbios_rim, settings=settings)
+            verifier_obj = Verifier(
+                attestation_report_obj, driver_rim, vbios_rim, settings=settings
+            )
             verifier_obj.verify(settings)
 
             # Checking the attestation status.
             if settings.check_status():
-                info_log.info(f"\tGPU {i} with UUID {gpu_info_obj.get_uuid()} verified successfully.")
+                info_log.info(
+                    f"\tGPU {i} with UUID {gpu_info_obj.get_uuid()} verified successfully."
+                )
             else:
-                info_log.info(f"The verification of GPU {i} with UUID {gpu_info_obj.get_uuid()} resulted in failure.")
+                info_log.info(
+                    f"The verification of GPU {i} with UUID {gpu_info_obj.get_uuid()} resulted in failure."
+                )
 
             if i == 0:
                 overall_status = settings.check_status()
@@ -591,7 +685,9 @@ def attest(arguments_as_dictionary, nonce, gpu_evidence_list):
 
             # Set current gpu_claims
             current_gpu_uuid = gpu_info_obj.get_uuid()
-            current_gpu_claims = ClaimsUtils.get_current_gpu_claims(settings, current_gpu_uuid)
+            current_gpu_claims = ClaimsUtils.get_current_gpu_claims(
+                settings, current_gpu_uuid
+            )
             gpu_claims_list.append((i, current_gpu_uuid, current_gpu_claims))
 
     except Exception as error:
@@ -601,13 +697,18 @@ def attest(arguments_as_dictionary, nonce, gpu_evidence_list):
             return
         else:
             current_gpu_uuid = gpu_info_obj.get_uuid()
-            current_gpu_claims = ClaimsUtils.get_current_gpu_claims(settings, current_gpu_uuid)
+            current_gpu_claims = ClaimsUtils.get_current_gpu_claims(
+                settings, current_gpu_uuid
+            )
             gpu_claims_list.append((i, current_gpu_uuid, current_gpu_claims))
 
     finally:
         # Checking the attestation status.
         if overall_status:
-            if not arguments_as_dictionary["user_mode"] and not arguments_as_dictionary["test_no_gpu"]:
+            if (
+                not arguments_as_dictionary["user_mode"]
+                and not arguments_as_dictionary["test_no_gpu"]
+            ):
                 if not NvmlHandler.get_gpu_ready_state():
                     info_log.info("\tSetting the GPU Ready State to READY")
                     NvmlHandler.set_gpu_ready_state(True)

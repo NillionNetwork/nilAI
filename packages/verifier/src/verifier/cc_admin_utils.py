@@ -66,37 +66,40 @@ from verifier.exceptions import (
     VBIOSVersionMismatchError,
     RIMFetchError,
     OCSPFetchError,
-    InvalidNonceError
+    InvalidNonceError,
 )
 
+
 class CcAdminUtils:
-    """ A class to provide the required functionalities for the CC ADMIN to perform the GPU attestation.
-    """
+    """A class to provide the required functionalities for the CC ADMIN to perform the GPU attestation."""
+
     @staticmethod
     def extract_fwid(cert):
-        """ A static function to extract the FWID data from the given certificate.
+        """A static function to extract the FWID data from the given certificate.
         Args:
             cert (OpenSSL.crypto.X509): The certificate whose FWID data is needed to be fetched.
         Returns:
             [str]: the FWID as a hex string extracted from the certificate if
                     it is present otherwise returns an empty string.
         """
-        result = ''
+        result = ""
         # The OID for the FWID extension.
-        TCG_DICE_FWID_OID = '2.23.133.5.4.1'
+        TCG_DICE_FWID_OID = "2.23.133.5.4.1"
         cryptography_cert = cert.to_cryptography()
 
         for i in range(len(cryptography_cert.extensions)):
-            oid_obj = (vars(cryptography_cert.extensions)['_extensions'][i]).oid
-            if getattr(oid_obj, 'dotted_string') == TCG_DICE_FWID_OID:
+            oid_obj = (vars(cryptography_cert.extensions)["_extensions"][i]).oid
+            if getattr(oid_obj, "dotted_string") == TCG_DICE_FWID_OID:
                 # The FWID data is the last 48 bytes.
-                result = vars((vars(cryptography_cert.extensions)['_extensions'][i]).value)['_value'][-48:].hex()
+                result = vars(
+                    (vars(cryptography_cert.extensions)["_extensions"][i]).value
+                )["_value"][-48:].hex()
 
         return result
 
     @staticmethod
     def verify_gpu_certificate_chain(cert_chain, settings, attestation_report_fwid):
-        """ A static function to perform the GPU device certificate chain verification.
+        """A static function to perform the GPU device certificate chain verification.
         Args:
             cert_chain (list): A list containing the certificate objects of the device certificate chain.
             settings (config.HopperSettings): the object containing the various config info.
@@ -105,20 +108,29 @@ class CcAdminUtils:
             [bool]: True if the verification is successful, otherwise False.
         """
         # Skipping the comparision of FWID in the attestation certificate if the Attestation report does not contains the FWID.
-        if attestation_report_fwid != '':
-
+        if attestation_report_fwid != "":
             if attestation_report_fwid != CcAdminUtils.extract_fwid(cert_chain[0]):
-                info_log.error("\t\tThe firmware ID in the device certificate chain is not matching with the one in the attestation report.")
-                event_log.info(f"\t\tThe FWID read from the attestation report is : {attestation_report_fwid}")
+                info_log.error(
+                    "\t\tThe firmware ID in the device certificate chain is not matching with the one in the attestation report."
+                )
+                event_log.info(
+                    f"\t\tThe FWID read from the attestation report is : {attestation_report_fwid}"
+                )
                 return False
 
-            info_log.info("\t\tThe firmware ID in the device certificate chain is matching with the one in the attestation report.")
+            info_log.info(
+                "\t\tThe firmware ID in the device certificate chain is matching with the one in the attestation report."
+            )
 
-        return CcAdminUtils.verify_certificate_chain(cert_chain, settings, BaseSettings.Certificate_Chain_Verification_Mode.GPU_ATTESTATION)
+        return CcAdminUtils.verify_certificate_chain(
+            cert_chain,
+            settings,
+            BaseSettings.Certificate_Chain_Verification_Mode.GPU_ATTESTATION,
+        )
 
     @staticmethod
     def verify_certificate_chain(cert_chain, settings, mode):
-        """ Performs the certificate chain verification.
+        """Performs the certificate chain verification.
 
         Args:
             cert_chain (list): the certificate chain as a list with the root
@@ -141,15 +153,22 @@ class CcAdminUtils:
         number_of_certificates = len(cert_chain)
 
         event_log.debug(f"verify_certificate_chain() called for {str(mode)}")
-        event_log.debug(f'Number of certificates : {number_of_certificates}')
+        event_log.debug(f"Number of certificates : {number_of_certificates}")
 
         if number_of_certificates < 1:
             event_log.error("\t\tNo certificates found in certificate chain.")
             raise NoCertificateError("\t\tNo certificates found in certificate chain.")
 
-        if number_of_certificates != settings.MAX_CERT_CHAIN_LENGTH and mode == BaseSettings.Certificate_Chain_Verification_Mode.GPU_ATTESTATION:
-            event_log.error("\t\tThe number of certificates fetched from the GPU is unexpected.")
-            raise IncorrectNumberOfCertificatesError("\t\tThe number of certificates fetched from the GPU is unexpected.")
+        if (
+            number_of_certificates != settings.MAX_CERT_CHAIN_LENGTH
+            and mode == BaseSettings.Certificate_Chain_Verification_Mode.GPU_ATTESTATION
+        ):
+            event_log.error(
+                "\t\tThe number of certificates fetched from the GPU is unexpected."
+            )
+            raise IncorrectNumberOfCertificatesError(
+                "\t\tThe number of certificates fetched from the GPU is unexpected."
+            )
 
         store = crypto.X509Store()
         index = number_of_certificates - 1
@@ -165,14 +184,16 @@ class CcAdminUtils:
                     store.add_cert(cert_chain[index])
                     index = index - 1
                 except crypto.X509StoreContextError as e:
-                    event_log.info(f'Cert chain verification is failing at index : {index}')
+                    event_log.info(
+                        f"Cert chain verification is failing at index : {index}"
+                    )
                     event_log.error(e)
                     return False
         return True
 
     @staticmethod
     def convert_cert_from_cryptography_to_pyopenssl(cert):
-        """ A static method to convert the "Cryptography" X509 certificate object to "pyOpenSSL"
+        """A static method to convert the "Cryptography" X509 certificate object to "pyOpenSSL"
         X509 certificate object.
 
         Args:
@@ -181,11 +202,14 @@ class CcAdminUtils:
         Returns:
             [OpenSSL.crypto.X509]: the converted X509 certificate object.
         """
-        return crypto.load_certificate(type=crypto.FILETYPE_ASN1, buffer = cert.public_bytes(serialization.Encoding.DER))
+        return crypto.load_certificate(
+            type=crypto.FILETYPE_ASN1,
+            buffer=cert.public_bytes(serialization.Encoding.DER),
+        )
 
     @staticmethod
     def build_ocsp_request(cert, issuer, nonce=None):
-        """ A static method to build the ocsp request message.
+        """A static method to build the ocsp request message.
 
         Args:
             cert (OpenSSL.crypto.X509): the input certificate object.
@@ -198,12 +222,14 @@ class CcAdminUtils:
         request_builder = ocsp.OCSPRequestBuilder()
         request_builder = request_builder.add_certificate(cert, issuer, SHA384())
         if nonce is not None:
-            request_builder = request_builder.add_extension(extval=OCSPNonce(nonce), critical=True)
+            request_builder = request_builder.add_extension(
+                extval=OCSPNonce(nonce), critical=True
+            )
         return request_builder.build()
 
     @staticmethod
     def ocsp_certificate_chain_validation(cert_chain, settings, mode):
-        """ A static method to perform the ocsp status check of the input certificate chain along with the
+        """A static method to perform the ocsp status check of the input certificate chain along with the
         signature verification and the cert chain verification if the ocsp response message received.
 
         Args:
@@ -231,7 +257,11 @@ class CcAdminUtils:
             cert_chain[i] = cert.to_cryptography()
 
         for i in range(start_index, end_index):
-            cert_common_name = cert_chain[i].subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME)[0].value
+            cert_common_name = (
+                cert_chain[i]
+                .subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME)[0]
+                .value
+            )
 
             # Fetch OCSP Response from provided OCSP Service
             nonce = (
@@ -239,7 +269,9 @@ class CcAdminUtils:
                 if BaseSettings.OCSP_NONCE_ENABLED
                 else None
             )
-            ocsp_request = CcAdminUtils.build_ocsp_request(cert_chain[i], cert_chain[i + 1], nonce)
+            ocsp_request = CcAdminUtils.build_ocsp_request(
+                cert_chain[i], cert_chain[i + 1], nonce
+            )
             try:
                 ocsp_response = function_wrapper_with_timeout(
                     [
@@ -249,16 +281,21 @@ class CcAdminUtils:
                         BaseSettings.OCSP_RETRY_COUNT,
                         "send_ocsp_request",
                     ],
-                    BaseSettings.MAX_OCSP_REQUEST_TIME_DELAY * BaseSettings.OCSP_RETRY_COUNT,
+                    BaseSettings.MAX_OCSP_REQUEST_TIME_DELAY
+                    * BaseSettings.OCSP_RETRY_COUNT,
                 )
             except Exception as e:
-                event_log.error(f"Exception occurred while fetching OCSP response from provided OCSP service: {str(e)}")
+                event_log.error(
+                    f"Exception occurred while fetching OCSP response from provided OCSP service: {str(e)}"
+                )
                 ocsp_response = None
 
             # Fallback to Nvidia OCSP Service if the fetch fails
             if ocsp_response is None:
                 nonce = CcAdminUtils.generate_nonce(BaseSettings.SIZE_OF_NONCE_IN_BYTES)
-                ocsp_request = CcAdminUtils.build_ocsp_request(cert_chain[i], cert_chain[i + 1], nonce)
+                ocsp_request = CcAdminUtils.build_ocsp_request(
+                    cert_chain[i], cert_chain[i + 1], nonce
+                )
                 try:
                     ocsp_response = function_wrapper_with_timeout(
                         [
@@ -268,10 +305,13 @@ class CcAdminUtils:
                             BaseSettings.OCSP_RETRY_COUNT,
                             "send_ocsp_request",
                         ],
-                        BaseSettings.MAX_OCSP_REQUEST_TIME_DELAY * BaseSettings.OCSP_RETRY_COUNT,
+                        BaseSettings.MAX_OCSP_REQUEST_TIME_DELAY
+                        * BaseSettings.OCSP_RETRY_COUNT,
                     )
                 except Exception as e:
-                    event_log.error(f"Exception occurred while fetching OCSP response from Nvidia OCSP service: {str(e)}")
+                    event_log.error(
+                        f"Exception occurred while fetching OCSP response from Nvidia OCSP service: {str(e)}"
+                    )
                     ocsp_response = None
 
             # Raise error if OCSP response is not fetched from both OCSP services
@@ -287,7 +327,13 @@ class CcAdminUtils:
                 return False, error_msg
 
             # Verify the Nonce in the OCSP response
-            if nonce is not None and nonce != ocsp_response.extensions.get_extension_for_class(OCSPNonce).value.nonce:
+            if (
+                nonce is not None
+                and nonce
+                != ocsp_response.extensions.get_extension_for_class(
+                    OCSPNonce
+                ).value.nonce
+            ):
                 error_msg = "The nonce in the OCSP response message is not matching with the one passed in the OCSP request message."
                 info_log.error(f"\t\t{error_msg}")
                 return False, error_msg
@@ -298,12 +344,20 @@ class CcAdminUtils:
             timestamp_format = "%Y/%m/%d %H:%M:%S UTC"
             this_update = ocsp_response.this_update_utc
             next_update = ocsp_response.next_update_utc
-            next_update_extended = next_update + timedelta(hours=BaseSettings.OCSP_VALIDITY_EXTENSION_HRS)
+            next_update_extended = next_update + timedelta(
+                hours=BaseSettings.OCSP_VALIDITY_EXTENSION_HRS
+            )
             utc_now = datetime.now(timezone.utc)
             event_log.debug(f"Current time: {utc_now.strftime(timestamp_format)}")
-            event_log.debug(f"OCSP this update: {this_update.strftime(timestamp_format)}")
-            event_log.debug(f"OCSP next update: {next_update.strftime(timestamp_format)}")
-            event_log.debug(f"OCSP next update extended: {next_update_extended.strftime(timestamp_format)}")
+            event_log.debug(
+                f"OCSP this update: {this_update.strftime(timestamp_format)}"
+            )
+            event_log.debug(
+                f"OCSP next update: {next_update.strftime(timestamp_format)}"
+            )
+            event_log.debug(
+                f"OCSP next update extended: {next_update_extended.strftime(timestamp_format)}"
+            )
 
             # Outside validity period, print warning
             if not (this_update <= utc_now <= next_update):
@@ -324,14 +378,22 @@ class CcAdminUtils:
             # Verifying the ocsp response certificate chain.
             ocsp_response_leaf_cert = crypto.load_certificate(
                 type=crypto.FILETYPE_ASN1,
-                buffer=ocsp_response.certificates[0].public_bytes(serialization.Encoding.DER),
+                buffer=ocsp_response.certificates[0].public_bytes(
+                    serialization.Encoding.DER
+                ),
             )
             ocsp_cert_chain = [ocsp_response_leaf_cert]
 
             for j in range(i, len(cert_chain)):
-                ocsp_cert_chain.append(CcAdminUtils.convert_cert_from_cryptography_to_pyopenssl(cert_chain[j]))
+                ocsp_cert_chain.append(
+                    CcAdminUtils.convert_cert_from_cryptography_to_pyopenssl(
+                        cert_chain[j]
+                    )
+                )
             ocsp_cert_chain_verification_status = CcAdminUtils.verify_certificate_chain(
-                ocsp_cert_chain, settings, BaseSettings.Certificate_Chain_Verification_Mode.OCSP_RESPONSE
+                ocsp_cert_chain,
+                settings,
+                BaseSettings.Certificate_Chain_Verification_Mode.OCSP_RESPONSE,
             )
 
             if not ocsp_cert_chain_verification_status:
@@ -351,7 +413,9 @@ class CcAdminUtils:
 
             # The OCSP response certificate status is unknown
             if ocsp_response.certificate_status == ocsp.OCSPCertStatus.UNKNOWN:
-                error_msg = f"The {cert_common_name} certificate revocation status is UNKNOWN"
+                error_msg = (
+                    f"The {cert_common_name} certificate revocation status is UNKNOWN"
+                )
                 info_log.error(f"\t\t\t{error_msg}")
                 return False, error_msg
 
@@ -359,16 +423,33 @@ class CcAdminUtils:
             if ocsp_response.certificate_status == ocsp.OCSPCertStatus.REVOKED:
                 # Get cert revoke timestamp
                 cert_revocation_extension_hrs = 0
-                if mode == BaseSettings.Certificate_Chain_Verification_Mode.GPU_ATTESTATION:
-                    cert_revocation_extension_hrs = BaseSettings.OCSP_CERT_REVOCATION_DEVICE_EXTENSION_HRS
-                elif mode == BaseSettings.Certificate_Chain_Verification_Mode.DRIVER_RIM_CERT:
-                    cert_revocation_extension_hrs = BaseSettings.OCSP_CERT_REVOCATION_DRIVER_RIM_EXTENSION_HRS
-                elif mode == BaseSettings.Certificate_Chain_Verification_Mode.VBIOS_RIM_CERT:
-                    cert_revocation_extension_hrs = BaseSettings.OCSP_CERT_REVOCATION_VBIOS_RIM_EXTENSION_HRS
+                if (
+                    mode
+                    == BaseSettings.Certificate_Chain_Verification_Mode.GPU_ATTESTATION
+                ):
+                    cert_revocation_extension_hrs = (
+                        BaseSettings.OCSP_CERT_REVOCATION_DEVICE_EXTENSION_HRS
+                    )
+                elif (
+                    mode
+                    == BaseSettings.Certificate_Chain_Verification_Mode.DRIVER_RIM_CERT
+                ):
+                    cert_revocation_extension_hrs = (
+                        BaseSettings.OCSP_CERT_REVOCATION_DRIVER_RIM_EXTENSION_HRS
+                    )
+                elif (
+                    mode
+                    == BaseSettings.Certificate_Chain_Verification_Mode.VBIOS_RIM_CERT
+                ):
+                    cert_revocation_extension_hrs = (
+                        BaseSettings.OCSP_CERT_REVOCATION_VBIOS_RIM_EXTENSION_HRS
+                    )
 
                 cert_revocation_time = ocsp_response.revocation_time_utc
                 cert_revocation_reason = ocsp_response.revocation_reason
-                cert_revocation_time_extended = cert_revocation_time + timedelta(hours=cert_revocation_extension_hrs)
+                cert_revocation_time_extended = cert_revocation_time + timedelta(
+                    hours=cert_revocation_extension_hrs
+                )
 
                 # Cert is revoked, print warning
                 cert_revocation_msg = (
@@ -379,13 +460,18 @@ class CcAdminUtils:
                 gpu_attestation_warning_msg_list.append(cert_revocation_msg)
 
                 # Cert is revoked but certificate_hold is allowed
-                if x509.ReasonFlags.certificate_hold == cert_revocation_reason and BaseSettings.allow_hold_cert:
+                if (
+                    x509.ReasonFlags.certificate_hold == cert_revocation_reason
+                    and BaseSettings.allow_hold_cert
+                ):
                     cert_revocation_hold_allowed_msg = (
                         f"THE CERTIFICATE {cert_common_name} IS REVOKED FOR '{cert_revocation_reason.value}' "
                         f"BUT STILL GOOD FOR ATTESTATION WITH allow_hold_cert ENABLED."
                     )
                     event_log.warning(cert_revocation_hold_allowed_msg)
-                    gpu_attestation_warning_msg_list.append(cert_revocation_hold_allowed_msg)
+                    gpu_attestation_warning_msg_list.append(
+                        cert_revocation_hold_allowed_msg
+                    )
 
                 # Cert is revoked but within the extension period
                 elif datetime.now(timezone.utc) <= cert_revocation_time_extended:
@@ -395,7 +481,9 @@ class CcAdminUtils:
                         f"{cert_revocation_extension_hrs} HOURS OF GRACE PERIOD."
                     )
                     event_log.warning(cert_revocation_within_extension_msg)
-                    gpu_attestation_warning_msg_list.append(cert_revocation_within_extension_msg)
+                    gpu_attestation_warning_msg_list.append(
+                        cert_revocation_within_extension_msg
+                    )
 
                 # Cert is revoked and outside the extension period
                 else:
@@ -406,15 +494,19 @@ class CcAdminUtils:
                     event_log.error(cert_revocation_novalid_msg)
                     gpu_attestation_warning_msg_list.append(cert_revocation_novalid_msg)
                     info_log.error(f"\t\t\tERROR: {cert_revocation_novalid_msg}")
-                    info_log.error("\t\t\tThe certificate chain revocation status verification was not successful")
-                    return False, '\n'.join(gpu_attestation_warning_msg_list)
+                    info_log.error(
+                        "\t\t\tThe certificate chain revocation status verification was not successful"
+                    )
+                    return False, "\n".join(gpu_attestation_warning_msg_list)
 
-        info_log.info(f"\t\t\tThe certificate chain revocation status verification successful.")
-        return True, '\n'.join(gpu_attestation_warning_msg_list)
+        info_log.info(
+            f"\t\t\tThe certificate chain revocation status verification successful."
+        )
+        return True, "\n".join(gpu_attestation_warning_msg_list)
 
     @staticmethod
     def fetch_ocsp_response_from_url(ocsp_request_data, url, max_retries):
-        """ A static method to prepare http request and send it to the ocsp server
+        """A static method to prepare http request and send it to the ocsp server
             and returns the ocsp response message.
 
         Args:
@@ -446,13 +538,15 @@ class CcAdminUtils:
                 event_log.error(f"HTTP Error code : {e.code}")
             if max_retries > 0:
                 time.sleep(BaseSettings.OCSP_RETRY_DELAY)
-                return CcAdminUtils.fetch_ocsp_response_from_url(ocsp_request_data, url, max_retries - 1)
+                return CcAdminUtils.fetch_ocsp_response_from_url(
+                    ocsp_request_data, url, max_retries - 1
+                )
             else:
                 return None
 
     @staticmethod
     def verify_ocsp_signature(ocsp_response):
-        """ A static method to perform the signature verification of the ocsp response message.
+        """A static method to perform the signature verification of the ocsp response message.
 
         Args:
             ocsp_response (cryptography.hazmat.backends.openssl.ocsp._OCSPResponse): the input ocsp response message object.
@@ -478,7 +572,7 @@ class CcAdminUtils:
 
     @staticmethod
     def fetch_rim_file_from_url(rim_id, url, max_retries):
-        """ A static method to fetch the RIM file with the given file id from the given url.
+        """A static method to fetch the RIM file with the given file id from the given url.
             If the fetch fails, it retries for the maximum number of times specified by the max_retries parameter.
             If the max_retries is set to 0, it does not retry on failure and return None.
 
@@ -502,7 +596,9 @@ class CcAdminUtils:
                 json_object = json.loads(data)
                 base64_data = json_object["rim"]
                 decoded_str = base64.b64decode(base64_data).decode("utf-8")
-                event_log.debug(f"Successfully fetched the RIM file from {url + rim_id}")
+                event_log.debug(
+                    f"Successfully fetched the RIM file from {url + rim_id}"
+                )
                 return decoded_str
         except Exception as e:
             event_log.error(f"Error while fetching the RIM file from {url + rim_id}")
@@ -510,7 +606,9 @@ class CcAdminUtils:
                 event_log.error(f"HTTP Error code : {e.code}")
             if max_retries > 0:
                 time.sleep(BaseSettings.RIM_SERVICE_RETRY_DELAY)
-                return CcAdminUtils.fetch_rim_file_from_url(rim_id, url, max_retries - 1)
+                return CcAdminUtils.fetch_rim_file_from_url(
+                    rim_id, url, max_retries - 1
+                )
             else:
                 return None
 
@@ -541,7 +639,9 @@ class CcAdminUtils:
                 BaseSettings.MAX_RIM_REQUEST_TIME_DELAY * max_retries,
             )
         except Exception as e:
-            event_log.error(f"Exception occurred while fetching RIM {rim_id} from provided RIM service: {str(e)}")
+            event_log.error(
+                f"Exception occurred while fetching RIM {rim_id} from provided RIM service: {str(e)}"
+            )
             rim_result = None
 
         # RIM is successfully fetched from the provided RIM service
@@ -549,11 +649,18 @@ class CcAdminUtils:
             return rim_result
 
         # Log error if RIM file is not fetched from the provided RIM service
-        event_log.error(f"Failed to fetch RIM {rim_id} from provided RIM service: {BaseSettings.RIM_SERVICE_BASE_URL}")
+        event_log.error(
+            f"Failed to fetch RIM {rim_id} from provided RIM service: {BaseSettings.RIM_SERVICE_BASE_URL}"
+        )
 
         # Fallback to the Nvidia RIM service if the fetch fails
-        if BaseSettings.RIM_SERVICE_BASE_URL_NVIDIA != BaseSettings.RIM_SERVICE_BASE_URL:
-            event_log.info(f"Falling back to Nvidia RIM service {BaseSettings.RIM_SERVICE_BASE_URL_NVIDIA}")
+        if (
+            BaseSettings.RIM_SERVICE_BASE_URL_NVIDIA
+            != BaseSettings.RIM_SERVICE_BASE_URL
+        ):
+            event_log.info(
+                f"Falling back to Nvidia RIM service {BaseSettings.RIM_SERVICE_BASE_URL_NVIDIA}"
+            )
             try:
                 rim_result = function_wrapper_with_timeout(
                     [
@@ -566,7 +673,9 @@ class CcAdminUtils:
                     BaseSettings.MAX_RIM_REQUEST_TIME_DELAY * max_retries,
                 )
             except Exception as e:
-                event_log.error(f"Exception occurred while fetching RIM {rim_id} from Nvidia RIM service: {str(e)}")
+                event_log.error(
+                    f"Exception occurred while fetching RIM {rim_id} from Nvidia RIM service: {str(e)}"
+                )
                 rim_result = None
 
             # RIM is successfully fetched from the Nvidia RIM service
@@ -574,14 +683,18 @@ class CcAdminUtils:
                 return rim_result
 
             # Log error if RIM file is not fetched from the Nvidia RIM service
-            event_log.error(f"Failed to fetch RIM {rim_id} from Nvidia RIM service: {BaseSettings.RIM_SERVICE_BASE_URL_NVIDIA}")
+            event_log.error(
+                f"Failed to fetch RIM {rim_id} from Nvidia RIM service: {BaseSettings.RIM_SERVICE_BASE_URL_NVIDIA}"
+            )
 
         # Raise error if RIM file is not fetched from both the RIM services
-        raise RIMFetchError(f"Could not fetch the required RIM file : {rim_id} from the RIM service.")
+        raise RIMFetchError(
+            f"Could not fetch the required RIM file : {rim_id} from the RIM service."
+        )
 
     @staticmethod
     def get_vbios_rim_file_id(project, project_sku, chip_sku, vbios_version):
-        """ A static method to generate the required VBIOS RIM file id which needs to be fetched from the RIM service
+        """A static method to generate the required VBIOS RIM file id which needs to be fetched from the RIM service
             according to the vbios flashed onto the system.
 
         Args:
@@ -590,13 +703,22 @@ class CcAdminUtils:
         Returns:
             [str]: the VBIOS RIM file id.
         """
-        base_str = 'NV_GPU_VBIOS_'
+        base_str = "NV_GPU_VBIOS_"
 
-        return base_str + project + "_" + project_sku + "_" + chip_sku + "_" + vbios_version
+        return (
+            base_str
+            + project
+            + "_"
+            + project_sku
+            + "_"
+            + chip_sku
+            + "_"
+            + vbios_version
+        )
 
     @staticmethod
     def get_driver_rim_file_id(driver_version):
-        """ A static method to generate the driver RIM file id to be fetched from the RIM service corresponding to
+        """A static method to generate the driver RIM file id to be fetched from the RIM service corresponding to
             the driver installed onto the system.
 
         Args:
@@ -605,12 +727,12 @@ class CcAdminUtils:
         Returns:
             [str]: the driver RIM file id.
         """
-        base_str = 'NV_GPU_DRIVER_GH100_'
+        base_str = "NV_GPU_DRIVER_GH100_"
         return base_str + driver_version
 
     @staticmethod
     def get_vbios_rim_path(settings, attestation_report):
-        """ A static method to determine the path of the appropriate VBIOS RIM file.
+        """A static method to determine the path of the appropriate VBIOS RIM file.
 
         Args:
             settings (config.HopperSettings): the object containing the various config info.
@@ -622,20 +744,47 @@ class CcAdminUtils:
         Returns:
             [str] : the path to the VBIOS RIM file.
         """
-        project = attestation_report.get_response_message().get_opaque_data().get_data("OPAQUE_FIELD_ID_PROJECT")
-        project_sku = attestation_report.get_response_message().get_opaque_data().get_data("OPAQUE_FIELD_ID_PROJECT_SKU")
-        chip_sku = attestation_report.get_response_message().get_opaque_data().get_data("OPAQUE_FIELD_ID_CHIP_SKU")
-        vbios_version = format_vbios_version(attestation_report.get_response_message().get_opaque_data().get_data("OPAQUE_FIELD_ID_VBIOS_VERSION"))
+        project = (
+            attestation_report.get_response_message()
+            .get_opaque_data()
+            .get_data("OPAQUE_FIELD_ID_PROJECT")
+        )
+        project_sku = (
+            attestation_report.get_response_message()
+            .get_opaque_data()
+            .get_data("OPAQUE_FIELD_ID_PROJECT_SKU")
+        )
+        chip_sku = (
+            attestation_report.get_response_message()
+            .get_opaque_data()
+            .get_data("OPAQUE_FIELD_ID_CHIP_SKU")
+        )
+        vbios_version = format_vbios_version(
+            attestation_report.get_response_message()
+            .get_opaque_data()
+            .get_data("OPAQUE_FIELD_ID_VBIOS_VERSION")
+        )
         vbios_version = vbios_version.replace(".", "").upper()
 
-        project = project.decode('ascii').strip().strip('\x00')
+        project = project.decode("ascii").strip().strip("\x00")
         project = project.lower()
-        project_sku = project_sku.decode('ascii').strip().strip('\x00')
+        project_sku = project_sku.decode("ascii").strip().strip("\x00")
         project_sku = project_sku.lower()
-        chip_sku = chip_sku.decode('ascii').strip().strip('\x00')
+        chip_sku = chip_sku.decode("ascii").strip().strip("\x00")
         chip_sku = chip_sku.lower()
 
-        rim_file_name = project + "_" + project_sku + "_" + chip_sku + "_" + vbios_version + "_" + settings.get_sku() + ".swidtag"
+        rim_file_name = (
+            project
+            + "_"
+            + project_sku
+            + "_"
+            + chip_sku
+            + "_"
+            + vbios_version
+            + "_"
+            + settings.get_sku()
+            + ".swidtag"
+        )
         list_of_files = os.listdir(settings.RIM_DIRECTORY_PATH)
         rim_path = os.path.join(settings.RIM_DIRECTORY_PATH, rim_file_name)
 
@@ -645,9 +794,15 @@ class CcAdminUtils:
         raise RIMFetchError(f"Could not find the required VBIOS RIM file : {rim_path}")
 
     @staticmethod
-    def verify_attestation_report(attestation_report_obj, gpu_leaf_certificate, nonce, driver_version,
-                                  vbios_version, settings):
-        """ Performs the verification of the attestation report. This contains matching the nonce in the attestation report with
+    def verify_attestation_report(
+        attestation_report_obj,
+        gpu_leaf_certificate,
+        nonce,
+        driver_version,
+        vbios_version,
+        settings,
+    ):
+        """Performs the verification of the attestation report. This contains matching the nonce in the attestation report with
         the one generated by the cc admin, matching the driver version and vbios version in the attestation report with the one
         fetched from the driver. And then performing the signature verification of the attestation report.
 
@@ -670,12 +825,17 @@ class CcAdminUtils:
         """
         assert isinstance(attestation_report_obj, AttestationReport)
         assert isinstance(gpu_leaf_certificate, crypto.X509)
-        assert isinstance(nonce, bytes) and len(nonce) == settings.SIZE_OF_NONCE_IN_BYTES
+        assert (
+            isinstance(nonce, bytes) and len(nonce) == settings.SIZE_OF_NONCE_IN_BYTES
+        )
 
         # Here the attestation report is the concatenated SPDM GET_MEASUREMENTS request with the SPDM GET_MEASUREMENT response message.
         request_nonce = attestation_report_obj.get_request_message().get_nonce()
 
-        if len(nonce) > settings.SIZE_OF_NONCE_IN_BYTES or len(request_nonce) > settings.SIZE_OF_NONCE_IN_BYTES:
+        if (
+            len(nonce) > settings.SIZE_OF_NONCE_IN_BYTES
+            or len(request_nonce) > settings.SIZE_OF_NONCE_IN_BYTES
+        ):
             err_msg = "\t\t Length of Nonce is greater than max nonce size allowed."
             event_log.error(err_msg)
             raise InvalidNonceError(err_msg)
@@ -686,17 +846,29 @@ class CcAdminUtils:
             event_log.error(err_msg)
             raise NonceMismatchError(err_msg)
         else:
-            info_log.info("\t\tThe nonce in the SPDM GET MEASUREMENT request message is matching with the generated nonce.")
+            info_log.info(
+                "\t\tThe nonce in the SPDM GET MEASUREMENT request message is matching with the generated nonce."
+            )
             settings.mark_nonce_as_matching()
 
         # Checking driver version.
-        driver_version_from_attestation_report = attestation_report_obj.get_response_message().get_opaque_data().get_data("OPAQUE_FIELD_ID_DRIVER_VERSION")
-        driver_version_from_attestation_report = driver_version_from_attestation_report.decode()
+        driver_version_from_attestation_report = (
+            attestation_report_obj.get_response_message()
+            .get_opaque_data()
+            .get_data("OPAQUE_FIELD_ID_DRIVER_VERSION")
+        )
+        driver_version_from_attestation_report = (
+            driver_version_from_attestation_report.decode()
+        )
 
-        if driver_version_from_attestation_report[-1] == '\0':
-            driver_version_from_attestation_report = driver_version_from_attestation_report[:-1]
+        if driver_version_from_attestation_report[-1] == "\0":
+            driver_version_from_attestation_report = (
+                driver_version_from_attestation_report[:-1]
+            )
 
-        info_log.info(f'\t\tDriver version fetched from the attestation report : {driver_version_from_attestation_report}')
+        info_log.info(
+            f"\t\tDriver version fetched from the attestation report : {driver_version_from_attestation_report}"
+        )
 
         if driver_version_from_attestation_report != driver_version:
             err_msg = "\t\tThe driver version in attestation report is not matching with the driver version fetched from the driver."
@@ -707,9 +879,17 @@ class CcAdminUtils:
         settings.mark_attestation_report_driver_version_as_matching()
 
         # Checking vbios version.
-        vbios_version_from_attestation_report = attestation_report_obj.get_response_message().get_opaque_data().get_data("OPAQUE_FIELD_ID_VBIOS_VERSION")
-        vbios_version_from_attestation_report = format_vbios_version(vbios_version_from_attestation_report)
-        info_log.info(f'\t\tVBIOS version fetched from the attestation report : {vbios_version_from_attestation_report}')
+        vbios_version_from_attestation_report = (
+            attestation_report_obj.get_response_message()
+            .get_opaque_data()
+            .get_data("OPAQUE_FIELD_ID_VBIOS_VERSION")
+        )
+        vbios_version_from_attestation_report = format_vbios_version(
+            vbios_version_from_attestation_report
+        )
+        info_log.info(
+            f"\t\tVBIOS version fetched from the attestation report : {vbios_version_from_attestation_report}"
+        )
 
         if vbios_version_from_attestation_report != vbios_version:
             err_msg = "\t\tThe vbios version in attestation report is not matching with the vbios verison fetched from the driver."
@@ -720,9 +900,13 @@ class CcAdminUtils:
         settings.mark_attestation_report_vbios_version_as_matching()
 
         # Performing the signature verification.
-        attestation_report_verification_status = attestation_report_obj.verify_signature(gpu_leaf_certificate.to_cryptography(),
-                                                                                         settings.signature_length,
-                                                                                         settings.HashFunction)
+        attestation_report_verification_status = (
+            attestation_report_obj.verify_signature(
+                gpu_leaf_certificate.to_cryptography(),
+                settings.signature_length,
+                settings.HashFunction,
+            )
+        )
         if attestation_report_verification_status:
             info_log.info("\t\tAttestation report signature verification successful.")
             settings.mark_attestation_report_signature_verified()
@@ -736,7 +920,7 @@ class CcAdminUtils:
 
     @staticmethod
     def generate_nonce(size):
-        """ Generates cryptographically strong nonce to be sent to the SPDM requester via the nvml api for the attestation report.
+        """Generates cryptographically strong nonce to be sent to the SPDM requester via the nvml api for the attestation report.
 
         Args:
             size (int): the number of random bytes to be generated.
@@ -749,7 +933,7 @@ class CcAdminUtils:
 
     @staticmethod
     def validate_and_extract_nonce(nonce_hex_string):
-        """ Validate and convert Nonce to bytes format
+        """Validate and convert Nonce to bytes format
 
         Args:
             nonce_hex_string (string): 32 Bytes Nonce represented as Hex String
@@ -757,13 +941,17 @@ class CcAdminUtils:
         Returns:
             [bytes]: Nonce represented as Bytes
         """
-        if len(nonce_hex_string) == BaseSettings.SIZE_OF_NONCE_IN_HEX_STR and set(nonce_hex_string).issubset(string.hexdigits):
+        if len(nonce_hex_string) == BaseSettings.SIZE_OF_NONCE_IN_HEX_STR and set(
+            nonce_hex_string
+        ).issubset(string.hexdigits):
             return bytes.fromhex(nonce_hex_string)
-        else :
-            raise InvalidNonceError("Invalid Nonce Size. The nonce should be 32 bytes in length represented as Hex String")
+        else:
+            raise InvalidNonceError(
+                "Invalid Nonce Size. The nonce should be 32 bytes in length represented as Hex String"
+            )
 
     def __init__(self, number_of_gpus):
-        """ It is the constructor for the CcAdminUtils.
+        """It is the constructor for the CcAdminUtils.
 
         Args:
             number_of_gpus (int): The number of the available GPUs.

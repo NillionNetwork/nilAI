@@ -60,16 +60,17 @@ from verifier.exceptions import (
     RIMCertChainOCSPVerificationError,
 )
 
+
 class RIM:
-    """ A class to process and manage all the processing of the RIM files.
-    RIM module Trusted Computing Group Reference Integrity Manifest of the 
+    """A class to process and manage all the processing of the RIM files.
+    RIM module Trusted Computing Group Reference Integrity Manifest of the
     Verifier is used to perform the authentication and access of the golden
     measurements.
     """
 
     @staticmethod
     def get_element(parent_element, name_of_element):
-        """ A static method that gives the child element of the parent_element with the given name.
+        """A static method that gives the child element of the parent_element with the given name.
 
         Args:
             parent_element (lxml.etree._Element): the parent of the required element.
@@ -82,7 +83,6 @@ class RIM:
         assert type(name_of_element) is str
 
         for child in parent_element.getchildren():
-
             if (child.tag).find(name_of_element) != -1:
                 return child
 
@@ -95,15 +95,14 @@ class RIM:
 
         list_of_elements = list()
         for child in parent_element.getchildren():
-
             if (child.tag).find(name_of_element) != -1:
                 list_of_elements.append(child)
         return list_of_elements
 
     @staticmethod
-    def read(base_RIM_path = None, content = None):
-        """ Static method that reads the signed base RIM from the disk.
-        
+    def read(base_RIM_path=None, content=None):
+        """Static method that reads the signed base RIM from the disk.
+
         Argument:
         base_RIM_path (str) : the path to the signed base RIM.
         content (str) : the content of the RIM file as a string.
@@ -114,12 +113,16 @@ class RIM:
             try:
                 assert type(base_RIM_path) is str
 
-                with open(base_RIM_path, 'rb') as f:
+                with open(base_RIM_path, "rb") as f:
                     read_data = f.read()
 
             except OSError:
-                event_log.error(f'Unable to read {base_RIM_path} \nPlease provide a valid RIM file.')
-                raise RIMFetchError(f'Unable to read {base_RIM_path} \nPlease provide a valid RIM file.')
+                event_log.error(
+                    f"Unable to read {base_RIM_path} \nPlease provide a valid RIM file."
+                )
+                raise RIMFetchError(
+                    f"Unable to read {base_RIM_path} \nPlease provide a valid RIM file."
+                )
 
             file_stream = io.BytesIO(read_data)
 
@@ -130,12 +133,12 @@ class RIM:
             raise RIMFetchError("Invalid parameters!!")
 
         parser = etree.XMLParser(resolve_entities=False)
-        new_swidtag_tree = etree.parse(file_stream, parser) 
+        new_swidtag_tree = etree.parse(file_stream, parser)
         new_root = new_swidtag_tree.getroot()
         return new_root
 
     def validate_schema(self, schema_path):
-        """ Performs the schema validation of the base RIM against a given schema.
+        """Performs the schema validation of the base RIM against a given schema.
 
         Args:
             schema_path (str): the path to the swidtag schema xsd file.
@@ -159,7 +162,7 @@ class RIM:
         return result
 
     def get_colloquial_version(self):
-        """ Parses RIM to return the driver/vbios version which is present in the RIM as
+        """Parses RIM to return the driver/vbios version which is present in the RIM as
         colloquial version.
 
         Raises:
@@ -175,19 +178,19 @@ class RIM:
             info_log.error(err_msg)
             raise ElementNotFoundError(err_msg)
 
-        version = Meta.attrib['colloquialVersion']
+        version = Meta.attrib["colloquialVersion"]
 
-        if version is None or version == '':
+        if version is None or version == "":
             err_msg = "Driver version not found in the RIM."
             info_log.error(err_msg)
             raise EmptyElementError(err_msg)
 
-        event_log.debug(f'The driver version in the RIM file is {version}')
+        event_log.debug(f"The driver version in the RIM file is {version}")
         version = version.lower()
         return version
 
     def extract_certificates(self):
-        """ Extracts all the x509 certificate in PEM format from the base RIM.
+        """Extracts all the x509 certificate in PEM format from the base RIM.
 
         Raises:
             ElementNotFoundError: it is raised if the required element is not present.
@@ -228,11 +231,13 @@ class RIM:
             for i in range(len(X509Certificates) - 1):
                 header = "-----BEGIN CERTIFICATE-----\n"
                 cert_string = X509Certificates[i].text
-                cert_string = cert_string.replace(' ','')
+                cert_string = cert_string.replace(" ", "")
                 tail = "-----END CERTIFICATE-----\n"
                 final = header + cert_string + tail
                 cert_bytes = final.encode()
-                x509_cert_object = crypto.load_certificate(type=crypto.FILETYPE_PEM, buffer=cert_bytes)
+                x509_cert_object = crypto.load_certificate(
+                    type=crypto.FILETYPE_PEM, buffer=cert_bytes
+                )
 
                 if not isinstance(x509_cert_object, crypto.X509):
                     raise ValueError()
@@ -247,23 +252,31 @@ class RIM:
         return result
 
     def verify_signature(self, settings):
-        """ Verifies the signature of the base RIM.
-        
+        """Verifies the signature of the base RIM.
+
         Arguments:
         settings (config.HopperSettings): the object containing the various config info.
-        
-        Returns: 
+
+        Returns:
             [bool] : If signature verification is successful, then return the True. Otherwise,
                 raises RIMSignatureVerificationError.
         """
-        if self.rim_name == 'driver':
+        if self.rim_name == "driver":
             event_log.info("Driver rim cert has been extracted successfully")
         else:
             event_log.info("Vbios rim cert has been extracted successfully")
         try:
             # performs the signature verification of the RIM. We will get the root of the RIM
             # if the signature verification is successful otherwise, it raises InvalidSignature exception.
-            verified_root = XMLVerifier().verify(self.root, ca_pem_file = settings.RIM_ROOT_CERT, ca_path = settings.ROOT_CERT_DIR).signed_xml
+            verified_root = (
+                XMLVerifier()
+                .verify(
+                    self.root,
+                    ca_pem_file=settings.RIM_ROOT_CERT,
+                    ca_path=settings.ROOT_CERT_DIR,
+                )
+                .signed_xml
+            )
 
             if verified_root is None:
                 err_msg = "\t\t\tRIM signature verification failed."
@@ -283,14 +296,14 @@ class RIM:
 
         info_log.info(f"\t\t\t{self.rim_name} RIM signature verification successful.")
         self.root = verified_root
-        if self.rim_name == 'driver':
+        if self.rim_name == "driver":
             settings.mark_driver_rim_cert_validated_successfully()
         else:
             settings.mark_vbios_rim_cert_validated_successfully()
         return True
 
     def get_measurements(self):
-        """ Returns the dictionary object that contains the golden measurement.
+        """Returns the dictionary object that contains the golden measurement.
 
         Returns:
             [dict]: the dictionary containing the golden measurement.
@@ -298,7 +311,7 @@ class RIM:
         return self.measurements_obj
 
     def parse_measurements(self, settings):
-        """ Lists the measurements of the Resource tags in the base RIM.
+        """Lists the measurements of the Resource tags in the base RIM.
 
         Args:
             settings (config.HopperSettings): the object containing the various config info.
@@ -307,7 +320,7 @@ class RIM:
             ElementNotFoundError: it is raised if a required element is not found.
             InvalidMeasurementIndexError: it is raised in case multiple measurement are assigned same index.
             NoRIMMeasurementsError: it is raised in case there are no golden measurements in the RIM file.
-        """       
+        """
         self.measurements_obj = dict()
         Payload = RIM.get_element(self.root, "Payload")
 
@@ -317,43 +330,54 @@ class RIM:
             raise ElementNotFoundError(err_msg)
 
         for child in Payload:
-
-            if child.attrib['active'] == 'False':
+            if child.attrib["active"] == "False":
                 active = False
             else:
-                active =True
+                active = True
 
-            index = int(child.attrib['index'])
-            alternatives = int(child.attrib['alternatives'])
+            index = int(child.attrib["index"])
+            alternatives = int(child.attrib["alternatives"])
             measurements_values = list()
 
             for i in range(alternatives):
-                measurements_values.append(child.attrib[settings.HashFunctionNamespace + 'Hash' + str(i)])
+                measurements_values.append(
+                    child.attrib[settings.HashFunctionNamespace + "Hash" + str(i)]
+                )
 
-            golden_measurement = GoldenMeasurement(component = self.rim_name,
-                                                   values = measurements_values,
-                                                   name = child.attrib['name'],
-                                                   index = index,
-                                                   size = int(child.attrib['size']),
-                                                   alternatives = alternatives,
-                                                   active = active)
+            golden_measurement = GoldenMeasurement(
+                component=self.rim_name,
+                values=measurements_values,
+                name=child.attrib["name"],
+                index=index,
+                size=int(child.attrib["size"]),
+                alternatives=alternatives,
+                active=active,
+            )
             if index in self.measurements_obj:
-                raise InvalidMeasurementIndexError(f"Multiple measurement are assigned same index in {self.rim_name} rim.")
+                raise InvalidMeasurementIndexError(
+                    f"Multiple measurement are assigned same index in {self.rim_name} rim."
+                )
 
             self.measurements_obj[index] = golden_measurement
 
         if len(self.measurements_obj) == 0:
-            raise NoRIMMeasurementsError(f"\tNo golden measurements found in {self.rim_name} rim.\n\tQuitting now.")
+            raise NoRIMMeasurementsError(
+                f"\tNo golden measurements found in {self.rim_name} rim.\n\tQuitting now."
+            )
 
         event_log.debug(f"{self.rim_name} golden measurements are : \n\t\t\t\t\t\t\t")
 
         for idx in self.measurements_obj:
             event_log.debug(f"\n\t\t\t\t\t\t\t index : {idx}")
-            event_log.debug(f"\t\t\t\t\t\t\t number of alternative values : {self.measurements_obj[idx].get_number_of_alternatives()}")
+            event_log.debug(
+                f"\t\t\t\t\t\t\t number of alternative values : {self.measurements_obj[idx].get_number_of_alternatives()}"
+            )
             for i in range(self.measurements_obj[idx].get_number_of_alternatives()):
-                event_log.debug(f"\t\t\t\t\t\t\t\t value {i + 1} : {self.measurements_obj[idx].get_value_at_index(i)}")
+                event_log.debug(
+                    f"\t\t\t\t\t\t\t\t value {i + 1} : {self.measurements_obj[idx].get_value_at_index(i)}"
+                )
 
-        if self.rim_name == 'driver':
+        if self.rim_name == "driver":
             settings.mark_rim_driver_measurements_as_available()
         else:
             settings.mark_rim_vbios_measurements_as_available()
@@ -379,19 +403,21 @@ class RIM:
             "",
         )
         if not firmware_manufacturer_id:
-            event_log.error("FirmwareManufacturerId attribute not found in Meta element.")
+            event_log.error(
+                "FirmwareManufacturerId attribute not found in Meta element."
+            )
         return firmware_manufacturer_id
 
-    def verify(self, version, settings, schema_path = ''): 
-        """ Performs the schema validation if it is successful then signature verification is done.
+    def verify(self, version, settings, schema_path=""):
+        """Performs the schema validation if it is successful then signature verification is done.
         If both tests passed then returns True, otherwise returns False.
-        
+
         Arguments:
             version (str) : the driver/vbios version of the required RIM.
             settings (config.HopperSettings): the object containing the various config info.
             base_RIM_path (str) : the path to the base RIM. Default value is None.
             schema_path (str) : the path to the swidtag schema xsd file. Default value is "swid_schema_2015.xsd".
-        
+
         Returns :
             [bool] : True if schema validation and signature verification passes, otherwise returns False.
         """
@@ -399,61 +425,83 @@ class RIM:
         assert type(schema_path) is str
 
         if schema_path == "":
-            schema_path = os.path.join(os.path.dirname(__file__), 'swidSchema2015.xsd')
+            schema_path = os.path.join(os.path.dirname(__file__), "swidSchema2015.xsd")
 
         if not schema_path or not os.path.isfile(schema_path):
-            info_log.error("There is a problem in the path to the swid schema. Please provide a valid the path to the swid schema.")
+            info_log.error(
+                "There is a problem in the path to the swid schema. Please provide a valid the path to the swid schema."
+            )
             raise FileNotFoundError("\t\tSWID schema file not found.")
 
-        if self.validate_schema(schema_path = schema_path):
+        if self.validate_schema(schema_path=schema_path):
             info_log.info("\t\t\tRIM Schema validation passed.")
 
-            if self.rim_name == 'driver':
+            if self.rim_name == "driver":
                 settings.mark_driver_rim_schema_validated()
             else:
                 settings.mark_vbios_rim_schema_validated()
 
             if version != self.colloquialVersion.lower():
-                info_log.warning(f"\t\t\tThe {self.rim_name} version in the RIM file is not matching with the installed {self.rim_name} version.")
+                info_log.warning(
+                    f"\t\t\tThe {self.rim_name} version in the RIM file is not matching with the installed {self.rim_name} version."
+                )
             else:
-                if self.rim_name == 'driver':
+                if self.rim_name == "driver":
                     settings.mark_rim_driver_version_as_matching()
                 else:
                     settings.mark_rim_vbios_version_as_matching()
 
-                event_log.debug(f"The {self.rim_name} version in the RIM file is matching with the installed {self.rim_name} version.")
+                event_log.debug(
+                    f"The {self.rim_name} version in the RIM file is matching with the installed {self.rim_name} version."
+                )
 
             rim_cert_chain = self.extract_certificates()
             # Reading the RIM root certificate.
-            with open(os.path.join(settings.ROOT_CERT_DIR, settings.RIM_ROOT_CERT), 'r') as root_cert_file:
+            with open(
+                os.path.join(settings.ROOT_CERT_DIR, settings.RIM_ROOT_CERT), "r"
+            ) as root_cert_file:
                 root_cert_data = root_cert_file.read()
 
-            if self.rim_name == 'driver':
+            if self.rim_name == "driver":
                 mode = BaseSettings.Certificate_Chain_Verification_Mode.DRIVER_RIM_CERT
             else:
                 mode = BaseSettings.Certificate_Chain_Verification_Mode.VBIOS_RIM_CERT
 
-            rim_cert_chain.append(crypto.load_certificate(type = crypto.FILETYPE_PEM, buffer = root_cert_data))
-            rim_cert_chain_verification_status = CcAdminUtils.verify_certificate_chain(rim_cert_chain,
-                                                                                       settings,
-                                                                                       mode)
+            rim_cert_chain.append(
+                crypto.load_certificate(type=crypto.FILETYPE_PEM, buffer=root_cert_data)
+            )
+            rim_cert_chain_verification_status = CcAdminUtils.verify_certificate_chain(
+                rim_cert_chain, settings, mode
+            )
             if not rim_cert_chain_verification_status:
-                raise RIMCertChainVerificationError(f"\t\t\t{self.rim_name} RIM cert chain verification failed")
+                raise RIMCertChainVerificationError(
+                    f"\t\t\t{self.rim_name} RIM cert chain verification failed"
+                )
 
-            info_log.info(f"\t\t\t{self.rim_name} RIM certificate chain verification successful.")
+            info_log.info(
+                f"\t\t\t{self.rim_name} RIM certificate chain verification successful."
+            )
 
-            rim_cert_chain_ocsp_revocation_status, gpu_attestation_warning = CcAdminUtils.ocsp_certificate_chain_validation(rim_cert_chain, settings, mode)
+            rim_cert_chain_ocsp_revocation_status, gpu_attestation_warning = (
+                CcAdminUtils.ocsp_certificate_chain_validation(
+                    rim_cert_chain, settings, mode
+                )
+            )
 
             if not rim_cert_chain_ocsp_revocation_status:
-                raise RIMCertChainOCSPVerificationError(f"\t\t\t{self.rim_name} RIM cert chain ocsp status verification failed.")
+                raise RIMCertChainOCSPVerificationError(
+                    f"\t\t\t{self.rim_name} RIM cert chain ocsp status verification failed."
+                )
 
             return self.verify_signature(settings), gpu_attestation_warning
 
-        else:            
-            raise RIMSchemaValidationError(f"\t\t\tSchema validation of {self.rim_name} RIM failed.")
+        else:
+            raise RIMSchemaValidationError(
+                f"\t\t\tSchema validation of {self.rim_name} RIM failed."
+            )
 
-    def __init__(self, rim_name, settings, rim_path = '', content = ''):
-        """ The constructor method for the RIM class handling all the RIM file processing.
+    def __init__(self, rim_name, settings, rim_path="", content=""):
+        """The constructor method for the RIM class handling all the RIM file processing.
 
         Args:
             rim_name (str): the name of the RIM, can be either "driver" or "vbios"
@@ -466,16 +514,18 @@ class RIM:
         assert type(rim_path) is str
         assert type(rim_name) is str
 
-        if rim_name != 'driver' and rim_name != 'vbios':
-            raise InvalidRIMNameError(f"Invalid rim name '{rim_name}' provided, valid names can be 'driver'/'vbios'.")
+        if rim_name != "driver" and rim_name != "vbios":
+            raise InvalidRIMNameError(
+                f"Invalid rim name '{rim_name}' provided, valid names can be 'driver'/'vbios'."
+            )
 
         self.rim_name = rim_name
-        if content == '':
-            self.root = RIM.read(base_RIM_path = rim_path)
+        if content == "":
+            self.root = RIM.read(base_RIM_path=rim_path)
         else:
-            self.root = RIM.read(content = content)
+            self.root = RIM.read(content=content)
 
-        if rim_name == 'driver':
+        if rim_name == "driver":
             settings.mark_driver_rim_fetched()
         else:
             settings.mark_vbios_rim_fetched()

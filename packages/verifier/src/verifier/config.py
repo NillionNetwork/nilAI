@@ -50,7 +50,9 @@ if os.path.exists(logger_file_path):
 event_log = logging.getLogger("gpu-verifier-event")
 event_log.setLevel(logging.DEBUG)
 fhandler = logging.FileHandler(logger_file_path)
-fhandler.setFormatter(logging.Formatter("%(asctime)s:%(levelname)s: %(message)s", "%m-%d-%Y %H:%M:%S"))
+fhandler.setFormatter(
+    logging.Formatter("%(asctime)s:%(levelname)s: %(message)s", "%m-%d-%Y %H:%M:%S")
+)
 event_log.addHandler(fhandler)
 
 event_log.debug("----------STARTING----------")
@@ -89,11 +91,14 @@ class BaseSettings:
     OCSP_CERT_REVOCATION_DRIVER_RIM_EXTENSION_HRS = 14 * 24
     OCSP_CERT_REVOCATION_VBIOS_RIM_EXTENSION_HRS = 90 * 24
     RIM_SERVICE_BASE_URL = ""
-    RIM_SERVICE_BASE_URL_NVIDIA = os.getenv("NV_RIM_URL", "https://rim.attestation.nvidia.com/v1/rim/")
+    RIM_SERVICE_BASE_URL_NVIDIA = os.getenv(
+        "NV_RIM_URL", "https://rim.attestation.nvidia.com/v1/rim/"
+    )
     RIM_SERVICE_RETRY_COUNT = 3
     RIM_SERVICE_RETRY_DELAY = 0.1
     Certificate_Chain_Verification_Mode = Enum(
-        "CERT CHAIN VERIFICATION MODE", ["GPU_ATTESTATION", "OCSP_RESPONSE", "DRIVER_RIM_CERT", "VBIOS_RIM_CERT"]
+        "CERT CHAIN VERIFICATION MODE",
+        ["GPU_ATTESTATION", "OCSP_RESPONSE", "DRIVER_RIM_CERT", "VBIOS_RIM_CERT"],
     )
     NVDEC_STATUS = Enum("NVDEC0 status", [("ENABLED", 0xAA), ("DISABLED", 0x55)])
     INDEX_OF_IK_CERT = 1
@@ -167,7 +172,9 @@ class BaseSettings:
 
     @classmethod
     def reset(cls):
-        cls.NONCE = bytes.fromhex("4cff7f5380ead8fad8ec2c531c110aca4302a88f603792801a8ca29ee151af2e")
+        cls.NONCE = bytes.fromhex(
+            "4cff7f5380ead8fad8ec2c531c110aca4302a88f603792801a8ca29ee151af2e"
+        )
         cls.current_retry_count = 0
         cls.claims = {}
 
@@ -290,7 +297,9 @@ class BaseSettings:
         self.fetch_vbios_rim = True
 
     def check_if_driver_rim_signature_verified(self):
-        event_log.debug(f"check_if_driver_rim_signature_verified: {self.driver_rim_signature_verification}")
+        event_log.debug(
+            f"check_if_driver_rim_signature_verified: {self.driver_rim_signature_verification}"
+        )
         return self.driver_rim_signature_verification
 
     def mark_driver_rim_signature_verified(self):
@@ -298,7 +307,9 @@ class BaseSettings:
         self.driver_rim_signature_verification = True
 
     def check_if_vbios_rim_signature_verified(self):
-        event_log.debug(f"check_if_vbios_rim_signature_verified: {self.vbios_rim_signature_verification}")
+        event_log.debug(
+            f"check_if_vbios_rim_signature_verified: {self.vbios_rim_signature_verification}"
+        )
         return self.vbios_rim_signature_verification
 
     def mark_vbios_rim_signature_verified(self):
@@ -306,7 +317,9 @@ class BaseSettings:
         self.vbios_rim_signature_verification = True
 
     def check_if_driver_rim_schema_validated(self):
-        event_log.debug(f"check_if_driver_rim_schema_validated: {self.driver_rim_schema_validation}")
+        event_log.debug(
+            f"check_if_driver_rim_schema_validated: {self.driver_rim_schema_validation}"
+        )
         return self.driver_rim_schema_validation
 
     def mark_driver_rim_schema_validated(self):
@@ -331,7 +344,9 @@ class BaseSettings:
             self.gpu_vbios_version = vbios_version.upper()
 
     def check_if_vbios_rim_schema_validated(self):
-        event_log.debug(f"check_if_vbios_rim_schema_validated: {self.vbios_rim_schema_validation}")
+        event_log.debug(
+            f"check_if_vbios_rim_schema_validated: {self.vbios_rim_schema_validation}"
+        )
         return self.vbios_rim_schema_validation
 
     def mark_vbios_rim_schema_validated(self):
@@ -339,7 +354,9 @@ class BaseSettings:
         self.vbios_rim_schema_validation = True
 
     def check_rim_driver_measurements_availability(self):
-        event_log.debug(f"check_rim_driver_measurements_availability: {self.rim_driver_measurements_availability}")
+        event_log.debug(
+            f"check_rim_driver_measurements_availability: {self.rim_driver_measurements_availability}"
+        )
         return self.rim_driver_measurements_availability
 
     def mark_rim_driver_measurements_as_available(self):
@@ -347,7 +364,9 @@ class BaseSettings:
         self.rim_driver_measurements_availability = True
 
     def check_rim_vbios_measurements_availability(self):
-        event_log.debug(f"check_rim_vbios_measurements_availability: {self.rim_vbios_measurements_availability}")
+        event_log.debug(
+            f"check_rim_vbios_measurements_availability: {self.rim_vbios_measurements_availability}"
+        )
         return self.rim_vbios_measurements_availability
 
     def mark_rim_vbios_measurements_as_available(self):
@@ -365,7 +384,9 @@ class BaseSettings:
         self.measurement_comparison = True
 
     def check_if_rim_driver_version_matches(self):
-        event_log.debug(f"check_if_rim_driver_version_matches: {self.rim_driver_version_match}")
+        event_log.debug(
+            f"check_if_rim_driver_version_matches: {self.rim_driver_version_match}"
+        )
         return self.rim_driver_version_match
 
     def mark_rim_driver_version_as_matching(self):
@@ -373,15 +394,19 @@ class BaseSettings:
         self.rim_driver_version_match = True
 
     def check_if_rim_vbios_version_matches(self):
-        event_log.debug(f"check_if_rim_vbios_version_matches: {self.rim_vbios_version_match}")
+        event_log.debug(
+            f"check_if_rim_vbios_version_matches: {self.rim_vbios_version_match}"
+        )
         return self.rim_vbios_version_match
 
     def mark_rim_vbios_version_as_matching(self):
         event_log.debug("mark_rim_vbios_version_as_matching called.")
         self.rim_vbios_version_match = True
-    
+
     def check_if_driver_rim_cert_validated(self):
-        event_log.debug(f"check_if_driver_rim_cert_validated: {self.driver_rim_certificate_validated}")
+        event_log.debug(
+            f"check_if_driver_rim_cert_validated: {self.driver_rim_certificate_validated}"
+        )
         return self.driver_rim_certificate_validated
 
     def mark_driver_rim_cert_validated_successfully(self):
@@ -389,7 +414,9 @@ class BaseSettings:
         self.driver_rim_certificate_validated = True
 
     def check_if_vbios_rim_cert_extracted(self):
-        event_log.debug(f"check_if_vbios_rim_cert_extracted: {self.vbios_rim_certificate_extraction}")
+        event_log.debug(
+            f"check_if_vbios_rim_cert_extracted: {self.vbios_rim_certificate_extraction}"
+        )
         return self.vbios_rim_certificate_extraction
 
     def mark_vbios_rim_cert_extracted_successfully(self):
@@ -397,7 +424,9 @@ class BaseSettings:
         self.vbios_rim_certificate_extraction = True
 
     def check_if_vbios_rim_cert_validated(self):
-        event_log.debug(f"check_if_vbios_rim_cert_extracted: {self.vbios_rim_certificate_validated}")
+        event_log.debug(
+            f"check_if_vbios_rim_cert_extracted: {self.vbios_rim_certificate_validated}"
+        )
         return self.vbios_rim_certificate_validated
 
     def mark_vbios_rim_cert_validated_successfully(self):
@@ -421,7 +450,9 @@ class BaseSettings:
         self.nonce_comparison = True
 
     def check_if_attestation_report_parsed_successfully(self):
-        event_log.debug(f"check_if_attestation_report_parsed_successfully: {self.parse_attestation_report}")
+        event_log.debug(
+            f"check_if_attestation_report_parsed_successfully: {self.parse_attestation_report}"
+        )
         return self.parse_attestation_report
 
     def mark_attestation_report_parsed(self):
@@ -490,12 +521,18 @@ class HopperSettings(BaseSettings):
     HashFunctionNamespace = "{http://www.w3.org/2001/04/xmlenc#sha384}"
     GpuArch = "HOPPER"
     RIM_DIRECTORY_PATH = os.path.join(parent_dir, "samples")
-    TEST_NO_GPU_DRIVER_RIM_PATH = os.path.join(RIM_DIRECTORY_PATH, "Driver_RIM_test_no_gpu.swidtag")
+    TEST_NO_GPU_DRIVER_RIM_PATH = os.path.join(
+        RIM_DIRECTORY_PATH, "Driver_RIM_test_no_gpu.swidtag"
+    )
     DRIVER_RIM_PATH = ""
-    TEST_NO_GPU_VBIOS_RIM_PATH = os.path.join(RIM_DIRECTORY_PATH, "1010_0200_882_96005E0001_test_no_gpu.swidtag")
+    TEST_NO_GPU_VBIOS_RIM_PATH = os.path.join(
+        RIM_DIRECTORY_PATH, "1010_0200_882_96005E0001_test_no_gpu.swidtag"
+    )
     VBIOS_RIM_PATH = ""
     ATTESTATION_REPORT_PATH = os.path.join(RIM_DIRECTORY_PATH, "attestationReport.txt")
-    GPU_ATTESTATION_CERTIFICATES_PATH = os.path.join(RIM_DIRECTORY_PATH, "gpuAkCertChain.txt")
+    GPU_ATTESTATION_CERTIFICATES_PATH = os.path.join(
+        RIM_DIRECTORY_PATH, "gpuAkCertChain.txt"
+    )
 
     @classmethod
     def set_driver_rim_path(cls, path):

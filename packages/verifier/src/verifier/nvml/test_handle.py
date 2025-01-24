@@ -1,7 +1,7 @@
 #
 # SPDX-FileCopyrightText: Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
-# 
+#
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
 #
@@ -28,24 +28,25 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
+
 class TestHandle:
-    """ A class to feed the hard coded GPU attestation certificate chains
+    """A class to feed the hard coded GPU attestation certificate chains
     during testing.
     """
-    
+
     def get_test_gpu_certificate_chain(self):
-        """ Fetches the hardcoded GPU attestation certificate chain data.
+        """Fetches the hardcoded GPU attestation certificate chain data.
 
         Returns:
             [bytes]: the GPU attestation certificate chain data.
         """
         return self.test_cert_chain
-    
+
     def __init__(self, test_cert_chain_data):
-        """ Constructor method for the TestHandle class. 
+        """Constructor method for the TestHandle class.
 
         Args:
-            test_cert_chain_data (bytes): the hardcoded GPU attestation 
+            test_cert_chain_data (bytes): the hardcoded GPU attestation
             certificate chain data.
         """
         self.test_cert_chain = test_cert_chain_data
