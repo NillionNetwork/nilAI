@@ -1,8 +1,9 @@
 from fastapi import HTTPException, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from nilai_api.db import UserManager
+import asyncio
 
-UserManager.initialize_db()
+asyncio.run(UserManager.initialize_db())
 
 bearer_scheme = HTTPBearer()
 

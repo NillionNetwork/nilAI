@@ -343,7 +343,7 @@ async def chat_completion(
     )
 
     model_response = SignedChatCompletion(
-        **response.dict(),
+        **response.model_dump(),
         signature="",
     )
     # Update token usage
