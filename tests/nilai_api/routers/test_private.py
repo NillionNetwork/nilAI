@@ -129,9 +129,9 @@ def test_get_attestation(mock_user, mock_user_manager, mock_state, client):
         "/v1/attestation/report", headers={"Authorization": "Bearer test-api-key"}
     )
     assert response.status_code == 200
-    assert response.json()['verifying_key'] == "test-verifying-key"
-    assert response.json()['cpu_attestation'] == "test-cpu-attestation"
-    assert response.json()['gpu_attestation'] != "test-gpu-attestation"
+    assert response.json()["verifying_key"] == "test-verifying-key"
+    assert response.json()["cpu_attestation"] == "test-cpu-attestation"
+    assert response.json()["gpu_attestation"] != "test-gpu-attestation"
 
 
 def test_get_models(mock_user, mock_user_manager, mock_state, client):
