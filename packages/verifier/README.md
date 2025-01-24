@@ -1,3 +1,4 @@
+# This code is taken from [Azure Confidential GPU Onboarding](https://github.com/Azure/az-cgpu-onboarding/tree/main/src/local_gpu_verifier)
 - [Verifier](#verifier)
   - [System Requirements:](#system-requirements)
   - [Pre-requisites:](#pre-requisites)
