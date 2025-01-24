@@ -5,7 +5,6 @@ import pytest
 from fastapi.testclient import TestClient
 from nilai_api.app import app
 from nilai_api.db import UserManager
-from tests.nilai_api import MockUserDatabase
 from nilai_api.state import state
 from tests import model_endpoint, model_metadata, response as RESPONSE
 
@@ -17,6 +16,7 @@ client = TestClient(app)
 #     asyncio.set_event_loop(loop)
 #     yield loop
 #     loop.close()
+
 
 @pytest.mark.asyncio
 async def test_runs_in_a_loop():
@@ -45,13 +45,13 @@ def mock_user_manager(mocker):
         UserManager,
         "get_user_token_usage",
         return_value={
-        "prompt_tokens": 100,
-        "completion_tokens": 50,
-        "total_tokens": 150,
-        "completion_tokens_details": None,
-        "prompt_tokens_details": None,
-        "queries": 10,
-    }
+            "prompt_tokens": 100,
+            "completion_tokens": 50,
+            "total_tokens": 150,
+            "completion_tokens_details": None,
+            "prompt_tokens_details": None,
+            "queries": 10,
+        },
     )
     mocker.patch.object(
         UserManager,
@@ -74,6 +74,7 @@ def mock_user_manager(mocker):
     mocker.patch.object(UserManager, "initialize_db")
     mocker.patch.object(UserManager, "log_query")
     mocker.patch.object(UserManager, "update_last_activity")
+
 
 @pytest.fixture
 def mock_state(mocker, event_loop):
@@ -107,6 +108,7 @@ async def test_models_property(mock_state):
 
     # Assert the expected models
     assert models == {"ABC": model_endpoint}
+
 
 def test_get_usage(mock_user, mock_user_manager, mock_state):
     response = client.get("/v1/usage", headers={"Authorization": "Bearer test-api-key"})

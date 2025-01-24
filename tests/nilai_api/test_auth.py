@@ -27,6 +27,7 @@ async def test_get_user_valid_token(mock_user_manager):
     assert user["name"] == "Test User"
     assert user["userid"] == "test-user-id"
 
+
 @pytest.mark.asyncio
 async def test_get_user_invalid_token(mock_user_manager):
     """Test get_user with an invalid token."""
