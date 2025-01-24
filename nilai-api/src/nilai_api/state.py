@@ -43,7 +43,6 @@ class AppState:
         # Check if GPU is available
         try:
             nonce = secrets.token_bytes(32).hex()
-            print(nonce, len(nonce))
             arguments_as_dictionary = {
                 "nonce": nonce,
                 "verbose": False,
