@@ -51,7 +51,7 @@ async def get_usage(user: dict = Depends(get_user)) -> Usage:
     usage = await get_usage(user)
     ```
     """
-    return Usage(**UserManager.get_token_usage(user["userid"]))  # type: ignore
+    return Usage(**await UserManager.get_token_usage(user["userid"]))  # type: ignore
 
 
 @router.get("/v1/attestation/report", tags=["Attestation"])
@@ -313,8 +313,14 @@ async def chat_completion(
 
                 for chunk in response:
                     if chunk.usage is not None:
-                        UserManager.update_token_usage(
+                        await UserManager.update_token_usage(
                             user["userid"],
+                            prompt_tokens=chunk.usage.prompt_tokens,
+                            completion_tokens=chunk.usage.completion_tokens,
+                        )
+                        await UserManager.log_query(
+                            user["userid"],
+                            model=req.model,
                             prompt_tokens=chunk.usage.prompt_tokens,
                             completion_tokens=chunk.usage.completion_tokens,
                         )
@@ -337,12 +343,19 @@ async def chat_completion(
     )
 
     model_response = SignedChatCompletion(
-        **response.dict(),
+        **response.model_dump(),
         signature="",
     )
     # Update token usage
-    UserManager.update_token_usage(
+    await UserManager.update_token_usage(
         user["userid"],
+        prompt_tokens=model_response.usage.prompt_tokens,
+        completion_tokens=model_response.usage.completion_tokens,
+    )
+
+    await UserManager.log_query(
+        user["userid"],
+        model=req.model,
         prompt_tokens=model_response.usage.prompt_tokens,
         completion_tokens=model_response.usage.completion_tokens,
     )

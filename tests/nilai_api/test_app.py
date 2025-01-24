@@ -1,10 +1,19 @@
 from fastapi.testclient import TestClient
-from nilai_api.app import app
-
-client = TestClient(app)
+import pytest
 
 
-def test_openapi_schema():
-    response = client.get("/openapi.json")
+@pytest.fixture
+def mock_client(mocker):
+    from nilai_api.db import UserManager
+
+    mocker.patch.object(UserManager, "initialize_db")
+    from nilai_api.app import app
+
+    client = TestClient(app)
+    return client
+
+
+def test_openapi_schema(mock_client):
+    response = mock_client.get("/openapi.json")
     assert response.status_code == 200
     assert "openapi" in response.json()

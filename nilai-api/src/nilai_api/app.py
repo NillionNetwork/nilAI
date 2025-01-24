@@ -2,6 +2,16 @@
 from fastapi import Depends, FastAPI
 from nilai_api.auth import get_user
 from nilai_api.routers import private, public
+from contextlib import asynccontextmanager
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    from nilai_api.db import UserManager
+
+    await UserManager.initialize_db()
+    yield
+
 
 host = "nilai.sandbox.nilogy.xyz"
 description = f"""
@@ -66,6 +76,7 @@ app = FastAPI(
             "description": "Track and retrieve user token consumption metrics",
         },
     ],
+    lifespan=lifespan,
 )
 
 

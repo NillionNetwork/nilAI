@@ -23,6 +23,9 @@ dependencies = [
     "nilrag>=0.1.2",
     "nilql>=0.0.0a3",
     "openai>=1.59.9",
+    "pg8000>=1.31.2",
+    "asyncpg>=0.30.0",
+    "greenlet>=3.1.1",
 ]
 
 

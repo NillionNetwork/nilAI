@@ -1,29 +1,35 @@
 import logging
 import os
+import dotenv
 import uuid
-from contextlib import contextmanager
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any, Dict, Generator, List, Optional
 
 import sqlalchemy
-from sqlalchemy import Column, Integer, String, create_engine
+from datetime import datetime
+from sqlalchemy import Column, ForeignKey, Integer, String, DateTime, Text
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session, sessionmaker
-from sqlalchemy.pool import QueuePool
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import AsyncAdaptedQueuePool
 
 # Configure logging
-
 logger = logging.getLogger(__name__)
 
-
-# Database configuration with better defaults and connection pooling
-def get_sqlite_path():
-    return f"sqlite:///{os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))}/db/users.sqlite"
+dotenv.load_dotenv()
+DATABASE_URL = sqlalchemy.engine.url.URL.create(
+    drivername="postgresql+asyncpg",  # Use asyncpg driver
+    username=os.getenv("DB_USER", "postgres"),
+    password=os.getenv("DB_PASS", ""),
+    host=os.getenv("DB_HOST", "localhost"),
+    port=int(os.getenv("DB_PORT", 5432)),
+    database=os.getenv("DB_NAME", "nilai_users"),
+)
 
 
 class DatabaseConfig:
-    # Use environment variables in a real-world scenario
-    DATABASE_URL = get_sqlite_path()
+    DATABASE_URL = DATABASE_URL
     POOL_SIZE = 5
     MAX_OVERFLOW = 10
     POOL_TIMEOUT = 30
@@ -32,23 +38,37 @@ class DatabaseConfig:
 
 # Create base and engine with improved configuration
 Base = sqlalchemy.orm.declarative_base()
-engine = create_engine(
-    DatabaseConfig.DATABASE_URL,
-    poolclass=QueuePool,
-    pool_size=DatabaseConfig.POOL_SIZE,
-    max_overflow=DatabaseConfig.MAX_OVERFLOW,
-    pool_timeout=DatabaseConfig.POOL_TIMEOUT,
-    pool_recycle=DatabaseConfig.POOL_RECYCLE,
-    echo=False,  # Set to True for SQL logging during development
-)
 
-# Create session factory with improved settings
-SessionLocal = sessionmaker(
-    bind=engine,
-    autocommit=False,  # Changed to False for more explicit transaction control
-    autoflush=False,  # More control over when to flush
-    expire_on_commit=False,  # Keep objects usable after session closes
-)
+_engine: Optional[sqlalchemy.ext.asyncio.AsyncEngine] = None
+_SessionLocal: Optional[sessionmaker] = None
+
+
+def get_engine() -> sqlalchemy.ext.asyncio.AsyncEngine:
+    global _engine
+    if _engine is None:
+        _engine = create_async_engine(
+            DatabaseConfig.DATABASE_URL,
+            poolclass=AsyncAdaptedQueuePool,
+            pool_size=DatabaseConfig.POOL_SIZE,
+            max_overflow=DatabaseConfig.MAX_OVERFLOW,
+            pool_timeout=DatabaseConfig.POOL_TIMEOUT,
+            pool_recycle=DatabaseConfig.POOL_RECYCLE,
+            echo=False,  # Set to True for SQL logging during development
+        )
+    return _engine
+
+
+def get_sessionmaker() -> sessionmaker:
+    global _SessionLocal
+    if _SessionLocal is None:
+        _SessionLocal = sessionmaker(
+            bind=get_engine(),
+            class_=AsyncSession,
+            autocommit=False,
+            autoflush=False,
+            expire_on_commit=False,
+        )
+    return _SessionLocal
 
 
 # Enhanced User Model with additional constraints and validation
@@ -57,13 +77,32 @@ class User(Base):
 
     userid = Column(String(36), primary_key=True, index=True)
     name = Column(String(100), nullable=False)
+    email = Column(String(255), unique=True, nullable=False, index=True)
     apikey = Column(String(36), unique=True, nullable=False, index=True)
     prompt_tokens = Column(Integer, default=0, nullable=False)
     completion_tokens = Column(Integer, default=0, nullable=False)
     queries = Column(Integer, default=0, nullable=False)
+    signup_date = Column(DateTime, default=datetime.now(), nullable=False)
+    last_activity = Column(DateTime, nullable=True)
 
     def __repr__(self):
-        return f"<User(userid={self.userid}, name={self.name})>"
+        return f"<User(userid={self.userid}, name={self.name}, email={self.email})>"
+
+
+# New QueryLog Model for tracking individual queries
+class QueryLog(Base):
+    __tablename__ = "query_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    userid = Column(String(36), ForeignKey("users.userid"), nullable=False, index=True)
+    query_timestamp = Column(DateTime, default=datetime.now(), nullable=False)
+    model = Column(Text, nullable=False)
+    prompt_tokens = Column(Integer, nullable=False)
+    completion_tokens = Column(Integer, nullable=False)
+    total_tokens = Column(Integer, nullable=False)
+
+    def __repr__(self):
+        return f"<QueryLog(userid={self.userid}, query_timestamp={self.query_timestamp}, total_tokens={self.total_tokens})>"
 
 
 @dataclass
@@ -76,25 +115,25 @@ class UserData:
     queries: int
 
 
-# Context manager for database sessions
-@contextmanager
-def get_db_session() -> "Generator[Session, Any, Any]":
+# Async context manager for database sessions
+@asynccontextmanager
+async def get_db_session() -> "Generator[AsyncSession, Any, Any]":
     """Provide a transactional scope for database operations."""
-    session = SessionLocal()
+    session = get_sessionmaker()()
     try:
         yield session
-        session.commit()
+        await session.commit()
     except SQLAlchemyError as e:
-        session.rollback()
+        await session.rollback()
         logger.error(f"Database error: {e}")
         raise
     finally:
-        session.close()
+        await session.close()
 
 
 class UserManager:
     @staticmethod
-    def initialize_db() -> bool:
+    async def initialize_db() -> bool:
         """
         Create database tables only if they do not already exist.
 
@@ -102,18 +141,25 @@ class UserManager:
             bool: True if tables were created, False if tables already existed
         """
         try:
-            # Create an inspector to check existing tables
-            inspector = sqlalchemy.inspect(engine)
+            async with get_engine().begin() as conn:
+                # Create an inspector to check existing tables
+                inspector = await conn.run_sync(
+                    lambda sync_conn: sqlalchemy.inspect(sync_conn)
+                )
 
-            # Check if the 'users' table already exists
-            if not inspector.has_table("users"):
-                # Create all tables that do not exist
-                Base.metadata.create_all(bind=engine)
-                logger.info("Database tables created successfully.")
-                return True
-            else:
-                logger.info("Database tables already exist. Skipping creation.")
-                return False
+                # Check if the 'users' table already exists
+                if not await conn.run_sync(
+                    lambda sync_conn: inspector.has_table("users")
+                ) or not await conn.run_sync(
+                    lambda sync_conn: inspector.has_table("query_logs")
+                ):
+                    # Create all tables that do not exist
+                    await conn.run_sync(Base.metadata.create_all)
+                    logger.info("Database tables created successfully.")
+                    return True
+                else:
+                    logger.info("Database tables already exist. Skipping creation.")
+                    return False
         except SQLAlchemyError as e:
             logger.error(f"Error checking or creating database tables: {e}")
             raise
@@ -129,12 +175,33 @@ class UserManager:
         return str(uuid.uuid4())
 
     @staticmethod
-    def insert_user(name: str) -> Dict[str, str]:
+    async def update_last_activity(userid: str):
+        """
+        Update the last activity timestamp for a user.
+
+        Args:
+            userid (str): User's unique ID
+        """
+        try:
+            async with get_db_session() as session:
+                user = await session.get(User, userid)
+                if user:
+                    user.last_activity = datetime.now()
+                    await session.commit()
+                    logger.info(f"Updated last activity for user {userid}")
+                else:
+                    logger.warning(f"User {userid} not found")
+        except SQLAlchemyError as e:
+            logger.error(f"Error updating last activity: {e}")
+
+    @staticmethod
+    async def insert_user(name: str, email: str) -> Dict[str, str]:
         """
         Insert a new user into the database.
 
         Args:
             name (str): Name of the user
+            email (str): Email of the user
 
         Returns:
             Dict containing userid and apikey
@@ -143,9 +210,10 @@ class UserManager:
         apikey = UserManager.generate_api_key()
 
         try:
-            with get_db_session() as session:
-                user = User(userid=userid, name=name, apikey=apikey)
+            async with get_db_session() as session:
+                user = User(userid=userid, name=name, email=email, apikey=apikey)
                 session.add(user)
+                await session.commit()
                 logger.info(f"User {name} added successfully.")
                 return {"userid": userid, "apikey": apikey}
         except SQLAlchemyError as e:
@@ -153,7 +221,40 @@ class UserManager:
             raise
 
     @staticmethod
-    def check_api_key(api_key: str) -> Optional[dict]:
+    async def log_query(
+        userid: str, model: str, prompt_tokens: int, completion_tokens: int
+    ):
+        """
+        Log a user's query.
+
+        Args:
+            userid (str): User's unique ID
+            model (str): The model that generated the response
+            prompt_tokens (int): Number of input tokens used
+            completion_tokens (int): Number of tokens in the generated response
+        """
+        total_tokens = prompt_tokens + completion_tokens
+
+        try:
+            async with get_db_session() as session:
+                query_log = QueryLog(
+                    userid=userid,
+                    model=model,
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    total_tokens=total_tokens,
+                )
+                session.add(query_log)
+                await session.commit()
+                logger.info(
+                    f"Query logged for user {userid} with total tokens {total_tokens}."
+                )
+        except SQLAlchemyError as e:
+            logger.error(f"Error logging query: {e}")
+            raise
+
+    @staticmethod
+    async def check_api_key(api_key: str) -> Optional[dict]:
         """
         Validate an API key.
 
@@ -164,15 +265,20 @@ class UserManager:
             User's name if API key is valid, None otherwise
         """
         try:
-            with get_db_session() as session:
-                user = session.query(User).filter(User.apikey == api_key).first()
-                return {"name": user.name, "userid": user.userid} if user else None  # type: ignore
+            async with get_db_session() as session:
+                user = await session.execute(
+                    sqlalchemy.select(User).filter(User.apikey == api_key)
+                )
+                user = user.scalar_one_or_none()
+                return {"name": user.name, "userid": user.userid} if user else None
         except SQLAlchemyError as e:
             logger.error(f"Error checking API key: {e}")
             return None
 
     @staticmethod
-    def update_token_usage(userid: str, prompt_tokens: int, completion_tokens: int):
+    async def update_token_usage(
+        userid: str, prompt_tokens: int, completion_tokens: int
+    ):
         """
         Update token usage for a specific user.
 
@@ -182,12 +288,13 @@ class UserManager:
             completion_tokens (int): Number of generated tokens
         """
         try:
-            with get_db_session() as session:
-                user = session.query(User).filter(User.userid == userid).first()
+            async with get_db_session() as session:
+                user = await session.get(User, userid)
                 if user:
-                    user.prompt_tokens += prompt_tokens  # type: ignore
-                    user.completion_tokens += completion_tokens  # type: ignore
-                    user.queries += 1  # type: ignore
+                    user.prompt_tokens += prompt_tokens
+                    user.completion_tokens += completion_tokens
+                    user.queries += 1
+                    await session.commit()
                     logger.info(f"Updated token usage for user {userid}")
                 else:
                     logger.warning(f"User {userid} not found")
@@ -195,11 +302,7 @@ class UserManager:
             logger.error(f"Error updating token usage: {e}")
 
     @staticmethod
-    def get_token_usage(
-        userid: str,
-    ) -> (
-        Dict[str, Any] | None
-    ):  # -> dict[str, Any] | None:# -> dict[str, Any] | None:# -> dict[str, Any] | None:# -> dict[str, Any] | None:# -> dict[str, Any] | None:
+    async def get_token_usage(userid: str) -> Optional[Dict[str, Any]]:
         """
         Get token usage for a specific user.
 
@@ -207,8 +310,8 @@ class UserManager:
             userid (str): User's unique ID
         """
         try:
-            with get_db_session() as session:
-                user = session.query(User).filter(User.userid == userid).first()
+            async with get_db_session() as session:
+                user = await session.get(User, userid)
                 if user:
                     return {
                         "prompt_tokens": user.prompt_tokens,
@@ -218,29 +321,31 @@ class UserManager:
                     }
                 else:
                     logger.warning(f"User {userid} not found")
+                    return None
         except SQLAlchemyError as e:
             logger.error(f"Error updating token usage: {e}")
             return None
 
     @staticmethod
-    def get_all_users() -> Optional[List[UserData]]:
+    async def get_all_users() -> Optional[List[UserData]]:
         """
         Retrieve all users from the database.
 
         Returns:
-            Dict of users or None if no users found
+            List of UserData or None if no users found
         """
         try:
-            with get_db_session() as session:
-                users = session.query(User).all()
+            async with get_db_session() as session:
+                users = await session.execute(sqlalchemy.select(User))
+                users = users.scalars().all()
                 return [
                     UserData(
-                        userid=user.userid,  # type: ignore
-                        name=user.name,  # type: ignore
-                        apikey=user.apikey,  # type: ignore
-                        input_tokens=user.prompt_tokens,  # type: ignore
-                        generated_tokens=user.completion_tokens,  # type: ignore
-                        queries=user.queries,  # type: ignore
+                        userid=user.userid,
+                        name=user.name,
+                        apikey=user.apikey,
+                        input_tokens=user.prompt_tokens,
+                        generated_tokens=user.completion_tokens,
+                        queries=user.queries,
                     )
                     for user in users
                 ]
@@ -249,7 +354,7 @@ class UserManager:
             return None
 
     @staticmethod
-    def get_user_token_usage(userid: str) -> Optional[Dict[str, int]]:
+    async def get_user_token_usage(userid: str) -> Optional[Dict[str, int]]:
         """
         Retrieve total token usage for a user.
 
@@ -260,14 +365,14 @@ class UserManager:
             Dict of token usage or None if user not found
         """
         try:
-            with get_db_session() as session:
-                user = session.query(User).filter(User.userid == userid).first()
+            async with get_db_session() as session:
+                user = await session.get(User, userid)
                 if user:
                     return {
                         "prompt_tokens": user.prompt_tokens,
                         "completion_tokens": user.completion_tokens,
                         "queries": user.queries,
-                    }  # type: ignore
+                    }
                 return None
         except SQLAlchemyError as e:
             logger.error(f"Error retrieving token usage: {e}")
@@ -275,27 +380,42 @@ class UserManager:
 
 
 __all__ = ["UserManager", "UserData"]
-# Example Usage
-if __name__ == "__main__":
-    # Initialize the database
-    UserManager.initialize_db()
 
-    print(UserManager.get_all_users())
+
+# Example Usage
+async def main():
+    # Initialize the database
+    await UserManager.initialize_db()
 
     # Add some users
-    bob = UserManager.insert_user("Bob")
-    alice = UserManager.insert_user("Alice")
+    bob = await UserManager.insert_user("Bob", "bob@example.com")
+    alice = await UserManager.insert_user("Alice", "alice@example.com")
 
     print(f"Bob's details: {bob}")
     print(f"Alice's details: {alice}")
 
     # Check API key
-    user_name = UserManager.check_api_key(bob["apikey"])
+    user_name = await UserManager.check_api_key(bob["apikey"])
     print(f"API key validation: {user_name}")
 
     # Update and retrieve token usage
-    UserManager.update_token_usage(
+    await UserManager.update_token_usage(
         bob["userid"], prompt_tokens=50, completion_tokens=20
     )
-    usage = UserManager.get_user_token_usage(bob["userid"])
+    usage = await UserManager.get_user_token_usage(bob["userid"])
     print(f"Bob's token usage: {usage}")
+
+    # Log a query
+    await UserManager.log_query(
+        userid=bob["userid"],
+        model="gpt-3.5-turbo",
+        prompt_tokens=8,
+        completion_tokens=7,
+    )
+
+
+if __name__ == "__main__":
+    # Run the example
+    import asyncio
+
+    asyncio.run(main())
