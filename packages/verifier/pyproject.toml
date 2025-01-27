@@ -1,0 +1,40 @@
+[project]
+name = "verifier"
+version = "2.0.0"
+description = "A Python-based tool that validates GPU measurements by comparing GPU runtime measurements with authenticated golden measurements"
+authors = [
+    {name = "NVIDIA"}
+]
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "BSD-3-Clause"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: OS Independent",
+]
+keywords = [
+    "confidential-computing",
+    "local-gpu-verifier",
+    "attestation",
+    "NVIDIA",
+    "verifier"
+]
+dependencies = [
+    'cryptography == 43.0.1',
+    'ecdsa >= 0.19.0',
+    'lxml >= 4.9.1',
+    'signxml == 3.2.0',
+    'xmlschema == 2.2.3',
+    'pyOpenSSL == 24.2.1',
+    'PyJWT >= 2.7.0',
+    'nvidia-ml-py >= 12.550.52',
+    'requests == 2.32.3'
+]
+
+[tool.setuptools.package-data]
+verifier = ["samples/*.swidtag", "rim/*.xsd", "samples/*.txt","certs/*.pem", "Tests/*/*.txt"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

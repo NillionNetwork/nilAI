@@ -13,6 +13,7 @@ dependencies = [
     "nilai-api",
     "nilai-common",
     "nilai-models",
+    "verifier",
 ]
 
 [dependency-groups]
@@ -34,9 +35,10 @@ build-backend = "setuptools.build_meta"
 find = { include = ["nilai"] }
 
 [tool.uv.workspace]
-members = ["nilai-models", "nilai-api", "packages/nilai-common"]
+members = ["nilai-models", "nilai-api", "packages/nilai-common", "packages/verifier"]
 
 [tool.uv.sources]
 nilai-common = { workspace = true }
 nilai-api = { workspace = true }
 nilai-models = { workspace = true }
+verifier = { workspace = true }

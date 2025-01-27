@@ -11,7 +11,7 @@ authors = [
 requires-python = ">=3.12"
 dependencies = [
     "accelerate>=1.1.1",
-    "cryptography>=44.0.0",
+    "cryptography>=43.0.1",
     "fastapi[standard]>=0.115.5",
     "gunicorn>=23.0.0",
     "nilai-common",
@@ -26,6 +26,7 @@ dependencies = [
     "pg8000>=1.31.2",
     "asyncpg>=0.30.0",
     "greenlet>=3.1.1",
+    "verifier",
 ]
 
 
@@ -35,3 +36,4 @@ build-backend = "hatchling.build"
 
 [tool.uv.sources]
 nilai-common = { workspace = true }
+verifier = { workspace = true }

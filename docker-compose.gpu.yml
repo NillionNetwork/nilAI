@@ -23,6 +23,13 @@ services:
         condition: service_healthy
     volumes:
       - ${PWD}/db/:/app/db/   # sqlite database for users
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     environment:
       - ETCD_HOST=etcd
       - ETCD_PORT=2379
@@ -33,7 +40,6 @@ services:
     build:
       context: .
       dockerfile: docker/vllm.Dockerfile
-    runtime: nvidia
     deploy:
       resources:
         reservations:
@@ -41,6 +47,12 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+    ipc: host
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    env_file:
+      - .env
     depends_on:
       etcd:
         condition: service_healthy
@@ -54,8 +66,6 @@ services:
       - SVC_PORT=8000
       - ETCD_HOST=etcd
       - ETCD_PORT=2379
-    env_file:
-      - .env
     volumes:
       - hugging_face_models:/root/.cache/huggingface  # cache models
     networks:
@@ -64,7 +74,6 @@ services:
     build:
       context: .
       dockerfile: docker/vllm.Dockerfile
-    runtime: nvidia
     deploy:
       resources:
         reservations:
@@ -72,6 +81,12 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+    ipc: host
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    env_file:
+      - .env
     depends_on:
       etcd:
         condition: service_healthy
@@ -85,8 +100,6 @@ services:
       - SVC_PORT=8000
       - ETCD_HOST=etcd
       - ETCD_PORT=2379
-    env_file:
-      - .env
     volumes:
       - hugging_face_models:/root/.cache/huggingface  # cache models
     networks:

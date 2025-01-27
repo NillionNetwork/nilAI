@@ -5,7 +5,7 @@ from nilai_api.state import AppState
 
 
 @pytest.fixture
-def app_state():
+def app_state(mocker):
     return AppState()
 
 
@@ -37,8 +37,8 @@ def test_cpu_attestation(mock_get_quote, mock_init, app_state):
     mock_get_quote.assert_called_once()
 
 
-def test_gpu_attestation(app_state):
-    assert app_state.gpu_attestation == "<No GPU>"
+def test_gpu_attestation():
+    assert AppState().gpu_attestation != "<No GPU>"
 
 
 @pytest.mark.asyncio

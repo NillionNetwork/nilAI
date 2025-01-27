@@ -243,6 +243,7 @@ class UserManager:
                     prompt_tokens=prompt_tokens,
                     completion_tokens=completion_tokens,
                     total_tokens=total_tokens,
+                    query_timestamp=datetime.now(),
                 )
                 session.add(query_log)
                 await session.commit()
