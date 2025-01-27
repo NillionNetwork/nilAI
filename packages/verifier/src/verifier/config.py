@@ -35,6 +35,7 @@ import sys
 import json
 import requests
 from verifier.__about__ import __author__, __copyright__, __version__
+import fcntl
 
 info_log = logging.getLogger("gpu-verifier-info")
 info_log.setLevel(logging.INFO)
@@ -44,8 +45,16 @@ info_log.addHandler(shandler)
 parent_dir = os.path.dirname(os.path.abspath(__file__))
 logger_file_path = os.path.join(os.getcwd(), "verifier.log")
 
-if os.path.exists(logger_file_path):
-    os.remove(logger_file_path)
+# Ensure only one gunicorn worker executes this section of code
+lock_file_path = os.path.join(os.getcwd(), "verifier.lock")
+with open(lock_file_path, "w") as lock_file:
+    try:
+        fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        if os.path.exists(logger_file_path):
+            os.remove(logger_file_path)
+    except BlockingIOError:
+        # Another worker has the lock, so skip this section
+        pass
 
 event_log = logging.getLogger("gpu-verifier-event")
 event_log.setLevel(logging.DEBUG)
