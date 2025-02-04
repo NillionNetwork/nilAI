@@ -1,7 +1,35 @@
 services:
   api:
     privileged: true
-    ports:
-      - "8080:8080"
     volumes:
       - /dev/sev-guest:/dev/sev-guest # for AMD SEV
+    networks:
+      - proxy_net
+  caddy:
+    image: caddy:latest
+    container_name: caddy
+    restart: unless-stopped
+    networks:
+      - proxy_net
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+      - ./caddy/caddy_data:/data
+      - ./caddy/caddy_config:/config
+    postgres:
+      image: postgres:16
+      container_name: postgres
+      restart: always
+      environment:
+        POSTGRES_USER: user
+        POSTGRES_PASSWORD: password
+        POSTGRES_DB: mydb
+      volumes:
+        - ./init-scripts:/docker-entrypoint-initdb.d
+      ports:
+        - "5432:5432"
+networks:
+  proxy_net:

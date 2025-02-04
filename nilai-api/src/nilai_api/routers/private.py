@@ -303,6 +303,11 @@ async def chat_completion(
                     model=req.model,
                     messages=req.messages,
                     stream=req.stream,
+                    top_p=req.top_p,
+                    temperature=req.temperature,
+                    max_tokens=req.max_tokens,
+                    tool_choice=req.tool_choice,
+                    tools=req.tools,
                     extra_body={
                         "stream_options": {
                             "include_usage": True,
@@ -339,7 +344,14 @@ async def chat_completion(
         )
 
     response = client.chat.completions.create(
-        model=req.model, messages=req.messages, stream=req.stream
+        model=req.model,
+        messages=req.messages,
+        stream=req.stream,
+        top_p=req.top_p,
+        temperature=req.temperature,
+        max_tokens=req.max_tokens,
+        tool_choice=req.tool_choice,
+        tools=req.tools,
     )
 
     model_response = SignedChatCompletion(

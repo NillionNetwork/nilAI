@@ -164,3 +164,4 @@ bench/
 
 data/
 .DS_Store
+verifier.lock
