@@ -169,6 +169,11 @@ async def chat_completion(
             detail=f"Invalid model name {model_name}, check /v1/models for options",
         )
 
+    if not endpoint.metadata.tool_support and req.tools:
+        raise HTTPException(
+            status_code=400,
+            detail="Model does not support tool usage, remove tools from request",
+        )
     model_url = endpoint.url + "/v1/"
 
     logger.info(
@@ -306,7 +311,6 @@ async def chat_completion(
                     top_p=req.top_p,
                     temperature=req.temperature,
                     max_tokens=req.max_tokens,
-                    tool_choice=req.tool_choice,
                     tools=req.tools,
                     extra_body={
                         "stream_options": {
@@ -350,7 +354,6 @@ async def chat_completion(
         top_p=req.top_p,
         temperature=req.temperature,
         max_tokens=req.max_tokens,
-        tool_choice=req.tool_choice,
         tools=req.tools,
     )
 
