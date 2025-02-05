@@ -25,8 +25,8 @@ services:
       --gpu-memory-utilization 0.5 
       --max-model-len 10000 
       --tensor-parallel-size 1
-#      --enable-auto-tool-choice
-#      --tool-call-parser llama3_json
+      --enable-auto-tool-choice
+      --tool-call-parser llama3_json
     environment:
       - SVC_HOST=llama_8b_gpu
       - SVC_PORT=8000

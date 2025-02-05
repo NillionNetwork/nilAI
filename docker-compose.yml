@@ -28,6 +28,7 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+    restart: unless-stopped
     environment:
       - ETCD_HOST=etcd
       - ETCD_PORT=2379
