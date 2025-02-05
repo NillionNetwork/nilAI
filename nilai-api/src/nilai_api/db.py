@@ -72,7 +72,7 @@ def get_sessionmaker() -> sessionmaker:
 
 
 # Enhanced User Model with additional constraints and validation
-class User(Base):
+class UserModel(Base):
     __tablename__ = "users"
 
     userid = Column(String(36), primary_key=True, index=True)
@@ -84,6 +84,9 @@ class User(Base):
     queries = Column(Integer, default=0, nullable=False)
     signup_date = Column(DateTime, default=datetime.now(), nullable=False)
     last_activity = Column(DateTime, nullable=True)
+    ratelimit_day = Column(Integer, default=1000, nullable=True)
+    ratelimit_hour = Column(Integer, default=100, nullable=True)
+    ratelimit_minute = Column(Integer, default=10, nullable=True)
 
     def __repr__(self):
         return f"<User(userid={self.userid}, name={self.name}, email={self.email})>"
@@ -113,7 +116,6 @@ class UserData:
     input_tokens: int
     generated_tokens: int
     queries: int
-
 
 # Async context manager for database sessions
 @asynccontextmanager
@@ -184,7 +186,7 @@ class UserManager:
         """
         try:
             async with get_db_session() as session:
-                user = await session.get(User, userid)
+                user = await session.get(UserModel, userid)
                 if user:
                     user.last_activity = datetime.now()
                     await session.commit()
@@ -211,7 +213,7 @@ class UserManager:
 
         try:
             async with get_db_session() as session:
-                user = User(userid=userid, name=name, email=email, apikey=apikey)
+                user = UserModel(userid=userid, name=name, email=email, apikey=apikey)
                 session.add(user)
                 await session.commit()
                 logger.info(f"User {name} added successfully.")
@@ -255,7 +257,7 @@ class UserManager:
             raise
 
     @staticmethod
-    async def check_api_key(api_key: str) -> Optional[dict]:
+    async def check_api_key(api_key: str) -> Optional[UserModel]:
         """
         Validate an API key.
 
@@ -268,10 +270,10 @@ class UserManager:
         try:
             async with get_db_session() as session:
                 user = await session.execute(
-                    sqlalchemy.select(User).filter(User.apikey == api_key)
+                    sqlalchemy.select(UserModel).filter(UserModel.apikey == api_key)
                 )
                 user = user.scalar_one_or_none()
-                return {"name": user.name, "userid": user.userid} if user else None
+                return user
         except SQLAlchemyError as e:
             logger.error(f"Error checking API key: {e}")
             return None
@@ -290,7 +292,7 @@ class UserManager:
         """
         try:
             async with get_db_session() as session:
-                user = await session.get(User, userid)
+                user = await session.get(UserModel, userid)
                 if user:
                     user.prompt_tokens += prompt_tokens
                     user.completion_tokens += completion_tokens
@@ -312,7 +314,7 @@ class UserManager:
         """
         try:
             async with get_db_session() as session:
-                user = await session.get(User, userid)
+                user = await session.get(UserModel, userid)
                 if user:
                     return {
                         "prompt_tokens": user.prompt_tokens,
@@ -337,7 +339,7 @@ class UserManager:
         """
         try:
             async with get_db_session() as session:
-                users = await session.execute(sqlalchemy.select(User))
+                users = await session.execute(sqlalchemy.select(UserModel))
                 users = users.scalars().all()
                 return [
                     UserData(
@@ -367,7 +369,7 @@ class UserManager:
         """
         try:
             async with get_db_session() as session:
-                user = await session.get(User, userid)
+                user = await session.get(UserModel, userid)
                 if user:
                     return {
                         "prompt_tokens": user.prompt_tokens,
@@ -380,7 +382,7 @@ class UserManager:
             return None
 
 
-__all__ = ["UserManager", "UserData"]
+__all__ = ["UserManager", "UserData", "UserModel"]
 
 
 # Example Usage
