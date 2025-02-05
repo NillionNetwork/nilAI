@@ -3,6 +3,7 @@ from fastapi import Depends, FastAPI
 from nilai_api.auth import get_user
 from nilai_api.routers import private, public
 from contextlib import asynccontextmanager
+from fastapi.middleware.cors import CORSMiddleware
 
 
 @asynccontextmanager
@@ -82,3 +83,15 @@ app = FastAPI(
 
 app.include_router(public.router)
 app.include_router(private.router, dependencies=[Depends(get_user)])
+
+origins = [
+    "https://docs.nillion.com",  # TODO: When users want to connect from browser
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)

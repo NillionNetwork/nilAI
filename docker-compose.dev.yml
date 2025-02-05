@@ -1,7 +1,37 @@
 services:
   api:
     privileged: true
-    ports:
-      - "8080:8080"
     volumes:
       - /dev/sev-guest:/dev/sev-guest # for AMD SEV
+    networks:
+      - proxy_net
+  caddy:
+    image: caddy:latest
+    container_name: caddy
+    restart: unless-stopped
+    networks:
+      - proxy_net
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+      - ./caddy/caddy_data:/data
+      - ./caddy/caddy_config:/config
+  postgres:
+    image: postgres:16
+    container_name: postgres
+    restart: always
+    env_file:
+      - .env
+    networks:
+      - proxy_net
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "user", "-d", "mydb", "-h", "localhost"]
+      interval: 30s
+      retries: 5
+      start_period: 10s
+      timeout: 10s
+networks:
+  proxy_net:

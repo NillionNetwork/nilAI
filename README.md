@@ -6,14 +6,22 @@ There are two ways to deploy **nilAI**. The recommended way is to use docker-com
 
 ## Docker
 
-For development environments:
+For development environments with 
 ```shell
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build 
+docker compose -f docker-compose.yml \
+-f docker-compose.dev.yml \
+-f docker/compose/docker-compose.llama-3b-gpu.yml \
+-f docker/compose/docker-compose.llama-8b-gpu.yml \
+up --build 
 ```
 
 For production environments:
 ```shell
-docker compose -f docker-compose.gpu.yml -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.yml \
+-f docker-compose.prod.yml \
+-f docker/compose/docker-compose.llama-3b-gpu.yml \
+-f docker/compose/docker-compose.llama-8b-gpu.yml \
+up --build 
 ```
 
 ## Manual Deployment
