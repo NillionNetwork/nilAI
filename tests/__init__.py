@@ -16,6 +16,7 @@ model_metadata: ModelMetadata = ModelMetadata(
     license="License",  # Usage license
     source="http://test-model-url",  # Model source
     supported_features=["supported_feature"],  # Capabilities
+    tool_support=False,  # Whether the model supports tools
 )
 
 model_endpoint: ModelEndpoint = ModelEndpoint(

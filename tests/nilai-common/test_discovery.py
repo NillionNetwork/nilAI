@@ -25,6 +25,7 @@ def model_endpoint():
         license="MIT",
         source="https://github.com/test/model",
         supported_features=["test_feature"],
+        tool_support=False,
     )
     return ModelEndpoint(
         url="http://test-model-service.example.com/predict", metadata=model_metadata

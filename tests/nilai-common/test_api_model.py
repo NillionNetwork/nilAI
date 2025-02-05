@@ -13,6 +13,7 @@ def test_model_metadata_creation():
         license="MIT",
         source="https://example.com",
         supported_features=["feature1", "feature2"],
+        tool_support=False,
     )
 
     assert metadata.id is not None
@@ -35,6 +36,7 @@ def test_model_metadata_default_id():
         license="MIT",
         source="https://example.com",
         supported_features=["feature1", "feature2"],
+        tool_support=False,
     )
 
     assert metadata.id is not None
@@ -51,4 +53,5 @@ def test_model_metadata_invalid_data():
             author="",
             license="",
             source="",
+            tool_support=False,
         )  # type: ignore
