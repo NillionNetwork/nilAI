@@ -1,0 +1,50 @@
+services:
+  llama_8b_gpu:
+    build:
+      context: .
+      dockerfile: docker/vllm.Dockerfile
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ipc: host
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    env_file:
+      - .env
+    restart: unless-stopped
+    depends_on:
+      etcd:
+        condition: service_healthy
+    command: >
+      --model meta-llama/Llama-3.1-8B-Instruct
+      --gpu-memory-utilization 0.5 
+      --max-model-len 10000 
+      --tensor-parallel-size 1
+      --enable-auto-tool-choice
+      --tool-call-parser llama3_json
+    environment:
+      - SVC_HOST=llama_8b_gpu
+      - SVC_PORT=8000
+      - ETCD_HOST=etcd
+      - ETCD_PORT=2379
+      - TOOL_SUPPORT=true
+    volumes:
+      - hugging_face_models:/root/.cache/huggingface  # cache models
+    networks:
+      - backend_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      retries: 3
+      start_period: 60s
+      timeout: 10s
+volumes:
+  hugging_face_models:
+
+networks:
+  backend_net:

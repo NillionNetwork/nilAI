@@ -1,9 +1,10 @@
 import uuid
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Iterable
 
 from openai.types.chat import ChatCompletion, ChatCompletionMessage
 from openai.types.chat.chat_completion import Choice as OpenaAIChoice
 from openai.types.chat.chat_completion import CompletionUsage
+from openai.types.chat import ChatCompletionToolParam
 from pydantic import BaseModel, Field
 
 
@@ -35,6 +36,7 @@ class ChatRequest(BaseModel):
     top_p: Optional[float] = 0.95
     max_tokens: Optional[int] = 2048
     stream: Optional[bool] = False
+    tools: Optional[Iterable[ChatCompletionToolParam]] = None
     nilrag: Optional[dict] = {}
 
 
@@ -57,6 +59,7 @@ class ModelMetadata(BaseModel):
     license: str
     source: str
     supported_features: List[str]
+    tool_support: bool
 
 
 class ModelEndpoint(BaseModel):

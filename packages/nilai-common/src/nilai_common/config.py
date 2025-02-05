@@ -9,6 +9,7 @@ SETTINGS = {
     "port": os.getenv("SVC_PORT", 8000),
     "etcd_host": os.getenv("ETCD_HOST", "localhost"),
     "etcd_port": os.getenv("ETCD_PORT", 2379),
+    "tool_support": os.getenv("TOOL_SUPPORT", False),
 }
 # if environment == "docker":
 #     config = "docker_settings.py"
