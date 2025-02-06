@@ -5,7 +5,9 @@ from nilai_api.db import UserManager, UserModel
 bearer_scheme = HTTPBearer()
 
 
-async def get_user(credentials: HTTPAuthorizationCredentials = Security(bearer_scheme)) -> UserModel:
+async def get_user(
+    credentials: HTTPAuthorizationCredentials = Security(bearer_scheme),
+) -> UserModel:
     token = credentials.credentials
     user = await UserManager.check_api_key(token)
     if user:

@@ -12,14 +12,13 @@ from fastapi.middleware.cors import CORSMiddleware
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     from nilai_api.db import UserManager
-    
+
     await UserManager.initialize_db()
-    client, rate_limit_command = await setup_redis_conn(os.getenv("REDIS_URL", "redis://localhost:6379"))
-    
-    yield {
-        "redis": client, 
-        "redis_rate_limit_command": rate_limit_command
-    }
+    client, rate_limit_command = await setup_redis_conn(
+        os.getenv("REDIS_URL", "redis://localhost:6379")
+    )
+
+    yield {"redis": client, "redis_rate_limit_command": rate_limit_command}
 
 
 host = "nilai.sandbox.nilogy.xyz"
