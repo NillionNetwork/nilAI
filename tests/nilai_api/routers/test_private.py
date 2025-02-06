@@ -168,7 +168,7 @@ def test_chat_completion(mock_user, mock_state, mock_user_manager, mocker, clien
     response = client.post(
         "/v1/chat/completions",
         json={
-            "model": "Llama-3.2-1B-Instruct",
+            "model": "meta-llama/Llama-3.2-1B-Instruct",
             "messages": [
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": "What is your name?"},
