@@ -38,3 +38,6 @@ jobs:
       
       - name: Run tests
         run: uv run pytest -v
+        
+      - name: pyright
+        run: uv run pyright nilai-api
