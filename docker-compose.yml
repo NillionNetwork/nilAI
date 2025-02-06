@@ -13,6 +13,11 @@ services:
     networks:
       - backend_net
 
+  redis:
+    image: 'redis:latest'
+    networks:
+      - backend_net
+
   api:
     build: 
       context: .
@@ -32,6 +37,7 @@ services:
     environment:
       - ETCD_HOST=etcd
       - ETCD_PORT=2379
+      - REDIS_URL=redis://redis:6379
     networks:
       - backend_net
     healthcheck:
