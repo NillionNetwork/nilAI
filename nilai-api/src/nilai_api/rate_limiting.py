@@ -140,7 +140,7 @@ class RateLimit:
             if iscoroutine(maybe_future):
                 max_concurrent, key = await maybe_future
             else:
-                max_concurrent, key = maybe_future # type: ignore
+                max_concurrent, key = maybe_future  # type: ignore
         else:
             max_concurrent, key = self.max_concurrent, request.url.path
 
