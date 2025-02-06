@@ -1,4 +1,5 @@
-from typing import Callable, Tuple
+from asyncio import iscoroutine
+from typing import Callable, Tuple, Awaitable
 
 from pydantic import BaseModel
 
@@ -59,7 +60,10 @@ class RateLimit:
     def __init__(
         self,
         concurrent: int | None = None,
-        concurrent_extractor: Callable[[Request], Tuple[int, str]] | None = None,
+        concurrent_extractor: Callable[
+            [Request], Tuple[int, str] | Awaitable[Tuple[int, str]]
+        ]
+        | None = None,
     ):
         """
         concurrent: Maximum number of concurrent requests allowed for a single path
@@ -128,7 +132,11 @@ class RateLimit:
             return
 
         if self.concurrent_extractor:
-            max_concurrent, key = self.concurrent_extractor(request)
+            maybe_future = self.concurrent_extractor(request)
+            if iscoroutine(maybe_future):
+                max_concurrent, key = await maybe_future
+            else:
+                max_concurrent, key = maybe_future
         else:
             max_concurrent, key = self.max_concurrent, request.url.path
 

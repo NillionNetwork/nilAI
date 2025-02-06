@@ -2,16 +2,17 @@
 import logging
 import os
 from base64 import b64encode
-from typing import AsyncGenerator, Union, List
+from typing import AsyncGenerator, Union, List, Tuple
 import numpy as np
 
 import nilql
 import nilrag
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from nilai_api.auth import get_user
 from nilai_api.crypto import sign_message
 from nilai_api.db import UserManager, UserModel
+from nilai_api.rate_limiting import RateLimit
 from nilai_api.state import state
 from openai import OpenAI
 
@@ -109,6 +110,23 @@ async def get_models(user: UserModel = Depends(get_user)) -> List[ModelMetadata]
     # return result[0]
 
 
+async def chat_completion_concurrent_rate_limit(request: Request) -> Tuple[int, str]:
+    body = await request.json()
+    chat_request = ChatRequest(**body)
+    key = f"chat:{chat_request.model}"
+    match chat_request.model:
+        case "meta-llama/Llama-3.2-1B-Instruct":
+            return 10, key
+        case "meta-llama/Llama-3.2-3B-Instruct":
+            return 10, key
+        case "meta-llama/Llama-3.1-8B-Instruct":
+            return 5, key
+        case "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B":
+            return 3, key
+        case _:
+            raise HTTPException(status_code=400, detail="Invalid model name")
+
+
 @router.post("/v1/chat/completions", tags=["Chat"], response_model=None)
 async def chat_completion(
     req: ChatRequest = Body(
@@ -120,6 +138,7 @@ async def chat_completion(
             ],
         )
     ),
+    _=Depends(RateLimit(concurrent_extractor=chat_completion_concurrent_rate_limit)),
     user: UserModel = Depends(get_user),
 ) -> Union[SignedChatCompletion, StreamingResponse]:
     """
