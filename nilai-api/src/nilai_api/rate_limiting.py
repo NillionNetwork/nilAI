@@ -1,5 +1,3 @@
-import os
-from dataclasses import dataclass
 from typing import Callable, Tuple
 
 from pydantic import BaseModel
@@ -11,7 +9,7 @@ from redis.asyncio import from_url, Redis
 from nilai_api.auth import get_user
 from nilai_api.db import UserModel
 
-LUA_RATE_LIMIT_SCRIPT ="""
+LUA_RATE_LIMIT_SCRIPT = """
 local key = KEYS[1]
 local limit = tonumber(ARGV[1])
 local expire_time = ARGV[2]
@@ -34,10 +32,12 @@ DAY_MS = 24 * 60 * 60 * 1000
 HOUR_MS = 60 * 60 * 1000
 MINUTE_MS = 60 * 1000
 
+
 async def setup_redis_conn(redis_url):
     client = from_url(redis_url, encoding="utf8")
     lua_sha = await client.script_load(LUA_RATE_LIMIT_SCRIPT)
     return client, lua_sha
+
 
 class UserRateLimits(BaseModel):
     id: str
@@ -47,11 +47,20 @@ class UserRateLimits(BaseModel):
 
 
 def get_user_limits(user: UserModel = Depends(get_user)) -> UserRateLimits:
-    return UserRateLimits(id=user.userid, day_limit=user.ratelimit_day, hour_limit=user.ratelimit_hour, minute_limit=user.ratelimit_minute)
+    return UserRateLimits(
+        id=user.userid,
+        day_limit=user.ratelimit_day,
+        hour_limit=user.ratelimit_hour,
+        minute_limit=user.ratelimit_minute,
+    )
 
 
 class RateLimit:
-    def __init__(self, concurrent: int | None = None, concurrent_extractor: Callable[[Request], Tuple[int, str]] | None = None):
+    def __init__(
+        self,
+        concurrent: int | None = None,
+        concurrent_extractor: Callable[[Request], Tuple[int, str]] | None = None,
+    ):
         """
         concurrent: Maximum number of concurrent requests allowed for a single path
         concurrent_extractor: A callable that extracts the concurrent limit and key from the request
@@ -61,21 +70,46 @@ class RateLimit:
         self.max_concurrent = concurrent
         self.concurrent_extractor = concurrent_extractor
 
-    async def __call__(self, request: Request, user_limits: UserRateLimits = Depends(get_user_limits)):
+    async def __call__(
+        self, request: Request, user_limits: UserRateLimits = Depends(get_user_limits)
+    ):
         redis = request.state.redis
         redis_rate_limit_command = request.state.redis_rate_limit_command
-        await self.check_bucket(redis, redis_rate_limit_command, f"minute:{user_limits.id}", user_limits.minute_limit, MINUTE_MS)
-        await self.check_bucket(redis, redis_rate_limit_command,f"hour:{user_limits.id}", user_limits.hour_limit, HOUR_MS)
-        await self.check_bucket(redis, redis_rate_limit_command,f"day:{user_limits.id}", user_limits.day_limit, DAY_MS)
+        await self.check_bucket(
+            redis,
+            redis_rate_limit_command,
+            f"minute:{user_limits.id}",
+            user_limits.minute_limit,
+            MINUTE_MS,
+        )
+        await self.check_bucket(
+            redis,
+            redis_rate_limit_command,
+            f"hour:{user_limits.id}",
+            user_limits.hour_limit,
+            HOUR_MS,
+        )
+        await self.check_bucket(
+            redis,
+            redis_rate_limit_command,
+            f"day:{user_limits.id}",
+            user_limits.day_limit,
+            DAY_MS,
+        )
         key = await self.check_concurrent_and_increment(redis, request)
         try:
             yield
         finally:
             await self.concurrent_decrement(redis, key)
 
-
     @staticmethod
-    async def check_bucket(redis: Redis, redis_rate_limit_command: str, key: str, times: int | None, milliseconds: int):
+    async def check_bucket(
+        redis: Redis,
+        redis_rate_limit_command: str,
+        key: str,
+        times: int | None,
+        milliseconds: int,
+    ):
         if times is None:
             return
         expire = await redis.evalsha(
@@ -84,9 +118,10 @@ class RateLimit:
 
         if int(expire) > 0:
             raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too Many Requests",  headers={"Retry-After": expire}
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Too Many Requests",
+                headers={"Retry-After": expire},
             )
-
 
     async def check_concurrent_and_increment(self, redis: Redis, request: Request):
         if not self.max_concurrent and not self.concurrent_extractor:
@@ -101,10 +136,10 @@ class RateLimit:
         if current > max_concurrent:
             await redis.decr(f"concurrent:{key}")
             raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too Many Requests"
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Too Many Requests",
             )
         return key
-
 
     async def concurrent_decrement(self, redis: Redis, key: str):
         if not self.max_concurrent and not self.concurrent_extractor:

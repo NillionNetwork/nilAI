@@ -117,6 +117,7 @@ class UserData:
     generated_tokens: int
     queries: int
 
+
 # Async context manager for database sessions
 @asynccontextmanager
 async def get_db_session() -> "Generator[AsyncSession, Any, Any]":

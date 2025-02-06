@@ -1,3 +1,5 @@
+from unittest.mock import MagicMock
+
 import pytest
 from fastapi import HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
@@ -14,21 +16,28 @@ def mock_user_manager(mocker):
     return UserManager
 
 
+@pytest.fixture
+def mock_user_model():
+    from nilai_api.db import UserModel
+
+    mock = MagicMock(spec=UserModel)
+    mock.name = "Test User"
+    mock.userid = "test-user-id"
+    return mock
+
+
 @pytest.mark.asyncio
-async def test_get_user_valid_token(mock_user_manager):
+async def test_get_user_valid_token(mock_user_manager, mock_user_model):
     from nilai_api.auth import get_user
 
     """Test get_user with a valid token."""
-    mock_user_manager.check_api_key.return_value = {
-        "name": "Test User",
-        "userid": "test-user-id",
-    }
+    mock_user_manager.check_api_key.return_value = mock_user_model
     credentials = HTTPAuthorizationCredentials(
         scheme="Bearer", credentials="valid-token"
     )
     user = await get_user(credentials)
-    assert user["name"] == "Test User"
-    assert user["userid"] == "test-user-id"
+    assert user.name == mock_user_model.name
+    assert user.userid == mock_user_model.userid
 
 
 @pytest.mark.asyncio

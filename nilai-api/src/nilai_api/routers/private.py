@@ -51,10 +51,11 @@ async def get_usage(user: UserModel = Depends(get_user)) -> Usage:
     usage = await get_usage(user)
     ```
     """
-    return Usage(prompt_tokens=user.prompt_tokens,
+    return Usage(
+        prompt_tokens=user.prompt_tokens,
         completion_tokens=user.completion_tokens,
         total_tokens=user.prompt_tokens + user.completion_tokens,
-        queries=user.queries, # FIXME this field is not part of Usage
+        queries=user.queries,  # FIXME this field is not part of Usage
     )
 
 
