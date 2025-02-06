@@ -1,9 +1,10 @@
 import asyncio
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
 
+from nilai_api.db import UserModel
 from nilai_api.state import state
 from tests import model_endpoint, model_metadata, response as RESPONSE
 
@@ -15,11 +16,20 @@ async def test_runs_in_a_loop():
 
 @pytest.fixture
 def mock_user():
-    return {"userid": "test-user-id", "name": "Test User"}
+    mock = MagicMock(spec=UserModel)
+    mock.userid = "test-user-id"
+    mock.name = "Test User"
+    mock.prompt_tokens = 100
+    mock.completion_tokens = 50
+    mock.total_tokens = 150
+    mock.completion_tokens_details = None
+    mock.prompt_tokens_details = None
+    mock.queries = 10
+    return mock
 
 
 @pytest.fixture
-def mock_user_manager(mocker):
+def mock_user_manager(mock_user, mocker):
     from nilai_api.db import UserManager
 
     mocker.patch.object(
@@ -53,7 +63,7 @@ def mock_user_manager(mocker):
     mocker.patch.object(
         UserManager,
         "check_api_key",
-        return_value={"name": "Test User", "userid": "test-user-id"},
+        return_value=mock_user,
     )
     mocker.patch.object(
         UserManager,
@@ -158,7 +168,7 @@ def test_chat_completion(mock_user, mock_state, mock_user_manager, mocker, clien
     response = client.post(
         "/v1/chat/completions",
         json={
-            "model": "Llama-3.2-1B-Instruct",
+            "model": "meta-llama/Llama-3.2-1B-Instruct",
             "messages": [
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": "What is your name?"},

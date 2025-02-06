@@ -2,16 +2,17 @@
 import logging
 import os
 from base64 import b64encode
-from typing import AsyncGenerator, Union, List
+from typing import AsyncGenerator, Union, List, Tuple
 import numpy as np
 
 import nilql
 import nilrag
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from nilai_api.auth import get_user
 from nilai_api.crypto import sign_message
-from nilai_api.db import UserManager
+from nilai_api.db import UserManager, UserModel
+from nilai_api.rate_limiting import RateLimit
 from nilai_api.state import state
 from openai import OpenAI
 
@@ -38,7 +39,7 @@ router = APIRouter()
 
 
 @router.get("/v1/usage", tags=["Usage"])
-async def get_usage(user: dict = Depends(get_user)) -> Usage:
+async def get_usage(user: UserModel = Depends(get_user)) -> Usage:
     """
     Retrieve the current token usage for the authenticated user.
 
@@ -51,11 +52,16 @@ async def get_usage(user: dict = Depends(get_user)) -> Usage:
     usage = await get_usage(user)
     ```
     """
-    return Usage(**await UserManager.get_token_usage(user["userid"]))  # type: ignore
+    return Usage(
+        prompt_tokens=user.prompt_tokens,
+        completion_tokens=user.completion_tokens,
+        total_tokens=user.prompt_tokens + user.completion_tokens,
+        queries=user.queries,  # FIXME this field is not part of Usage
+    )
 
 
 @router.get("/v1/attestation/report", tags=["Attestation"])
-async def get_attestation(user: dict = Depends(get_user)) -> AttestationResponse:
+async def get_attestation(user: UserModel = Depends(get_user)) -> AttestationResponse:
     """
     Generate a cryptographic attestation report.
 
@@ -78,7 +84,7 @@ async def get_attestation(user: dict = Depends(get_user)) -> AttestationResponse
 
 
 @router.get("/v1/models", tags=["Model"])
-async def get_models(user: dict = Depends(get_user)) -> List[ModelMetadata]:
+async def get_models(user: UserModel = Depends(get_user)) -> List[ModelMetadata]:
     """
     List all available models in the system.
 
@@ -91,7 +97,7 @@ async def get_models(user: dict = Depends(get_user)) -> List[ModelMetadata]:
     models = await get_models(user)
     ```
     """
-    logger.info(f"Retrieving models for user {user['userid']} from pid {os.getpid()}")
+    logger.info(f"Retrieving models for user {user.userid} from pid {os.getpid()}")
     return [endpoint.metadata for endpoint in (await state.models).values()]
     # result = [Model(
     #     id = endpoint.metadata.id,
@@ -102,6 +108,23 @@ async def get_models(user: dict = Depends(get_user)) -> List[ModelMetadata]:
     # ) for endpoint in (await state.models).values()]
 
     # return result[0]
+
+
+async def chat_completion_concurrent_rate_limit(request: Request) -> Tuple[int, str]:
+    body = await request.json()
+    chat_request = ChatRequest(**body)
+    key = f"chat:{chat_request.model}"
+    match chat_request.model:
+        case "meta-llama/Llama-3.2-1B-Instruct":
+            return 10, key
+        case "meta-llama/Llama-3.2-3B-Instruct":
+            return 10, key
+        case "meta-llama/Llama-3.1-8B-Instruct":
+            return 5, key
+        case "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B":
+            return 3, key
+        case _:
+            raise HTTPException(status_code=400, detail="Invalid model name")
 
 
 @router.post("/v1/chat/completions", tags=["Chat"], response_model=None)
@@ -115,7 +138,8 @@ async def chat_completion(
             ],
         )
     ),
-    user: dict = Depends(get_user),
+    _=Depends(RateLimit(concurrent_extractor=chat_completion_concurrent_rate_limit)),
+    user: UserModel = Depends(get_user),
 ) -> Union[SignedChatCompletion, StreamingResponse]:
     """
     Generate a chat completion response from the AI model.
@@ -177,7 +201,7 @@ async def chat_completion(
     model_url = endpoint.url + "/v1/"
 
     logger.info(
-        f"Chat completion request for model {model_name} from user {user['userid']} on url: {model_url}"
+        f"Chat completion request for model {model_name} from user {user.userid} on url: {model_url}"
     )
 
     client = OpenAI(base_url=model_url, api_key="<not-needed>")
@@ -323,12 +347,12 @@ async def chat_completion(
                 for chunk in response:
                     if chunk.usage is not None:
                         await UserManager.update_token_usage(
-                            user["userid"],
+                            user.userid,
                             prompt_tokens=chunk.usage.prompt_tokens,
                             completion_tokens=chunk.usage.completion_tokens,
                         )
                         await UserManager.log_query(
-                            user["userid"],
+                            user.userid,
                             model=req.model,
                             prompt_tokens=chunk.usage.prompt_tokens,
                             completion_tokens=chunk.usage.completion_tokens,
@@ -363,13 +387,13 @@ async def chat_completion(
     )
     # Update token usage
     await UserManager.update_token_usage(
-        user["userid"],
+        user.userid,
         prompt_tokens=model_response.usage.prompt_tokens,
         completion_tokens=model_response.usage.completion_tokens,
     )
 
     await UserManager.log_query(
-        user["userid"],
+        user.userid,
         model=req.model,
         prompt_tokens=model_response.usage.prompt_tokens,
         completion_tokens=model_response.usage.completion_tokens,
