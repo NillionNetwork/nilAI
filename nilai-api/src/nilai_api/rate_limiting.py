@@ -1,5 +1,5 @@
 from asyncio import iscoroutine
-from typing import Callable, Tuple, Awaitable
+from typing import Callable, Tuple, Awaitable, Annotated
 
 from pydantic import BaseModel
 
@@ -47,7 +47,7 @@ class UserRateLimits(BaseModel):
     minute_limit: int | None
 
 
-def get_user_limits(user: UserModel = Depends(get_user)) -> UserRateLimits:
+def get_user_limits(user: Annotated[UserModel, Depends(get_user)]) -> UserRateLimits:
     return UserRateLimits(
         id=user.userid,
         day_limit=user.ratelimit_day,
@@ -75,7 +75,9 @@ class RateLimit:
         self.concurrent_extractor = concurrent_extractor
 
     async def __call__(
-        self, request: Request, user_limits: UserRateLimits = Depends(get_user_limits)
+        self,
+        request: Request,
+        user_limits: Annotated[UserRateLimits, Depends(get_user_limits)],
     ):
         redis = request.state.redis
         redis_rate_limit_command = request.state.redis_rate_limit_command
@@ -118,7 +120,7 @@ class RateLimit:
             return
         expire = await redis.evalsha(
             redis_rate_limit_command, 1, key, str(times), str(milliseconds)
-        )
+        )  # type: ignore
 
         if int(expire) > 0:
             raise HTTPException(
@@ -127,16 +129,18 @@ class RateLimit:
                 headers={"Retry-After": expire},
             )
 
-    async def check_concurrent_and_increment(self, redis: Redis, request: Request):
+    async def check_concurrent_and_increment(
+        self, redis: Redis, request: Request
+    ) -> str | None:
         if not self.max_concurrent and not self.concurrent_extractor:
-            return
+            return None
 
         if self.concurrent_extractor:
             maybe_future = self.concurrent_extractor(request)
             if iscoroutine(maybe_future):
                 max_concurrent, key = await maybe_future
             else:
-                max_concurrent, key = maybe_future
+                max_concurrent, key = maybe_future # type: ignore
         else:
             max_concurrent, key = self.max_concurrent, request.url.path
 
@@ -149,7 +153,8 @@ class RateLimit:
             )
         return key
 
-    async def concurrent_decrement(self, redis: Redis, key: str):
-        if not self.max_concurrent and not self.concurrent_extractor:
+    @staticmethod
+    async def concurrent_decrement(redis: Redis, key: str | None):
+        if key is None:
             return
         await redis.decr(f"concurrent:{key}")

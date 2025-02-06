@@ -4,15 +4,23 @@ import dotenv
 import uuid
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import Any, Dict, Generator, List, Optional
+from typing import Any, Dict, List, Optional, AsyncGenerator
+import functools
 
 import sqlalchemy
 from datetime import datetime
-from sqlalchemy import Column, ForeignKey, Integer, String, DateTime, Text
+from sqlalchemy import ForeignKey, Integer, String, DateTime, Text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import AsyncAdaptedQueuePool
+from sqlalchemy import _Column
+
+
+@functools.wraps(_Column)  # type: ignore[reportUnknownVariableType]
+def Column(*args: Any, **kwargs: Any):  # ruff: disable=invalid-name
+    return _Column(*args, **kwargs)
+
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -120,7 +128,7 @@ class UserData:
 
 # Async context manager for database sessions
 @asynccontextmanager
-async def get_db_session() -> "Generator[AsyncSession, Any, Any]":
+async def get_db_session() -> "AsyncGenerator[AsyncSession, Any]":
     """Provide a transactional scope for database operations."""
     session = get_sessionmaker()()
     try:
