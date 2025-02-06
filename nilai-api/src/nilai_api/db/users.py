@@ -1,83 +1,22 @@
 import logging
-import os
-import dotenv
 import uuid
-from contextlib import asynccontextmanager
+
+from datetime import datetime
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, AsyncGenerator
-import functools
+from typing import Any, Dict, List, Optional
 
 import sqlalchemy
-from datetime import datetime
-
-from sqlalchemy import ForeignKey, Integer, String, DateTime, Text
+from sqlalchemy import Integer, String, DateTime
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import AsyncAdaptedQueuePool
-from sqlalchemy import Column as _Column
+
+from nilai_api.db import Column, get_db_session
 
 
-@functools.wraps(_Column)  # type: ignore[reportUnknownVariableType]
-def Column(*args: Any, **kwargs: Any):  # ruff: disable=invalid-name
-    return _Column(*args, **kwargs)
-
-
-# Configure logging
 logger = logging.getLogger(__name__)
-
-dotenv.load_dotenv()
-DATABASE_URL = sqlalchemy.engine.url.URL.create(
-    drivername="postgresql+asyncpg",  # Use asyncpg driver
-    username=os.getenv("DB_USER", "postgres"),
-    password=os.getenv("DB_PASS", ""),
-    host=os.getenv("DB_HOST", "localhost"),
-    port=int(os.getenv("DB_PORT", 5432)),
-    database=os.getenv("DB_NAME", "nilai_users"),
-)
-
-
-class DatabaseConfig:
-    DATABASE_URL = DATABASE_URL
-    POOL_SIZE = 5
-    MAX_OVERFLOW = 10
-    POOL_TIMEOUT = 30
-    POOL_RECYCLE = 3600  # Reconnect after 1 hour
 
 
 # Create base and engine with improved configuration
 Base = sqlalchemy.orm.declarative_base()
-
-_engine: Optional[sqlalchemy.ext.asyncio.AsyncEngine] = None
-_SessionLocal: Optional[sessionmaker] = None
-
-
-def get_engine() -> sqlalchemy.ext.asyncio.AsyncEngine:
-    global _engine
-    if _engine is None:
-        _engine = create_async_engine(
-            DatabaseConfig.DATABASE_URL,
-            poolclass=AsyncAdaptedQueuePool,
-            pool_size=DatabaseConfig.POOL_SIZE,
-            max_overflow=DatabaseConfig.MAX_OVERFLOW,
-            pool_timeout=DatabaseConfig.POOL_TIMEOUT,
-            pool_recycle=DatabaseConfig.POOL_RECYCLE,
-            echo=False,  # Set to True for SQL logging during development
-        )
-    return _engine
-
-
-def get_sessionmaker() -> sessionmaker:
-    global _SessionLocal
-    if _SessionLocal is None:
-        _SessionLocal = sessionmaker(
-            bind=get_engine(),
-            class_=AsyncSession,
-            autocommit=False,
-            autoflush=False,
-            expire_on_commit=False,
-        )
-    return _SessionLocal
 
 
 # Enhanced User Model with additional constraints and validation
@@ -101,24 +40,6 @@ class UserModel(Base):
         return f"<User(userid={self.userid}, name={self.name}, email={self.email})>"
 
 
-# New QueryLog Model for tracking individual queries
-class QueryLog(Base):
-    __tablename__ = "query_logs"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    userid = Column(String(36), ForeignKey("users.userid"), nullable=False, index=True)
-    query_timestamp = Column(
-        DateTime, server_default=sqlalchemy.func.now(), nullable=False
-    )
-    model = Column(Text, nullable=False)
-    prompt_tokens = Column(Integer, nullable=False)
-    completion_tokens = Column(Integer, nullable=False)
-    total_tokens = Column(Integer, nullable=False)
-
-    def __repr__(self):
-        return f"<QueryLog(userid={self.userid}, query_timestamp={self.query_timestamp}, total_tokens={self.total_tokens})>"
-
-
 @dataclass
 class UserData:
     userid: str
@@ -127,22 +48,6 @@ class UserData:
     input_tokens: int
     generated_tokens: int
     queries: int
-
-
-# Async context manager for database sessions
-@asynccontextmanager
-async def get_db_session() -> "AsyncGenerator[AsyncSession, Any]":
-    """Provide a transactional scope for database operations."""
-    session = get_sessionmaker()()
-    try:
-        yield session
-        await session.commit()
-    except SQLAlchemyError as e:
-        await session.rollback()
-        logger.error(f"Database error: {e}")
-        raise
-    finally:
-        await session.close()
 
 
 class UserManager:
@@ -200,40 +105,6 @@ class UserManager:
                 return {"userid": userid, "apikey": apikey}
         except SQLAlchemyError as e:
             logger.error(f"Error inserting user: {e}")
-            raise
-
-    @staticmethod
-    async def log_query(
-        userid: str, model: str, prompt_tokens: int, completion_tokens: int
-    ):
-        """
-        Log a user's query.
-
-        Args:
-            userid (str): User's unique ID
-            model (str): The model that generated the response
-            prompt_tokens (int): Number of input tokens used
-            completion_tokens (int): Number of tokens in the generated response
-        """
-        total_tokens = prompt_tokens + completion_tokens
-
-        try:
-            async with get_db_session() as session:
-                query_log = QueryLog(
-                    userid=userid,
-                    model=model,
-                    prompt_tokens=prompt_tokens,
-                    completion_tokens=completion_tokens,
-                    total_tokens=total_tokens,
-                    query_timestamp=datetime.now(),
-                )
-                session.add(query_log)
-                await session.commit()
-                logger.info(
-                    f"Query logged for user {userid} with total tokens {total_tokens}."
-                )
-        except SQLAlchemyError as e:
-            logger.error(f"Error logging query: {e}")
             raise
 
     @staticmethod
@@ -363,39 +234,3 @@ class UserManager:
 
 
 __all__ = ["UserManager", "UserData", "UserModel"]
-
-
-# Example Usage
-async def main():
-    # Add some users
-    bob = await UserManager.insert_user("Bob", "bob@example.com")
-    alice = await UserManager.insert_user("Alice", "alice@example.com")
-
-    print(f"Bob's details: {bob}")
-    print(f"Alice's details: {alice}")
-
-    # Check API key
-    user_name = await UserManager.check_api_key(bob["apikey"])
-    print(f"API key validation: {user_name}")
-
-    # Update and retrieve token usage
-    await UserManager.update_token_usage(
-        bob["userid"], prompt_tokens=50, completion_tokens=20
-    )
-    usage = await UserManager.get_user_token_usage(bob["userid"])
-    print(f"Bob's token usage: {usage}")
-
-    # Log a query
-    await UserManager.log_query(
-        userid=bob["userid"],
-        model="gpt-3.5-turbo",
-        prompt_tokens=8,
-        completion_tokens=7,
-    )
-
-
-if __name__ == "__main__":
-    # Run the example
-    import asyncio
-
-    asyncio.run(main())
