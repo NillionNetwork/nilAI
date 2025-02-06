@@ -9,13 +9,13 @@ import functools
 
 import sqlalchemy
 from datetime import datetime
+
 from sqlalchemy import ForeignKey, Integer, String, DateTime, Text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import AsyncAdaptedQueuePool
-from sqlalchemy import _Column
-
+from sqlalchemy import Column as _Column
 
 @functools.wraps(_Column)  # type: ignore[reportUnknownVariableType]
 def Column(*args: Any, **kwargs: Any):  # ruff: disable=invalid-name
