@@ -4,9 +4,6 @@ import pytest
 
 @pytest.fixture
 def mock_client(mocker):
-    from nilai_api.db import UserManager
-
-    mocker.patch.object(UserManager, "initialize_db")
     from nilai_api.app import app
 
     client = TestClient(app)

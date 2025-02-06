@@ -17,6 +17,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import AsyncAdaptedQueuePool
 from sqlalchemy import Column as _Column
 
+
 @functools.wraps(_Column)  # type: ignore[reportUnknownVariableType]
 def Column(*args: Any, **kwargs: Any):  # ruff: disable=invalid-name
     return _Column(*args, **kwargs)
@@ -90,7 +91,7 @@ class UserModel(Base):
     prompt_tokens = Column(Integer, default=0, nullable=False)
     completion_tokens = Column(Integer, default=0, nullable=False)
     queries = Column(Integer, default=0, nullable=False)
-    signup_date = Column(DateTime, default=datetime.now(), nullable=False)
+    signup_date = Column(DateTime, server_default=sqlalchemy.func.now(), nullable=False)
     last_activity = Column(DateTime, nullable=True)
     ratelimit_day = Column(Integer, default=1000, nullable=True)
     ratelimit_hour = Column(Integer, default=100, nullable=True)
@@ -106,7 +107,9 @@ class QueryLog(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     userid = Column(String(36), ForeignKey("users.userid"), nullable=False, index=True)
-    query_timestamp = Column(DateTime, default=datetime.now(), nullable=False)
+    query_timestamp = Column(
+        DateTime, server_default=sqlalchemy.func.now(), nullable=False
+    )
     model = Column(Text, nullable=False)
     prompt_tokens = Column(Integer, nullable=False)
     completion_tokens = Column(Integer, nullable=False)
@@ -143,38 +146,6 @@ async def get_db_session() -> "AsyncGenerator[AsyncSession, Any]":
 
 
 class UserManager:
-    @staticmethod
-    async def initialize_db() -> bool:
-        """
-        Create database tables only if they do not already exist.
-
-        Returns:
-            bool: True if tables were created, False if tables already existed
-        """
-        try:
-            async with get_engine().begin() as conn:
-                # Create an inspector to check existing tables
-                inspector = await conn.run_sync(
-                    lambda sync_conn: sqlalchemy.inspect(sync_conn)
-                )
-
-                # Check if the 'users' table already exists
-                if not await conn.run_sync(
-                    lambda sync_conn: inspector.has_table("users")
-                ) or not await conn.run_sync(
-                    lambda sync_conn: inspector.has_table("query_logs")
-                ):
-                    # Create all tables that do not exist
-                    await conn.run_sync(Base.metadata.create_all)
-                    logger.info("Database tables created successfully.")
-                    return True
-                else:
-                    logger.info("Database tables already exist. Skipping creation.")
-                    return False
-        except SQLAlchemyError as e:
-            logger.error(f"Error checking or creating database tables: {e}")
-            raise
-
     @staticmethod
     def generate_user_id() -> str:
         """Generate a unique user ID."""
@@ -396,9 +367,6 @@ __all__ = ["UserManager", "UserData", "UserModel"]
 
 # Example Usage
 async def main():
-    # Initialize the database
-    await UserManager.initialize_db()
-
     # Add some users
     bob = await UserManager.insert_user("Bob", "bob@example.com")
     alice = await UserManager.insert_user("Alice", "alice@example.com")

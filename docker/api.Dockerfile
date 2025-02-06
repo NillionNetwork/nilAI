@@ -23,4 +23,4 @@ uv sync
 
 EXPOSE 8080 8443
 
-CMD ["uv", "run", "gunicorn", "-c", "gunicorn.conf.py", "nilai_api.__main__:app"]
+CMD ["./launch.sh"]

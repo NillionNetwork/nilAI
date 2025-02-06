@@ -1,5 +1,6 @@
 # Fast API and serving
 import os
+import logging
 
 from fastapi import Depends, FastAPI
 from nilai_api.auth import get_user
@@ -8,12 +9,11 @@ from nilai_api.routers import private, public
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    from nilai_api.db import UserManager
-
-    await UserManager.initialize_db()
     client, rate_limit_command = await setup_redis_conn(
         os.getenv("REDIS_URL", "redis://localhost:6379")
     )
