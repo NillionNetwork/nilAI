@@ -16,6 +16,9 @@ from sqlalchemy.orm import sessionmaker
 _engine: Optional[sqlalchemy.ext.asyncio.AsyncEngine] = None
 _SessionLocal: Optional[sessionmaker] = None
 
+# Create base and engine with improved configuration
+Base = sqlalchemy.orm.declarative_base()
+
 logger = logging.getLogger(__name__)
 
 
