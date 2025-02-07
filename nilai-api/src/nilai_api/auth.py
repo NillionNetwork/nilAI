@@ -1,6 +1,6 @@
 from fastapi import HTTPException, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from nilai_api.db import UserManager, UserModel
+from nilai_api.db.users import UserManager, UserModel
 
 bearer_scheme = HTTPBearer()
 
