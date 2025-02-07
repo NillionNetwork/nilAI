@@ -36,6 +36,6 @@ response: SignedChatCompletion = SignedChatCompletion(
             logprobs={"test-logprobs": "test-value"},
         )
     ],
-    usage=Usage(prompt_tokens=100, completion_tokens=50, total_tokens=150),
+    usage=Usage(prompt_tokens=100, completion_tokens=50, total_tokens=150, queries=1),
     signature="test-signature",
 )
