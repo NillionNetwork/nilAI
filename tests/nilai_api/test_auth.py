@@ -12,7 +12,6 @@ def mock_user_manager(mocker):
     """Fixture to mock UserManager methods."""
     mocker.patch.object(UserManager, "check_api_key")
     mocker.patch.object(UserManager, "update_last_activity")
-    mocker.patch.object(UserManager, "initialize_db")
     return UserManager
 
 

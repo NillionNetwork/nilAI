@@ -73,7 +73,6 @@ def mock_user_manager(mock_user, mocker):
             {"userid": "test-user-id-2", "apikey": "test-api-key"},
         ],
     )
-    mocker.patch.object(UserManager, "initialize_db")
     mocker.patch.object(UserManager, "log_query")
     mocker.patch.object(UserManager, "update_last_activity")
     return UserManager

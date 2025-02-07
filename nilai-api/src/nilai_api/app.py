@@ -11,9 +11,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    from nilai_api.db import UserManager
-
-    await UserManager.initialize_db()
     client, rate_limit_command = await setup_redis_conn(
         os.getenv("REDIS_URL", "redis://localhost:6379")
     )
