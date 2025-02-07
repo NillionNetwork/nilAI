@@ -1,5 +1,8 @@
 services:
   api:
+    depends_on:
+      postgres:
+        condition: service_healthy
     privileged: true
     volumes:
       - /dev/sev-guest:/dev/sev-guest # for AMD SEV

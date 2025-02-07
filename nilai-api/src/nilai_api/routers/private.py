@@ -7,7 +7,7 @@ import numpy as np
 
 import nilql
 import nilrag
-from fastapi import APIRouter, Body, Depends, HTTPException, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, status, Request
 from fastapi.responses import StreamingResponse
 from nilai_api.auth import get_user
 from nilai_api.crypto import sign_message
@@ -189,7 +189,7 @@ async def chat_completion(
     endpoint = await state.get_model(model_name)
     if endpoint is None:
         raise HTTPException(
-            status_code=400,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid model name {model_name}, check /v1/models for options",
         )
 
@@ -244,10 +244,15 @@ async def chat_completion(
             # Step 2: Secret share query
             logger.debug("Secret sharing query and sending to NilDB...")
             # 2.1 Extract the user query
+            query = None
             for message in req.messages:
                 if message.role == "user":
                     query = message.content
                     break
+
+            if query is None:
+                raise HTTPException(status_code=400, detail="No user query found")
+
             # 2.2 Generate query embeddings: one string query is assumed.
             query_embedding = generate_embeddings_huggingface([query])[0]
             nilql_query_embedding = encrypt_float_list(additive_key, query_embedding)
@@ -260,7 +265,8 @@ async def chat_completion(
             logger.debug("Compute distances and sort...")
             # 4.1 Group difference shares by ID
             difference_shares_by_id = group_shares_by_id(
-                difference_shares, lambda share: share["difference"]
+                difference_shares,  # type: ignore
+                lambda share: share["difference"],
             )
             # 4.2 Transpose the lists for each _id
             difference_shares_by_id = {
@@ -290,7 +296,8 @@ async def chat_completion(
 
             # 5.2 Group chunk shares by ID
             chunk_shares_by_id = group_shares_by_id(
-                chunk_shares, lambda share: share["chunk"]
+                chunk_shares,  # type: ignore
+                lambda share: share["chunk"],
             )
 
             # 5.3 Decrypt chunks
@@ -308,6 +315,11 @@ async def chat_completion(
             # Step 7: Update system message
             for message in req.messages:
                 if message.role == "system":
+                    if message.content is None:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="system message is empty",
+                        )
                     message.content += (
                         relevant_context  # Append the context to the system message
                     )
@@ -322,7 +334,9 @@ async def chat_completion(
 
         except Exception as e:
             logger.error("An error occurred within nilrag: %s", str(e))
-            raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+            )
 
     if req.stream:
         # Forwarding Streamed Responses
@@ -330,19 +344,19 @@ async def chat_completion(
             try:
                 response = client.chat.completions.create(
                     model=req.model,
-                    messages=req.messages,
-                    stream=req.stream,
+                    messages=req.messages,  # type: ignore
+                    stream=req.stream,  # type: ignore
                     top_p=req.top_p,
                     temperature=req.temperature,
                     max_tokens=req.max_tokens,
-                    tools=req.tools,
+                    tools=req.tools,  # type: ignore
                     extra_body={
                         "stream_options": {
                             "include_usage": True,
                             # "continuous_usage_stats": True,
                         }
                     },
-                )
+                )  # type: ignore
 
                 for chunk in response:
                     if chunk.usage is not None:
@@ -373,18 +387,23 @@ async def chat_completion(
 
     response = client.chat.completions.create(
         model=req.model,
-        messages=req.messages,
+        messages=req.messages,  # type: ignore
         stream=req.stream,
         top_p=req.top_p,
         temperature=req.temperature,
         max_tokens=req.max_tokens,
-        tools=req.tools,
-    )
+        tools=req.tools,  # type: ignore
+    )  # type: ignore
 
     model_response = SignedChatCompletion(
         **response.model_dump(),
         signature="",
     )
+    if model_response.usage is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Model response does not contain usage statistics",
+        )
     # Update token usage
     await UserManager.update_token_usage(
         user.userid,
