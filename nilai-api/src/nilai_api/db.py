@@ -19,7 +19,7 @@ from sqlalchemy import Column as _Column
 
 
 @functools.wraps(_Column)  # type: ignore[reportUnknownVariableType]
-def Column(*args: Any, **kwargs: Any):  # ruff: disable=invalid-name
+def Column(*args: Any, **kwargs: Any) -> Any:  # ruff: disable=invalid-name
     return _Column(*args, **kwargs)
 
 
@@ -84,18 +84,18 @@ def get_sessionmaker() -> sessionmaker:
 class UserModel(Base):
     __tablename__ = "users"
 
-    userid = Column(String(36), primary_key=True, index=True)
-    name = Column(String(100), nullable=False)
-    email = Column(String(255), unique=True, nullable=False, index=True)
-    apikey = Column(String(36), unique=True, nullable=False, index=True)
-    prompt_tokens = Column(Integer, default=0, nullable=False)
-    completion_tokens = Column(Integer, default=0, nullable=False)
-    queries = Column(Integer, default=0, nullable=False)
-    signup_date = Column(DateTime, default=datetime.now(), nullable=False)
-    last_activity = Column(DateTime, nullable=True)
-    ratelimit_day = Column(Integer, default=1000, nullable=True)
-    ratelimit_hour = Column(Integer, default=100, nullable=True)
-    ratelimit_minute = Column(Integer, default=10, nullable=True)
+    userid: str = Column(String(36), primary_key=True, index=True)
+    name: str = Column(String(100), nullable=False)
+    email: str = Column(String(255), unique=True, nullable=False, index=True)
+    apikey: str = Column(String(36), unique=True, nullable=False, index=True)
+    prompt_tokens: int = Column(Integer, default=0, nullable=False)
+    completion_tokens: int = Column(Integer, default=0, nullable=False)
+    queries: int = Column(Integer, default=0, nullable=False)
+    signup_date: datetime = Column(DateTime, default=datetime.now(), nullable=False)
+    last_activity: datetime = Column(DateTime, nullable=True)
+    ratelimit_day: int = Column(Integer, default=1000, nullable=True)
+    ratelimit_hour: int = Column(Integer, default=100, nullable=True)
+    ratelimit_minute: int = Column(Integer, default=10, nullable=True)
 
     def __repr__(self):
         return f"<User(userid={self.userid}, name={self.name}, email={self.email})>"
@@ -105,13 +105,15 @@ class UserModel(Base):
 class QueryLog(Base):
     __tablename__ = "query_logs"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    userid = Column(String(36), ForeignKey("users.userid"), nullable=False, index=True)
-    query_timestamp = Column(DateTime, default=datetime.now(), nullable=False)
-    model = Column(Text, nullable=False)
-    prompt_tokens = Column(Integer, nullable=False)
-    completion_tokens = Column(Integer, nullable=False)
-    total_tokens = Column(Integer, nullable=False)
+    id: int = Column(Integer, primary_key=True, autoincrement=True)
+    userid: str = Column(
+        String(36), ForeignKey("users.userid"), nullable=False, index=True
+    )
+    query_timestamp: datetime = Column(DateTime, default=datetime.now(), nullable=False)
+    model: str = Column(Text, nullable=False)
+    prompt_tokens: int = Column(Integer, nullable=False)
+    completion_tokens: int = Column(Integer, nullable=False)
+    total_tokens: int = Column(Integer, nullable=False)
 
     def __repr__(self):
         return f"<QueryLog(userid={self.userid}, query_timestamp={self.query_timestamp}, total_tokens={self.total_tokens})>"
@@ -280,7 +282,7 @@ class UserManager:
         try:
             async with get_db_session() as session:
                 user = await session.execute(
-                    sqlalchemy.select(UserModel).filter(UserModel.apikey == api_key)
+                    sqlalchemy.select(UserModel).filter(UserModel.apikey == api_key)  # type: ignore
                 )
                 user = user.scalar_one_or_none()
                 return user
