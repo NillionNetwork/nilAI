@@ -8,7 +8,7 @@ from fastapi import status, HTTPException, Request
 from redis.asyncio import from_url, Redis
 
 from nilai_api.auth import get_user
-from nilai_api.db import UserModel
+from nilai_api.db.users import UserModel
 
 LUA_RATE_LIMIT_SCRIPT = """
 local key = KEYS[1]

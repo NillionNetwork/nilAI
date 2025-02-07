@@ -11,7 +11,8 @@ from fastapi import APIRouter, Body, Depends, HTTPException, status, Request
 from fastapi.responses import StreamingResponse
 from nilai_api.auth import get_user
 from nilai_api.crypto import sign_message
-from nilai_api.db import UserManager, UserModel
+from nilai_api.db.users import UserManager, UserModel
+from nilai_api.db.logs import QueryLogManager
 from nilai_api.rate_limiting import RateLimit
 from nilai_api.state import state
 from openai import OpenAI
@@ -365,7 +366,7 @@ async def chat_completion(
                             prompt_tokens=chunk.usage.prompt_tokens,
                             completion_tokens=chunk.usage.completion_tokens,
                         )
-                        await UserManager.log_query(
+                        await QueryLogManager.log_query(
                             user.userid,
                             model=req.model,
                             prompt_tokens=chunk.usage.prompt_tokens,
@@ -411,7 +412,7 @@ async def chat_completion(
         completion_tokens=model_response.usage.completion_tokens,
     )
 
-    await UserManager.log_query(
+    await QueryLogManager.log_query(
         user.userid,
         model=req.model,
         prompt_tokens=model_response.usage.prompt_tokens,
