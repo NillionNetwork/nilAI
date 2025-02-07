@@ -5,13 +5,10 @@ import sqlalchemy
 
 from sqlalchemy import ForeignKey, Integer, String, DateTime, Text
 from sqlalchemy.exc import SQLAlchemyError
-from nilai_api.db import Column, get_db_session
+from nilai_api.db import Base, Column, get_db_session
 from nilai_api.db.users import UserModel
 
 logger = logging.getLogger(__name__)
-
-
-Base = sqlalchemy.orm.declarative_base()
 
 
 # New QueryLog Model for tracking individual queries

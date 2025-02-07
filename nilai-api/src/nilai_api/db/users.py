@@ -9,14 +9,10 @@ import sqlalchemy
 from sqlalchemy import Integer, String, DateTime
 from sqlalchemy.exc import SQLAlchemyError
 
-from nilai_api.db import Column, get_db_session
+from nilai_api.db import Base, Column, get_db_session
 
 
 logger = logging.getLogger(__name__)
-
-
-# Create base and engine with improved configuration
-Base = sqlalchemy.orm.declarative_base()
 
 
 # Enhanced User Model with additional constraints and validation
