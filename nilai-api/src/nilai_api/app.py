@@ -1,6 +1,5 @@
 # Fast API and serving
 import os
-import logging
 
 from fastapi import Depends, FastAPI
 from nilai_api.auth import get_user
@@ -8,8 +7,6 @@ from nilai_api.rate_limiting import setup_redis_conn
 from nilai_api.routers import private, public
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
-
-logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
