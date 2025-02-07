@@ -186,4 +186,5 @@ def test_chat_completion(mock_user, mock_state, mock_user_manager, mocker, clien
         "total_tokens": 150,
         "completion_tokens_details": None,
         "prompt_tokens_details": None,
+        "queries": 1,
     }

@@ -17,6 +17,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import AsyncAdaptedQueuePool
 from sqlalchemy import Column as _Column
 
+
 @functools.wraps(_Column)  # type: ignore[reportUnknownVariableType]
 def Column(*args: Any, **kwargs: Any):  # ruff: disable=invalid-name
     return _Column(*args, **kwargs)

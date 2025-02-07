@@ -265,7 +265,7 @@ async def chat_completion(
             logger.debug("Compute distances and sort...")
             # 4.1 Group difference shares by ID
             difference_shares_by_id = group_shares_by_id(
-                difference_shares, # type: ignore
+                difference_shares,  # type: ignore
                 lambda share: share["difference"],
             )
             # 4.2 Transpose the lists for each _id
@@ -296,8 +296,8 @@ async def chat_completion(
 
             # 5.2 Group chunk shares by ID
             chunk_shares_by_id = group_shares_by_id(
-                chunk_shares, # type: ignore
-                lambda share: share["chunk"], 
+                chunk_shares,  # type: ignore
+                lambda share: share["chunk"],
             )
 
             # 5.3 Decrypt chunks
@@ -344,12 +344,12 @@ async def chat_completion(
             try:
                 response = client.chat.completions.create(
                     model=req.model,
-                    messages=req.messages, # type: ignore
-                    stream=req.stream, # type: ignore
+                    messages=req.messages,  # type: ignore
+                    stream=req.stream,  # type: ignore
                     top_p=req.top_p,
                     temperature=req.temperature,
                     max_tokens=req.max_tokens,
-                    tools=req.tools, # type: ignore
+                    tools=req.tools,  # type: ignore
                     extra_body={
                         "stream_options": {
                             "include_usage": True,
@@ -387,13 +387,13 @@ async def chat_completion(
 
     response = client.chat.completions.create(
         model=req.model,
-        messages=req.messages, # type: ignore
+        messages=req.messages,  # type: ignore
         stream=req.stream,
         top_p=req.top_p,
         temperature=req.temperature,
         max_tokens=req.max_tokens,
-        tools=req.tools, # type: ignore
-    ) # type: ignore
+        tools=req.tools,  # type: ignore
+    )  # type: ignore
 
     model_response = SignedChatCompletion(
         **response.model_dump(),
