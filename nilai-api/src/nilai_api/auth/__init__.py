@@ -1,28 +1,12 @@
 from fastapi import HTTPException, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from authlib.jose import JsonWebToken
 
-from nilai_api.db import UserManager, UserModel
 from nilai_api import config
+from nilai_api.auth.jwt import validate_jwt
+from nilai_api.db import UserManager, UserModel
+from nilai_api.auth.strategies import STRATEGIES
 
 bearer_scheme = HTTPBearer()
-
-
-async def api_key_strategy(api_key):
-    return await UserManager.check_api_key(api_key)
-
-
-async def jwt_strategy(jwt_creds):
-    jwt = JsonWebToken(["ES256"])
-    raise NotImplementedError("JWT Strategy not implemented yet")
-    public_key = None
-    jwt.decode(jwt_creds, public_key)
-
-
-STRATEGIES = {
-    "api_key": api_key_strategy,
-    "jwt": jwt_strategy,
-}
 
 
 async def get_user(
@@ -38,3 +22,6 @@ async def get_user(
 
     await UserManager.update_last_activity(userid=user.userid)
     return user
+
+
+__all__ = ["get_user", "validate_jwt"]
