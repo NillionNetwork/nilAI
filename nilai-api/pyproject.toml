@@ -29,6 +29,7 @@ dependencies = [
     "redis>=5.2.1",
     "authlib>=1.4.1",
     "verifier",
+    "web3>=7.8.0",
 ]
 
 
