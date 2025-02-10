@@ -162,6 +162,11 @@ bench/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 .idea/
 
-data/
 .DS_Store
 verifier.lock
+
+grafana/runtime-data/*
+!grafana/runtime-data/dashboards
+
+prometheus/data/*
+!prometheus/data/.gitkeep
