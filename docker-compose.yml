@@ -18,7 +18,54 @@ services:
     networks:
       - backend_net
 
+  prometheus:
+    container_name: prometheus
+    image: prom/prometheus:v3.1.0
+    restart: unless-stopped
+    networks:
+      - backend_net
+    user: "$UID:$GID"
+    volumes:
+      - ${PWD}/prometheus/config/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ${PWD}/prometheus/data:/prometheus/data
+    command: "--config.file=/etc/prometheus/prometheus.yml --storage.tsdb.retention.time=30d --web.enable-admin-api"
+    ports: 
+      - "127.0.0.1:9090:9090"
+
+  node_exporter:
+    container_name: node-exporter
+    image: quay.io/prometheus/node-exporter:v1.8.2
+    command:
+      - '--path.rootfs=/host'
+    networks:
+      - backend_net
+    pid: host
+    restart: unless-stopped
+    volumes:
+      - '/:/host:ro,rslave'
+
+  grafana:
+    container_name: grafana
+    image: 'grafana/grafana:11.5.1'
+    restart: unless-stopped
+    networks:
+      - backend_net
+    user: "$UID:$GID"
+    depends_on:
+      - prometheus
+    volumes:
+      - ${PWD}/grafana/runtime-data:/var/lib/grafana
+      - ${PWD}/grafana/datasources/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
+      - ${PWD}/grafana/dashboards/filesystem.yml:/etc/grafana/provisioning/dashboards/filesystem.yml
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=a3b4cdcb12fb913148f71b64314b8797
+      - GF_USERS_ALLOW_SIGN_UP=false
+    ports: 
+      - "127.0.0.1:3000:3000"
+
   api:
+    container_name: nilai-api
     build: 
       context: .
       dockerfile: docker/api.Dockerfile
