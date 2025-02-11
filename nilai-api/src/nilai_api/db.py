@@ -74,10 +74,10 @@ def get_sessionmaker() -> sessionmaker:
 class UserModel(Base):
     __tablename__ = "users"
 
-    userid = Column(String(36), primary_key=True, index=True)
+    userid = Column(String(50), primary_key=True, index=True)
     name = Column(String(100), nullable=False)
     email = Column(String(255), unique=True, nullable=False, index=True)
-    apikey = Column(String(36), unique=True, nullable=False, index=True)
+    apikey = Column(String(50), unique=True, nullable=False, index=True)
     prompt_tokens = Column(Integer, default=0, nullable=False)
     completion_tokens = Column(Integer, default=0, nullable=False)
     queries = Column(Integer, default=0, nullable=False)
@@ -96,7 +96,7 @@ class QueryLog(Base):
     __tablename__ = "query_logs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    userid = Column(String(36), ForeignKey("users.userid"), nullable=False, index=True)
+    userid = Column(String(50), ForeignKey("users.userid"), nullable=False, index=True)
     query_timestamp = Column(DateTime, default=datetime.now(), nullable=False)
     model = Column(Text, nullable=False)
     prompt_tokens = Column(Integer, nullable=False)

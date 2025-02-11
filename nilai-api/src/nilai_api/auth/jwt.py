@@ -133,9 +133,6 @@ def extract_fields(jwt: str) -> tuple[str, dict, dict, str]:
 def validate_jwt(jwt: str) -> Dict[str, Union[bool, str, dict]]:
     try:
         message, header, payload, signature = extract_fields(jwt)
-        print("header: ", header)
-        print("payload: ", payload)
-        print("signature: ", signature)
 
         match header.get("wallet"):
             case "Keplr":
