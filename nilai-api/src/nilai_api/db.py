@@ -210,14 +210,22 @@ class UserManager:
         """
         userid = UserManager.generate_user_id()
         apikey = UserManager.generate_api_key()
+        user = UserModel(userid=userid, name=name, email=email, apikey=apikey)
+        UserManager.insert_user_model(user)
 
+    @staticmethod
+    async def insert_user_model(user: UserModel):
+        """
+        Insert a new user model into the database.
+
+        Args:
+            user (UserModel): User model to insert
+        """
         try:
             async with get_db_session() as session:
-                user = UserModel(userid=userid, name=name, email=email, apikey=apikey)
                 session.add(user)
                 await session.commit()
-                logger.info(f"User {name} added successfully.")
-                return {"userid": userid, "apikey": apikey}
+                logger.info(f"User {user.name} added successfully.")
         except SQLAlchemyError as e:
             logger.error(f"Error inserting user: {e}")
             raise
