@@ -3,7 +3,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from nilai_api import config
 from nilai_api.auth.jwt import validate_jwt
-from nilai_api.db import UserManager, UserModel
+from nilai_api.db.users import UserManager, UserModel
 from nilai_api.auth.strategies import STRATEGIES
 
 bearer_scheme = HTTPBearer()
