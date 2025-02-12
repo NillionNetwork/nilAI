@@ -1,5 +1,4 @@
 # Fast API and serving
-import os
 
 
 from prometheus_fastapi_instrumentator import Instrumentator
@@ -14,9 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    client, rate_limit_command = await setup_redis_conn(
-        os.getenv("REDIS_URL", "redis://localhost:6379")
-    )
+    client, rate_limit_command = await setup_redis_conn(config.REDIS_URL)
 
     yield {"redis": client, "redis_rate_limit_command": rate_limit_command}
 

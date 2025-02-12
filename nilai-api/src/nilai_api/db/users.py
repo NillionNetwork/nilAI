@@ -14,6 +14,7 @@ from nilai_api.db import Base, Column, get_db_session
 
 logger = logging.getLogger(__name__)
 
+
 # Enhanced User Model with additional constraints and validation
 class UserModel(Base):
     __tablename__ = "users"
