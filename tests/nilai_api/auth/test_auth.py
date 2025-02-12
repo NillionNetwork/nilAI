@@ -4,6 +4,11 @@ import pytest
 from fastapi import HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
 
+import nilai_api.config as config
+
+# For these tests, we will use the api_key strategy
+config.AUTH_STRATEGY = "api_key"
+
 
 @pytest.fixture
 def mock_user_manager(mocker):
@@ -34,6 +39,7 @@ async def test_get_user_valid_token(mock_user_manager, mock_user_model):
     credentials = HTTPAuthorizationCredentials(
         scheme="Bearer", credentials="valid-token"
     )
+
     user = await get_user(credentials)
     assert user.name == mock_user_model.name
     assert user.userid == mock_user_model.userid

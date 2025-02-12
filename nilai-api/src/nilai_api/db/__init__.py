@@ -2,7 +2,6 @@ from contextlib import asynccontextmanager
 import logging
 import functools
 import sqlalchemy
-import os
 
 from typing import Any, Optional, AsyncGenerator
 from dataclasses import dataclass
@@ -41,7 +40,6 @@ class DatabaseConfig:
     def from_env() -> "DatabaseConfig":
         database_url = sqlalchemy.engine.url.URL.create(
             drivername="postgresql+asyncpg",  # Use asyncpg driver
-            username=config.DB_USER,
             username=config.DB_USER,
             password=config.DB_PASS,
             host=config.DB_HOST,
