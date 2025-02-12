@@ -13,6 +13,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
+from nilai_api import config
+
 _engine: Optional[sqlalchemy.ext.asyncio.AsyncEngine] = None
 _SessionLocal: Optional[sessionmaker] = None
 
@@ -39,11 +41,12 @@ class DatabaseConfig:
     def from_env() -> "DatabaseConfig":
         database_url = sqlalchemy.engine.url.URL.create(
             drivername="postgresql+asyncpg",  # Use asyncpg driver
-            username=os.getenv("DB_USER", "postgres"),
-            password=os.getenv("DB_PASS", ""),
-            host=os.getenv("DB_HOST", "localhost"),
-            port=int(os.getenv("DB_PORT", 5432)),
-            database=os.getenv("DB_NAME", "nilai_users"),
+            username=config.DB_USER,
+            username=config.DB_USER,
+            password=config.DB_PASS,
+            host=config.DB_HOST,
+            port=config.DB_PORT,
+            database=config.DB_NAME,
         )
         return DatabaseConfig(database_url)
 

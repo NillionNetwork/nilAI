@@ -1,4 +1,4 @@
-from nilai_api.db import UserManager, UserModel
+from nilai_api.db.users import UserManager, UserModel
 from nilai_api.auth.jwt import validate_jwt
 
 
