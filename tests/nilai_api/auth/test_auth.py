@@ -7,18 +7,17 @@ from fastapi.security import HTTPAuthorizationCredentials
 
 @pytest.fixture
 def mock_user_manager(mocker):
-    from nilai_api.db import UserManager
+    from nilai_api.db.users import UserManager
 
     """Fixture to mock UserManager methods."""
     mocker.patch.object(UserManager, "check_api_key")
     mocker.patch.object(UserManager, "update_last_activity")
-    mocker.patch.object(UserManager, "initialize_db")
     return UserManager
 
 
 @pytest.fixture
 def mock_user_model():
-    from nilai_api.db import UserModel
+    from nilai_api.db.users import UserModel
 
     mock = MagicMock(spec=UserModel)
     mock.name = "Test User"

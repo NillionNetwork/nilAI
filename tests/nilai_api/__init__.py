@@ -19,10 +19,6 @@ class MockUserDatabase:
         """Generate a unique API key."""
         return str(uuid.uuid4())
 
-    async def initialize_db(self) -> bool:
-        """Simulate database initialization."""
-        return True
-
     async def insert_user(self, name: str, email: str) -> Dict[str, str]:
         """Insert a new user into the mock database."""
         userid = self.generate_user_id()
