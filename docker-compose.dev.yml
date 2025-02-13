@@ -22,19 +22,5 @@ services:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile
       - ./caddy/caddy_data:/data
       - ./caddy/caddy_config:/config
-  postgres:
-    image: postgres:16
-    container_name: postgres
-    restart: always
-    env_file:
-      - .env
-    networks:
-      - proxy_net
-    healthcheck:
-      test: ["CMD", "pg_isready", "-U", "user", "-d", "mydb", "-h", "localhost"]
-      interval: 30s
-      retries: 5
-      start_period: 10s
-      timeout: 10s
 networks:
   proxy_net:
