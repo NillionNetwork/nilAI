@@ -8,19 +8,14 @@ async def api_key_strategy(api_key):
 
 async def jwt_strategy(jwt_creds):
     result = validate_jwt(jwt_creds)
-    print(result)
-    if not result["is_valid"]:
-        return None
-    user_address = result["payload"].get("user_address")
-    user_public_key = result["payload"].get("pub_key")
-    user = await UserManager.check_api_key(user_address)
+    user = await UserManager.check_api_key(result.user_address)
     if user:
         return user
     user = UserModel(
-        userid=user_address,
-        name=user_public_key,
-        email=user_public_key,
-        apikey=user_address,
+        userid=result.user_address,
+        name=result.pub_key,
+        email=result.pub_key,
+        apikey=result.user_address,
     )
     await UserManager.insert_user_model(user)
     return user

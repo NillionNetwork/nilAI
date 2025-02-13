@@ -61,38 +61,38 @@ def test_serialize_sign_doc():
 
 def test_validate_keplr_valid():
     result = validate_jwt(keplr_jwt_valid_forever)
-    assert result["is_valid"] is True, result
+    assert result is not None, result
 
 
 def test_validate_metamask_valid():
     result = validate_jwt(metamask_jwt_valid_forever)
-    assert result["is_valid"] is True, result
+    assert result is not None, result
 
 
 def test_validate_keplr_expired():
-    result = validate_jwt(keplr_jwt_expired)
-    assert result["is_valid"] is False, result
+    with pytest.raises(ValueError):
+        _ = validate_jwt(keplr_jwt_expired)
 
 
 def test_validate_metamask_expired():
-    result = validate_jwt(metamask_jwt_expired)
-    assert result["is_valid"] is False, result
+    with pytest.raises(ValueError):
+        _ = validate_jwt(metamask_jwt_expired)
 
 
 def test_validate_keplr_invalid():
-    result = validate_jwt(keplr_jwt_invalid_sig)
-    assert result["is_valid"] is False, result
+    with pytest.raises(ValueError):
+        _ = validate_jwt(keplr_jwt_invalid_sig)
 
 
 def test_validate_metamask_invalid():
-    result = validate_jwt(metamask_jwt_invalid_sig)
-    assert result["is_valid"] is False, result
+    with pytest.raises(ValueError):
+        _ = validate_jwt(metamask_jwt_invalid_sig)
 
 
 def test_keplr_validate():
     message, header, payload, signature = extract_fields(keplr_jwt_valid_forever)
     result = keplr_validate(message, header, payload, signature)
-    assert result["is_valid"] is True, result
+    assert result is not None, result
 
 
 def test_keplr_validate_invalid():
@@ -104,7 +104,7 @@ def test_keplr_validate_invalid():
 def test_metamask_validate():
     message, header, payload, signature = extract_fields(metamask_jwt_valid_forever)
     result = metamask_validate(message, header, payload, signature)
-    assert result["is_valid"] is True, result
+    assert result is not None, result
 
 
 def test_metamask_validate_invalid():
