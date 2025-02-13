@@ -19,10 +19,10 @@ logger = logging.getLogger(__name__)
 class UserModel(Base):
     __tablename__ = "users"
 
-    userid = Column(String(36), primary_key=True, index=True)
+    userid = Column(String(50), primary_key=True, index=True)
     name = Column(String(100), nullable=False)
     email = Column(String(255), unique=True, nullable=False, index=True)
-    apikey = Column(String(36), unique=True, nullable=False, index=True)
+    apikey = Column(String(50), unique=True, nullable=False, index=True)
     prompt_tokens = Column(Integer, default=0, nullable=False)
     completion_tokens = Column(Integer, default=0, nullable=False)
     queries = Column(Integer, default=0, nullable=False)
@@ -91,14 +91,22 @@ class UserManager:
         """
         userid = UserManager.generate_user_id()
         apikey = UserManager.generate_api_key()
+        user = UserModel(userid=userid, name=name, email=email, apikey=apikey)
+        UserManager.insert_user_model(user)
 
+    @staticmethod
+    async def insert_user_model(user: UserModel):
+        """
+        Insert a new user model into the database.
+
+        Args:
+            user (UserModel): User model to insert
+        """
         try:
             async with get_db_session() as session:
-                user = UserModel(userid=userid, name=name, email=email, apikey=apikey)
                 session.add(user)
                 await session.commit()
-                logger.info(f"User {name} added successfully.")
-                return {"userid": userid, "apikey": apikey}
+                logger.info(f"User {user.name} added successfully.")
         except SQLAlchemyError as e:
             logger.error(f"Error inserting user: {e}")
             raise

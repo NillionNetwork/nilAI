@@ -1,5 +1,4 @@
 # Fast API and serving
-import os
 
 
 from prometheus_fastapi_instrumentator import Instrumentator
@@ -7,15 +6,14 @@ from fastapi import Depends, FastAPI
 from nilai_api.auth import get_user
 from nilai_api.rate_limiting import setup_redis_conn
 from nilai_api.routers import private, public
+from nilai_api import config
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    client, rate_limit_command = await setup_redis_conn(
-        os.getenv("REDIS_URL", "redis://localhost:6379")
-    )
+    client, rate_limit_command = await setup_redis_conn(config.REDIS_URL)
 
     yield {"redis": client, "redis_rate_limit_command": rate_limit_command}
 

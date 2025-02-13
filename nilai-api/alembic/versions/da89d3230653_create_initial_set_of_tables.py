@@ -22,10 +22,10 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     op.create_table(
         "users",
-        sa.Column("userid", sa.String(36), primary_key=True, index=True),
+        sa.Column("userid", sa.String(50), primary_key=True, index=True),
         sa.Column("name", sa.String(100), nullable=False),
         sa.Column("email", sa.String(255), unique=True, nullable=False, index=True),
-        sa.Column("apikey", sa.String(36), unique=True, nullable=False, index=True),
+        sa.Column("apikey", sa.String(50), unique=True, nullable=False, index=True),
         sa.Column("prompt_tokens", sa.Integer, default=0, nullable=False),
         sa.Column("completion_tokens", sa.Integer, default=0, nullable=False),
         sa.Column("queries", sa.Integer, default=0, nullable=False),
@@ -42,7 +42,7 @@ def upgrade() -> None:
         sa.Column("id", sa.Integer, primary_key=True, autoincrement=True),
         sa.Column(
             "userid",
-            sa.String(36),
+            sa.String(50),
             sa.ForeignKey("users.userid"),
             nullable=False,
             index=True,

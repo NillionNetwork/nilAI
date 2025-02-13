@@ -3,10 +3,10 @@ import time
 from asyncio import Semaphore
 from typing import Dict, Optional
 
-from dotenv import load_dotenv
+from nilai_api import config
 from nilai_api.crypto import generate_key_pair
 from nilai_api.sev.sev import sev
-from nilai_common import SETTINGS, ModelServiceDiscovery
+from nilai_common import ModelServiceDiscovery
 from nilai_common.api_model import ModelEndpoint
 from verifier.cc_admin import collect_gpu_evidence, attest
 import secrets
@@ -22,7 +22,7 @@ class AppState:
         self.sem = Semaphore(2)
 
         self.discovery_service = ModelServiceDiscovery(
-            host=SETTINGS["etcd_host"], port=SETTINGS["etcd_port"]
+            host=config.ETCD_HOST, port=config.ETCD_PORT
         )
         self._uptime = time.time()
         self._cpu_quote = None
@@ -96,5 +96,4 @@ class AppState:
         return await self.discovery_service.get_model(model_id)
 
 
-load_dotenv()
 state = AppState()

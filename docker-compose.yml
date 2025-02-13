@@ -12,12 +12,24 @@ services:
       start_period: 5s
     networks:
       - backend_net
-
   redis:
     image: 'redis:latest'
     networks:
       - backend_net
-
+  postgres:
+    image: postgres:16
+    container_name: postgres
+    restart: always
+    env_file:
+      - .env
+    networks:
+      - backend_net
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "user", "-d", "mydb", "-h", "localhost"]
+      interval: 30s
+      retries: 5
+      start_period: 10s
+      timeout: 10s
   prometheus:
     container_name: prometheus
     image: prom/prometheus:v3.1.0
@@ -87,8 +99,10 @@ services:
       - REDIS_URL=redis://redis:6379
     networks:
       - backend_net
+    env_file:
+      - .env
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/v1/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/health"]
       interval: 30s
       retries: 3
       start_period: 15s

@@ -126,7 +126,7 @@ class RateLimit:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail="Too Many Requests",
-                headers={"Retry-After": expire},
+                headers={"Retry-After": str(expire)},
             )
 
     async def check_concurrent_and_increment(
