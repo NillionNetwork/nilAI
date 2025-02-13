@@ -1,14 +1,19 @@
 import json
 import ecdsa
+from pydantic import BaseModel
 from base64 import urlsafe_b64decode, urlsafe_b64encode
 from hashlib import sha256
 
 import time
-from typing import Dict, Union
 from web3 import Web3
 from hexbytes import HexBytes
 
 from eth_account.messages import encode_defunct
+
+
+class JWTAuthResult(BaseModel):
+    pub_key: str
+    user_address: str
 
 
 def to_base64_url(data: object) -> str:
@@ -54,7 +59,7 @@ def serialize_sign_doc(sign_doc: dict) -> bytes:
 
 def keplr_validate(
     message: str, header: dict, payload: dict, signature: str
-) -> Dict[str, Union[bool, str, dict]]:
+) -> JWTAuthResult:
     # Validate the algorithm
     if header["alg"] != "ES256":
         raise ValueError("Unsupported algorithm")
@@ -90,12 +95,14 @@ def keplr_validate(
         serialized_sign_doc,
     )
 
-    return {"is_valid": True, "payload": payload, "wallet": header.get("wallet")}
+    return JWTAuthResult(
+        pub_key=payload.get("pub_key"), user_address=payload.get("user_address")
+    )
 
 
 def metamask_validate(
     message: str, header: dict, payload: dict, signature: str
-) -> Dict[str, Union[bool, str, dict]]:
+) -> JWTAuthResult:
     # Validate the algorithm
     if header["alg"] != "ES256K":
         raise ValueError("Unsupported algorithm")
@@ -111,7 +118,9 @@ def metamask_validate(
     if address.lower() != payload.get("user_address"):
         raise ValueError("Invalid signature")
 
-    return {"is_valid": True, "payload": payload, "wallet": header.get("wallet")}
+    return JWTAuthResult(
+        pub_key=payload.get("pub_key"), user_address=payload.get("user_address")
+    )
 
 
 def extract_fields(jwt: str) -> tuple[str, dict, dict, str]:
@@ -130,17 +139,13 @@ def extract_fields(jwt: str) -> tuple[str, dict, dict, str]:
     return f"{header_b64}.{payload_b64}", header, payload, signature
 
 
-def validate_jwt(jwt: str) -> Dict[str, Union[bool, str, dict]]:
-    try:
-        message, header, payload, signature = extract_fields(jwt)
+def validate_jwt(jwt: str) -> JWTAuthResult:
+    message, header, payload, signature = extract_fields(jwt)
 
-        match header.get("wallet"):
-            case "Keplr":
-                return keplr_validate(message, header, payload, signature)
-            case "Metamask":
-                return metamask_validate(message, header, payload, signature)
-            case _:
-                raise ValueError("Unsupported wallet")
-
-    except Exception as error:
-        return {"is_valid": False, "error": str(error)}
+    match header.get("wallet"):
+        case "Keplr":
+            return keplr_validate(message, header, payload, signature)
+        case "Metamask":
+            return metamask_validate(message, header, payload, signature)
+        case _:
+            raise ValueError("Unsupported wallet")
