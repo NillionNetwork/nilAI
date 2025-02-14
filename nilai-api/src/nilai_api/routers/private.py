@@ -5,6 +5,7 @@ import asyncio
 from base64 import b64encode
 from typing import AsyncGenerator, Union, List, Tuple
 import numpy as np
+import uuid
 
 import nilql
 import nilrag
@@ -18,6 +19,7 @@ from nilai_api.db.logs import QueryLogManager
 from nilai_api.rate_limiting import RateLimit
 from nilai_api.state import state
 from openai import OpenAI, AsyncOpenAI
+from nilai_api.vault import SecretVaultHelper
 
 # Internal libraries
 from nilai_common import (
@@ -200,6 +202,21 @@ async def chat_completion(
     logger.info(
         f"Chat completion request for model {model_name} from user {user.userid} on url: {model_url}"
     )
+
+    if req.secret_vault:
+        """
+        Endpoint activated with SecretVault support
+        1. Test connectivity and pull schema definition
+        2. If instruction is to store:
+        2a. ... if schema includes encrypted values, inference result will mutate to encrypt fields
+        2b. ... then inference result will be posted to db
+        4. If instruction is to inject:
+        4a. ... query records
+        4b. ... if schema includes encrypted values, mutate payload to decrypt fields
+        4c. ... append payload to LLM query
+        """
+        # TODO: implement record injection to query
+        pass
 
     if req.nilrag:
         """
@@ -393,6 +410,30 @@ async def chat_completion(
         tools=req.tools,  # type: ignore
     )  # type: ignore
 
+    if req.secret_vault:
+        try:
+            vault = SecretVaultHelper(
+                org_did=req.secret_vault.get("org_did"),
+                secret_key=req.secret_vault.get("secret_key"),
+                schema_uuid=req.secret_vault.get("schema"),
+            )
+            remux_res = client.chat.completions.create(
+                model=model_name,
+                messages=[
+                    {"role": "system", "content": f"Please provide responses in the following JSON schema: {vault.schema_definition}"},
+                    {"role": "user", "content": response.content}
+                ],
+                response_format={ "type": "json_object" }
+            )
+            vault_res = vault.post(
+                [remux_res],
+            )
+        except Exception as e:
+            logger.error("An error occurred within nilrag: %s", str(e))
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+            )
+
     model_response = SignedChatCompletion(
         **response.model_dump(),
         signature="",
@@ -421,4 +462,7 @@ async def chat_completion(
     signature = sign_message(state.private_key, response_json)
     model_response.signature = b64encode(signature).decode()
 
+    if req.secret_vault:
+        # TODO: redact the model output
+        model_response["secret_vault"] = vault_res
     return model_response
