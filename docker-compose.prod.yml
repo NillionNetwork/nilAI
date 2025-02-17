@@ -19,6 +19,7 @@ services:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile
       - ./caddy/caddy_data:/data
       - ./caddy/caddy_config:/config
-
 networks:
+  # This network is meant to connect from the outside world to the API
+  ## This connects the API and Caddy
   proxy_net:

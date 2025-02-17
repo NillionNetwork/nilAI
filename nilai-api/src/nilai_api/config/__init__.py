@@ -14,11 +14,11 @@ ETCD_PORT = int(os.getenv("ETCD_PORT", 2379))
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 
 
-DB_USER = os.getenv("DB_USER", "postgres")
-DB_PASS = os.getenv("DB_PASS", "")
-DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_PORT = int(os.getenv("DB_PORT", 5432))
-DB_NAME = os.getenv("DB_NAME", "nilai_users")
+DB_USER = os.getenv("POSTGRES_USER", "postgres")
+DB_PASS = os.getenv("POSTGRES_PASSWORD", "")
+DB_HOST = os.getenv("POSTGRES_HOST", "localhost")
+DB_PORT = int(os.getenv("POSTGRES_PORT", 5432))
+DB_NAME = os.getenv("POSTGRES_DB", "nilai_users")
 
 
 AUTH_STRATEGY = "api_key"

@@ -1,4 +1,3 @@
-import os
 import asyncio
 
 from dotenv import load_dotenv
@@ -10,6 +9,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 from nilai_api.db import Base
+import nilai_api.config as nilai_config
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -88,12 +88,12 @@ def run_migrations_online() -> None:
 
 
 load_dotenv()
-db_host = os.getenv("DB_HOST")
+db_host = nilai_config.DB_HOST
 if db_host:
-    db_port = os.getenv("DB_PORT", "5432")
-    db_user = os.getenv("DB_USER")
-    db_pass = os.getenv("DB_PASS")
-    db_name = os.getenv("DB_NAME")
+    db_port = nilai_config.DB_PORT
+    db_user = nilai_config.DB_USER
+    db_pass = nilai_config.DB_PASS
+    db_name = nilai_config.DB_NAME
     config.set_main_option(
         "sqlalchemy.url",
         f"postgresql+asyncpg://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}",
