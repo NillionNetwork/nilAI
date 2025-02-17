@@ -1,6 +1,7 @@
 # Fast API and serving
 import logging
 import os
+import asyncio
 from base64 import b64encode
 from typing import AsyncGenerator, Union, List, Tuple
 import numpy as np
@@ -15,7 +16,7 @@ from nilai_api.db.users import UserManager, UserModel
 from nilai_api.db.logs import QueryLogManager
 from nilai_api.rate_limiting import RateLimit
 from nilai_api.state import state
-from openai import OpenAI
+from openai import OpenAI, AsyncOpenAI
 
 # Internal libraries
 from nilai_common import (
@@ -205,8 +206,6 @@ async def chat_completion(
         f"Chat completion request for model {model_name} from user {user.userid} on url: {model_url}"
     )
 
-    client = OpenAI(base_url=model_url, api_key="<not-needed>")
-
     if req.nilrag:
         """
         Endpoint to process a client query.
@@ -340,10 +339,12 @@ async def chat_completion(
             )
 
     if req.stream:
+        client = AsyncOpenAI(base_url=model_url, api_key="<not-needed>")
+
         # Forwarding Streamed Responses
         async def chat_completion_stream_generator() -> AsyncGenerator[str, None]:
             try:
-                response = client.chat.completions.create(
+                response = await client.chat.completions.create(
                     model=req.model,
                     messages=req.messages,  # type: ignore
                     stream=req.stream,  # type: ignore
@@ -359,7 +360,7 @@ async def chat_completion(
                     },
                 )  # type: ignore
 
-                for chunk in response:
+                async for chunk in response:
                     if chunk.usage is not None:
                         await UserManager.update_token_usage(
                             user.userid,
@@ -375,6 +376,7 @@ async def chat_completion(
                     else:
                         data = chunk.model_dump_json(exclude_unset=True)
                         yield f"data: {data}\n\n"
+                        await asyncio.sleep(0)
 
             except Exception as e:
                 logger.error(f"Error streaming response: {e}")
@@ -385,7 +387,7 @@ async def chat_completion(
             chat_completion_stream_generator(),
             media_type="text/event-stream",  # Ensure client interprets as Server-Sent Events
         )
-
+    client = OpenAI(base_url=model_url, api_key="<not-needed>")
     response = client.chat.completions.create(
         model=req.model,
         messages=req.messages,  # type: ignore
