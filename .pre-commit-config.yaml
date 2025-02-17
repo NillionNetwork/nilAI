@@ -1,0 +1,26 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: check-toml
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+
+  # First repository: Uses Ruff for formatting and linting
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.6  # Specifies the version of the Ruff pre-commit hooks to use
+    hooks:
+      - id: ruff-format  # Runs Ruff's code formatter
+      - id: ruff  # Runs Ruff's linter
+        exclude: "packages/verifier/"  # Excludes the "packages/verifier/" directory from linting
+
+  # Second repository: Local hooks (custom pre-commit checks)
+  - repo: local
+    hooks:
+      - id: pytest  # Defines a local hook for running pytest
+        name: pytest  # A human-readable name for the hook
+        entry: pytest  # The command to execute
+        language: system  # Uses the system-installed pytest instead of a virtual environment
+        types: [python]  # Applies only to Python files
+        pass_filenames: false  # Prevents passing filenames, so pytest runs on all tests
