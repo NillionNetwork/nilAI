@@ -15,23 +15,23 @@ services:
   redis:
     image: 'redis:latest'
     networks:
-      - backend_net
+      - frontend_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
   postgres:
     image: postgres:16
     container_name: postgres
     restart: always
-    environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: mydb
-    # volumes:
-    #   - ./init-scripts:/docker-entrypoint-initdb.d
-    ports:
-      - "5432:5432"
+    env_file:
+      - .env
     networks:
-      - backend_net
+      - frontend_net
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "user", "-d", "mydb", "-h", "localhost"]
+      test: ["CMD", "sh", "-c", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB} -h localhost"]
       interval: 30s
       retries: 5
       start_period: 10s
@@ -41,7 +41,7 @@ services:
     image: prom/prometheus:v3.1.0
     restart: unless-stopped
     networks:
-      - backend_net
+      - frontend_net
     user: "$UID:$GID"
     volumes:
       - ${PWD}/prometheus/config/prometheus.yml:/etc/prometheus/prometheus.yml
@@ -49,6 +49,12 @@ services:
     command: "--config.file=/etc/prometheus/prometheus.yml --storage.tsdb.retention.time=30d --web.enable-admin-api"
     ports: 
       - "127.0.0.1:9090:9090"
+    healthcheck:
+      test: ["CMD", "wget", "http://localhost:9090/-/healthy", "-O", "/dev/null", "-o", "/dev/null"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   node_exporter:
     container_name: node-exporter
@@ -56,18 +62,24 @@ services:
     command:
       - '--path.rootfs=/host'
     networks:
-      - backend_net
+      - frontend_net
     pid: host
     restart: unless-stopped
     volumes:
       - '/:/host:ro,rslave'
+    healthcheck:
+      test: ["CMD", "wget", "http://localhost:9100/", "-O", "/dev/null", "-o", "/dev/null"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   grafana:
     container_name: grafana
     image: 'grafana/grafana:11.5.1'
     restart: unless-stopped
     networks:
-      - backend_net
+      - frontend_net
     user: "$UID:$GID"
     depends_on:
       - prometheus
@@ -75,12 +87,18 @@ services:
       - ${PWD}/grafana/runtime-data:/var/lib/grafana
       - ${PWD}/grafana/datasources/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
       - ${PWD}/grafana/dashboards/filesystem.yml:/etc/grafana/provisioning/dashboards/filesystem.yml
+    env_file:
+      - .env
     environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=a3b4cdcb12fb913148f71b64314b8797
       - GF_USERS_ALLOW_SIGN_UP=false
     ports: 
       - "127.0.0.1:3000:3000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   api:
     container_name: nilai-api
@@ -91,6 +109,8 @@ services:
     depends_on:
       etcd:
         condition: service_healthy
+      postgres:
+        condition: service_healthy
     deploy:
       resources:
         reservations:
@@ -99,11 +119,8 @@ services:
               count: all
               capabilities: [gpu]
     restart: unless-stopped
-    environment:
-      - ETCD_HOST=etcd
-      - ETCD_PORT=2379
-      - REDIS_URL=redis://redis:6379
     networks:
+      - frontend_net
       - backend_net
     env_file:
       - .env
@@ -115,4 +132,9 @@ services:
       timeout: 10s
 
 networks:
+  # This is the network that is used for the "api" related services
+  ## API, user management (postgres), caching (redis) and monitoring (prometheus, grafana)
+  frontend_net:
+  # This is the network that is used for the model related services:
+  ## API, models, and etcd
   backend_net:
