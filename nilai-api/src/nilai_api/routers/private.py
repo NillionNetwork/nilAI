@@ -11,6 +11,7 @@ import nilrag
 from fastapi import APIRouter, Body, Depends, HTTPException, status, Request
 from fastapi.responses import StreamingResponse
 from nilai_api.auth import get_user
+from nilai_api.config import MODEL_CONCURRENT_RATE_LIMIT
 from nilai_api.crypto import sign_message
 from nilai_api.db.users import UserManager, UserModel
 from nilai_api.db.logs import QueryLogManager
@@ -116,17 +117,11 @@ async def chat_completion_concurrent_rate_limit(request: Request) -> Tuple[int, 
     body = await request.json()
     chat_request = ChatRequest(**body)
     key = f"chat:{chat_request.model}"
-    match chat_request.model:
-        case "meta-llama/Llama-3.2-1B-Instruct":
-            return 10, key
-        case "meta-llama/Llama-3.2-3B-Instruct":
-            return 10, key
-        case "meta-llama/Llama-3.1-8B-Instruct":
-            return 5, key
-        case "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B":
-            return 3, key
-        case _:
-            raise HTTPException(status_code=400, detail="Invalid model name")
+    try:
+        limit = MODEL_CONCURRENT_RATE_LIMIT[chat_request.model]
+    except KeyError:
+        raise HTTPException(status_code=400, detail="Invalid model name")
+    return limit, key
 
 
 @router.post("/v1/chat/completions", tags=["Chat"], response_model=None)
