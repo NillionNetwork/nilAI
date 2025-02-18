@@ -10,7 +10,11 @@ from sqlalchemy import Integer, String, DateTime
 from sqlalchemy.exc import SQLAlchemyError
 
 from nilai_api.db import Base, Column, get_db_session
-from nilai_api.config import USER_RATE_LIMIT
+from nilai_api.config import (
+    USER_RATE_LIMIT_MINUTE,
+    USER_RATE_LIMIT_HOUR,
+    USER_RATE_LIMIT_DAY,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -96,9 +100,9 @@ class UserManager:
             name=name,
             email=email,
             apikey=apikey,
-            ratelimit_day=USER_RATE_LIMIT["day"],
-            ratelimit_hour=USER_RATE_LIMIT["hour"],
-            ratelimit_minute=USER_RATE_LIMIT["minute"],
+            ratelimit_day=USER_RATE_LIMIT_DAY,
+            ratelimit_hour=USER_RATE_LIMIT_HOUR,
+            ratelimit_minute=USER_RATE_LIMIT_MINUTE,
         )
         UserManager.insert_user_model(user)
 

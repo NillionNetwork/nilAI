@@ -13,8 +13,6 @@ MODEL_CONCURRENT_RATE_LIMIT = {
 # It defines the number of requests allowed for each user for a given time frame.
 # A user can make 10 requests per minute, 100 requests per hour, and 1000 requests per day.
 # It follows a fixed window rate limiting algorithm. In this case, the rate limit is disabled.
-USER_RATE_LIMIT = {
-    "minute": None,
-    "hour": None,
-    "day": None,
-}
+USER_RATE_LIMIT_MINUTE = None
+USER_RATE_LIMIT_HOUR = None
+USER_RATE_LIMIT_DAY = None

@@ -116,7 +116,11 @@ async def chat_completion_concurrent_rate_limit(request: Request) -> Tuple[int, 
     body = await request.json()
     chat_request = ChatRequest(**body)
     key = f"chat:{chat_request.model}"
-    return MODEL_CONCURRENT_RATE_LIMIT[chat_request.model], key
+    try:
+        limit = MODEL_CONCURRENT_RATE_LIMIT[chat_request.model]
+    except KeyError:
+        raise HTTPException(status_code=400, detail="Invalid model name")
+    return limit, key
 
 
 @router.post("/v1/chat/completions", tags=["Chat"], response_model=None)

@@ -16,8 +16,6 @@ MODEL_CONCURRENT_RATE_LIMIT = {
 # After you do your first request, the timer is set to 1 minute, 1 hour, and 1 day.
 # You can make 9 more requests in the next 59 seconds, 99 in the next hour or 999 in the next day.
 # After the time frame is over, the counter resets.
-USER_RATE_LIMIT = {
-    "minute": 10,
-    "hour": 100,
-    "day": 1000,
-}
+USER_RATE_LIMIT_MINUTE = 10
+USER_RATE_LIMIT_HOUR = 100
+USER_RATE_LIMIT_DAY = 1000
