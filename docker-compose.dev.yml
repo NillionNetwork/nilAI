@@ -1,8 +1,5 @@
 services:
   api:
-    depends_on:
-      postgres:
-        condition: service_healthy
     privileged: true
     volumes:
       - /dev/sev-guest:/dev/sev-guest # for AMD SEV
@@ -23,4 +20,6 @@ services:
       - ./caddy/caddy_data:/data
       - ./caddy/caddy_config:/config
 networks:
+  # This network is meant to connect from the outside world to the API
+  ## This connects the API and Caddy
   proxy_net:
