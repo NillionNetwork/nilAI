@@ -6,13 +6,13 @@ There are two ways to deploy **nilAI**. The recommended way is to use docker-com
 
 ## Docker
 
-For development environments with 
+For development environments with
 ```shell
 docker compose -f docker-compose.yml \
 -f docker-compose.dev.yml \
 -f docker/compose/docker-compose.llama-3b-gpu.yml \
 -f docker/compose/docker-compose.llama-8b-gpu.yml \
-up --build 
+up --build
 ```
 
 For production environments:
@@ -21,7 +21,7 @@ docker compose -f docker-compose.yml \
 -f docker-compose.prod.yml \
 -f docker/compose/docker-compose.llama-3b-gpu.yml \
 -f docker/compose/docker-compose.llama-8b-gpu.yml \
-up --build 
+up --build
 ```
 
 ## Manual Deployment
@@ -37,7 +37,7 @@ To deploy the components, first create the `etcd3` instance. The easiest way is 
 
 ```shell
 # This command runs in the background. If it fails, you may already be running etcd-server on ports 2379 and 2380.
-docker run -d --name etcd-server -p 2379:2379 -p 2380:2380 -e ALLOW_NONE_AUTHENTICATION=yes bitnami/etcd:latest 
+docker run -d --name etcd-server -p 2379:2379 -p 2380:2380 -e ALLOW_NONE_AUTHENTICATION=yes bitnami/etcd:latest
 ```
 
 Run the **nilAI** API server:
@@ -56,4 +56,13 @@ Run the **nilAI** Llama 3.2 1B model. For different models, adapt the command be
 uv run fastapi dev nilai-models/src/nilai_models/models/llama_1b_cpu/__init__.py
 ## For production environment:
 uv run fastapi run nilai-models/src/nilai_models/models/llama_1b_cpu/__init__.py
+```
+
+## Developer Instructions
+
+If you are developping, you can use `pre-commit` configurations to ensure make the development smoother and not having to wait for CI checks. These are executed before you commit, and perform automatic changes to format your code.
+
+You can install those with:
+```shell
+uv run pre-commit install
 ```
