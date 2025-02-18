@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-from nilai_api.db import UserModel
+from nilai_api.db.users import UserModel
 from nilai_api.state import state
 from tests import model_endpoint, model_metadata, response as RESPONSE
 
@@ -30,7 +30,8 @@ def mock_user():
 
 @pytest.fixture
 def mock_user_manager(mock_user, mocker):
-    from nilai_api.db import UserManager
+    from nilai_api.db.users import UserManager
+    from nilai_api.db.logs import QueryLogManager
 
     mocker.patch.object(
         UserManager,
@@ -73,8 +74,7 @@ def mock_user_manager(mock_user, mocker):
             {"userid": "test-user-id-2", "apikey": "test-api-key"},
         ],
     )
-    mocker.patch.object(UserManager, "initialize_db")
-    mocker.patch.object(UserManager, "log_query")
+    mocker.patch.object(QueryLogManager, "log_query")
     mocker.patch.object(UserManager, "update_last_activity")
     return UserManager
 

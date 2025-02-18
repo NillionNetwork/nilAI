@@ -1,4 +1,8 @@
 # Fast API and serving
+import os
+
+
+from prometheus_fastapi_instrumentator import Instrumentator
 from fastapi import Depends, FastAPI
 from nilai_api.auth import get_user
 from nilai_api.rate_limiting import setup_redis_conn
@@ -99,3 +103,4 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+Instrumentator().instrument(app).expose(app)
