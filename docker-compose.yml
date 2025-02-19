@@ -30,6 +30,8 @@ services:
       - .env
     networks:
       - frontend_net
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD", "sh", "-c", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB} -h localhost"]
       interval: 30s
@@ -47,7 +49,7 @@ services:
       - ${PWD}/prometheus/config/prometheus.yml:/etc/prometheus/prometheus.yml
       - ${PWD}/prometheus/data:/prometheus/data
     command: "--config.file=/etc/prometheus/prometheus.yml --storage.tsdb.retention.time=30d --web.enable-admin-api"
-    ports: 
+    ports:
       - "127.0.0.1:9090:9090"
     healthcheck:
       test: ["CMD", "wget", "http://localhost:9090/-/healthy", "-O", "/dev/null", "-o", "/dev/null"]
@@ -91,7 +93,7 @@ services:
       - .env
     environment:
       - GF_USERS_ALLOW_SIGN_UP=false
-    ports: 
+    ports:
       - "127.0.0.1:3000:3000"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
@@ -102,7 +104,7 @@ services:
 
   api:
     container_name: nilai-api
-    build: 
+    build:
       context: .
       dockerfile: docker/api.Dockerfile
       target: nilai
@@ -138,3 +140,6 @@ networks:
   # This is the network that is used for the model related services:
   ## API, models, and etcd
   backend_net:
+
+volumes:
+  postgres_data:
