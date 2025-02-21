@@ -1,6 +1,7 @@
 from pdb import set_trace as bp
 from ecdsa import SigningKey, SECP256k1
 import jwt
+import logging
 import nilql
 import os
 import requests
@@ -8,18 +9,20 @@ from jsonschema import validators, Draft7Validator
 import uuid
 import time
 
+logger = logging.getLogger(__name__)
 
 class SecretVaultHelper:
     def __init__(self, org_did: str, secret_key: str, schema_uuid: str):
         """Initialize config with JWTs signed with ES256K for multiple node_ids; Add cluster key."""
         self.org_did = org_did
         response = requests.post(
-            "https://sv-sda-registration.replit.app/api/config",
+            "https://secret-vault-registration.replit.app/api/config",
             headers={
                 "Content-Type": "application/json",
             },
             json={"org_did": org_did},
         )
+        response.raise_for_status()
         self.nodes = response.json()["nodes"]
 
         # Convert the secret key from hex to bytes
@@ -44,6 +47,7 @@ class SecretVaultHelper:
         self.schema_list = self.fetch_schemas()
         self.schema_definition = self.find_schema(schema_uuid)
         self.schema_uuid = schema_uuid
+        logger.info(f"fn:data_upload init complete: {len(self.nodes)} nodes | schema {schema_uuid}")
 
     def fetch_schemas(self) -> list:
         """Get all my schemas from the first server."""
@@ -55,6 +59,7 @@ class SecretVaultHelper:
         response = requests.get(
             f"{self.nodes[0]['url']}/api/v1/schemas", headers=headers
         )
+        response.raise_for_status()
 
         assert (
             response.status_code == 200 and response.json().get("errors", []) == []
@@ -93,7 +98,7 @@ class SecretVaultHelper:
 
     def post(self, data_to_store: list) -> list:
         """Create/upload records in the specified node and schema."""
-        print(f"fn:data_upload [{self.schema_uuid}] [{data_to_store}]")
+        logger.info(f"fn:data_upload {self.schema_uuid} | {data_to_store}")
         try:
 
             builder = self._validator_builder()
@@ -104,6 +109,7 @@ class SecretVaultHelper:
 
             record_uuids = [x["_id"] for x in data_to_store]
             payloads = nilql.allot(data_to_store)
+            logger.info(f"fn:data_upload <mutated> {payloads}")
 
             for idx, shard in enumerate(payloads):
 
@@ -116,6 +122,7 @@ class SecretVaultHelper:
                 }
 
                 body = {"schema": self.schema_uuid, "data": shard}
+                logger.debug(f"fn:data_upload POST{idx} | {body}")
 
                 response = requests.post(
                     f"{node['url']}/api/v1/data/create",
@@ -127,10 +134,10 @@ class SecretVaultHelper:
                     response.status_code == 200
                     and response.json().get("errors", []) == []
                 ), f"upload (host-{idx}) failed: " + response.content.decode("utf8")
-            print(f"fn:data_upload COMPLETED: {record_uuids}")
+            logger.info(f"fn:data_upload COMPLETED: {record_uuids}")
             return record_uuids
         except Exception as e:
-            print(f"Error creating records in node: {e!r}")
+            logger.info(f"Error creating records in node: {e!r}")
             return []
 
 

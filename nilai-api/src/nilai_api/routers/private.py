@@ -6,6 +6,7 @@ from base64 import b64encode
 from typing import AsyncGenerator, Union, List, Tuple
 import numpy as np
 import uuid
+import json
 
 import nilql
 import nilrag
@@ -122,7 +123,7 @@ async def chat_completion_concurrent_rate_limit(request: Request) -> Tuple[int, 
     try:
         limit = MODEL_CONCURRENT_RATE_LIMIT[chat_request.model]
     except KeyError:
-        raise HTTPException(status_code=400, detail="Invalid model name")
+        raise HTTPException(status_code=400, detail="Invalid model concurrency value")
     return limit, key
 
 
@@ -203,6 +204,9 @@ async def chat_completion(
         f"Chat completion request for model {model_name} from user {user.userid} on url: {model_url}"
     )
 
+    logger.info(f"EXTRA INFO: {req}")
+    logger.info(f"VAULT INFO: {req.secret_vault}")
+
     if req.secret_vault:
         """
         Endpoint activated with SecretVault support
@@ -216,6 +220,7 @@ async def chat_completion(
         4c. ... append payload to LLM query
         """
         # TODO: implement record injection to query
+        logger.info("SECRET VAULT PROCESSING REQUESTED")
         pass
 
     if req.nilrag:
@@ -412,24 +417,42 @@ async def chat_completion(
 
     if req.secret_vault:
         try:
+            logger.info("GOING TO SAVE RECORDS TO SECRET VAULT")
             vault = SecretVaultHelper(
                 org_did=req.secret_vault.get("org_did"),
                 secret_key=req.secret_vault.get("secret_key"),
                 schema_uuid=req.secret_vault.get("schema"),
             )
+            inference_result = response.choices[0].message.content
+            my_schema = vault.schema_definition
+            if '$schema' in my_schema:
+                del my_schema["$schema"]
             remux_res = client.chat.completions.create(
                 model=model_name,
                 messages=[
-                    {"role": "system", "content": f"Please provide responses in the following JSON schema: {vault.schema_definition}"},
-                    {"role": "user", "content": response.content}
+                    {"role": "system", "content": f"You are a helpful assistant that outputs JSON according to this jsonschema: {json.dumps(vault.schema_definition)}"},
+                    {"role": "user", "content": inference_result }
                 ],
-                response_format={ "type": "json_object" }
+                response_format={"type": "json_object"},
             )
+            json_response = remux_res.choices[0].message.content
+            logger.info(f"""
+            INPUT:
+            {inference_result} 
+
+            SCHEMA:
+            {vault.schema_definition}
+
+            OUTPUT:
+            {json_response}
+            """)
+            parsed_data = json.loads(json_response)
             vault_res = vault.post(
-                [remux_res],
+                parsed_data["items"] if "items" in parsed_data else [parsed_data],
             )
+            logger.info("!! POSTED RECORDS TO SECRET VAULT")
         except Exception as e:
-            logger.error("An error occurred within nilrag: %s", str(e))
+            logger.error("An error occurred within secret vault: %s", str(e))
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
             )
@@ -459,10 +482,11 @@ async def chat_completion(
 
     # Sign the response
     response_json = model_response.model_dump_json()
+    if req.secret_vault:
+        unpacked = json.loads(response_json)
+        unpacked["secret_vault"] = vault_res
+        response_json = json.dumps(unpacked)
     signature = sign_message(state.private_key, response_json)
     model_response.signature = b64encode(signature).decode()
 
-    if req.secret_vault:
-        # TODO: redact the model output
-        model_response["secret_vault"] = vault_res
     return model_response

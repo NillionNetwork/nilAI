@@ -3,6 +3,9 @@ services:
     privileged: true
     volumes:
       - /dev/sev-guest:/dev/sev-guest # for AMD SEV
+      - $PWD/packages:/app/packages:ro
+      - $PWD/nilai-models:/app/nilai-models:ro
+      - $PWD/nilai-api:/app/nilai-api # this will drop a lockfile
     networks:
       - proxy_net
   redis:

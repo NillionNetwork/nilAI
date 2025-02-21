@@ -1,0 +1,55 @@
+services:
+  watt_tool_gpu:
+    build:
+      context: .
+      dockerfile: docker/vllm.Dockerfile
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities:
+                - gpu
+              driver: nvidia
+              device_ids:
+                - "0"
+    ipc: host
+    command:
+      - --model
+      - watt-ai/watt-tool-8B
+      - --max-model-len
+      - "65536"
+      - --device
+      - cuda
+      - --gpu-memory-utilization
+      - "0.95"
+      - --enable-auto-tool-choice
+      - --tool-call-parser
+      - llama3_json
+      - --chat-template
+      - /tmp/tool_chat_template.jinja
+    env_file:
+      - .env
+    environment:
+      SVC_HOST: "watt_tool_gpu"
+      SVC_PORT: "8000"
+      ETCD_HOST: "etcd"
+      ETCD_PORT: "2379"
+      TOOL_SUPPORT: true
+      MODEL_ROLE: "worker"
+    networks:
+      - backend_net
+    volumes:
+      - type: volume
+        source: hugging_face_models
+        target: /root/.cache/huggingface
+        volume: {}
+      - type: bind
+        source: /home/niko/tool_chat_template_llama3.1_json.jinja
+        target: /tmp/tool_chat_template.jinja
+        bind:
+          create_host_path: true
+volumes:
+  hugging_face_models:
+
+networks:
+  backend_net:

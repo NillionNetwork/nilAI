@@ -22,7 +22,7 @@ __all__ = [
 
 
 class Message(ChatCompletionMessage):
-    role: Literal["system", "user", "assistant"]
+    role: Literal["system", "user", "assistant", "tool"]
 
 
 class Choice(OpenaAIChoice):
@@ -59,6 +59,7 @@ class ModelMetadata(BaseModel):
     author: str
     license: str
     source: str
+    role: Optional[str] = "unknown"
     supported_features: List[str]
     tool_support: bool
 
