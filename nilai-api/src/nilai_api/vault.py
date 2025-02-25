@@ -5,7 +5,9 @@ import logging
 import nilql
 import os
 import requests
+import traceback
 from jsonschema import validators, Draft7Validator
+from jsonschema.exceptions import ValidationError
 import uuid
 import time
 
@@ -104,6 +106,7 @@ class SecretVaultHelper:
             builder = self._validator_builder()
             validator = builder(self.schema_definition)
 
+            logger.info(f"fn:data_upload <analysis> | got {len(data_to_store)} records")
             for entry in data_to_store:
                 self._mutate_secret_attributes(entry)
 
@@ -137,8 +140,9 @@ class SecretVaultHelper:
             logger.info(f"fn:data_upload COMPLETED: {record_uuids}")
             return record_uuids
         except Exception as e:
-            logger.info(f"Error creating records in node: {e!r}")
-            return []
+            msg = ''.join(traceback.format_tb(e.__traceback__, limit=3))
+            logger.info(f"Error creating records in node: {msg}")
+            raise ValidationError(f"{e!r}")
 
 
 if __name__ == "__main__":

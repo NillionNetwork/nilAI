@@ -7,6 +7,7 @@ from typing import AsyncGenerator, Union, List, Tuple
 import numpy as np
 import uuid
 import json
+from jsonschema.exceptions import ValidationError
 
 import nilql
 import nilrag
@@ -427,30 +428,48 @@ async def chat_completion(
             my_schema = vault.schema_definition
             if '$schema' in my_schema:
                 del my_schema["$schema"]
-            remux_res = client.chat.completions.create(
-                model=model_name,
-                messages=[
-                    {"role": "system", "content": f"You are a helpful assistant that outputs JSON according to this jsonschema: {json.dumps(vault.schema_definition)}"},
-                    {"role": "user", "content": inference_result }
-                ],
-                response_format={"type": "json_object"},
-            )
-            json_response = remux_res.choices[0].message.content
-            logger.info(f"""
-            INPUT:
-            {inference_result} 
+            messages = [
+                {"role": "system", "content": f"Output only minimal JSON according to this jsonschema: {json.dumps(vault.schema_definition)}"},
+                {"role": "user", "content": inference_result }
+            ]
+            max_retries = 3
+            attempt = 0
+            while attempt < max_retries:
+                try:
+                    remux_res = client.chat.completions.create(
+                        model=model_name,
+                        messages=messages,
+                        response_format={"type": "json_object"},
+                    )
+                    json_response = remux_res.choices[0].message.content
+                    logger.info(f"""
+                    INPUT:
+                    {inference_result} 
 
-            SCHEMA:
-            {vault.schema_definition}
+                    SCHEMA:
+                    {vault.schema_definition}
 
-            OUTPUT:
-            {json_response}
-            """)
-            parsed_data = json.loads(json_response)
-            vault_res = vault.post(
-                parsed_data["items"] if "items" in parsed_data else [parsed_data],
-            )
-            logger.info("!! POSTED RECORDS TO SECRET VAULT")
+                    OUTPUT:
+                    {json_response}
+                    """)
+                    parsed_data = json.loads(json_response)
+                    vault_res = vault.post(
+                        parsed_data["items"] if "items" in parsed_data else parsed_data,
+                    )
+                    logger.info("!! POSTED RECORDS TO SECRET VAULT")
+                    break
+
+                except (json.JSONDecodeError, ValidationError) as e:
+                    attempt += 1
+                    if attempt == max_retries:
+                        raise Exception(f"Failed to get valid response after {max_retries} attempts. Last error: {str(e)}")
+                    
+                    # Add the failed attempt and error to the conversation
+                    messages.extend([
+                        {"role": "assistant", "content": json_response},
+                        {"role": "user", "content": f"{str(e)}. Try again, ensuring the response exactly matches the schema. Format dates like: 2025-02-24T15:30:00Z"}
+                    ])
+                    print(f"Attempt {attempt} failed: {str(e)}. Retrying...")
         except Exception as e:
             logger.error("An error occurred within secret vault: %s", str(e))
             raise HTTPException(
@@ -459,6 +478,7 @@ async def chat_completion(
 
     model_response = SignedChatCompletion(
         **response.model_dump(),
+        **({"secret_vault": vault_res} if req.secret_vault else {}),
         signature="",
     )
     if model_response.usage is None:
@@ -482,10 +502,6 @@ async def chat_completion(
 
     # Sign the response
     response_json = model_response.model_dump_json()
-    if req.secret_vault:
-        unpacked = json.loads(response_json)
-        unpacked["secret_vault"] = vault_res
-        response_json = json.dumps(unpacked)
     signature = sign_message(state.private_key, response_json)
     model_response.signature = b64encode(signature).decode()
 

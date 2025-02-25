@@ -43,6 +43,7 @@ class ChatRequest(BaseModel):
 
 class SignedChatCompletion(ChatCompletion):
     signature: str
+    secret_vault: List[str] = []
 
 
 class AttestationResponse(BaseModel):
