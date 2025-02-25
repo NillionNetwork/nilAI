@@ -1,4 +1,5 @@
 from pdb import set_trace as bp
+from collections import defaultdict
 from ecdsa import SigningKey, SECP256k1
 import jwt
 import logging
@@ -97,6 +98,51 @@ class SecretVaultHelper:
     def _validator_builder(self):
         """Build a validator to validate the candidate document against loaded schema."""
         return validators.extend(Draft7Validator)
+
+
+    def data_reveal(self, filter: dict = {}) -> list[dict]:
+        """Get filtered data from schema on all nodes then reconstruct secret.
+
+        Args:
+            dict: Optional filter paramters
+
+        Returns:
+            list[dict]: A list of the downloaded records
+
+        """
+        try:
+            logger.info(f"fn:data_reveal | {self.schema_uuid} | filter: {filter} ")
+
+            shares = defaultdict(list)
+            for node in self.nodes:
+                headers = {
+                    "Authorization": f'Bearer {node["bearer"]}',
+                    "Content-Type": "application/json",
+                }
+
+                body = {
+                    "schema": self.schema_uuid,
+                    "filter": filter
+                }
+
+                response = requests.post(
+                    f"{node['url']}/api/v1/data/read",
+                    headers=headers,
+                    json=body,
+                )
+                assert (
+                    response.status_code == 200
+                ), "upload failed: " + response.content.decode("utf8")
+                data = response.json().get("data")
+                for d in data:
+                    shares[d["_id"]].append(d)
+            decrypted = []
+            for k in shares:
+                decrypted.append(nilql.unify(self.key, shares[k]))
+            return decrypted
+        except Exception as e:
+            logger.info(f"Error retrieving records in node: {e!r}")
+            return []
 
     def post(self, data_to_store: list) -> list:
         """Create/upload records in the specified node and schema."""

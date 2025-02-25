@@ -208,7 +208,7 @@ async def chat_completion(
     logger.info(f"EXTRA INFO: {req}")
     logger.info(f"VAULT INFO: {req.secret_vault}")
 
-    if req.secret_vault:
+    if req.secret_vault and (schema_uuid := req.secret_vault.get("inject_from")):
         """
         Endpoint activated with SecretVault support
         1. Test connectivity and pull schema definition
@@ -220,9 +220,40 @@ async def chat_completion(
         4b. ... if schema includes encrypted values, mutate payload to decrypt fields
         4c. ... append payload to LLM query
         """
-        # TODO: implement record injection to query
-        logger.info("SECRET VAULT PROCESSING REQUESTED")
-        pass
+        try:
+            logger.info(f"SECRET VAULT INJECTION REQUESTED ({schema_uuid})")
+            vault = SecretVaultHelper(
+                org_did=req.secret_vault.get("org_did"),
+                secret_key=req.secret_vault.get("secret_key"),
+                schema_uuid=schema_uuid,
+            )
+            
+            records = vault.data_reveal(req.secret_vault.get("filter"))
+            formatted_results = "\n".join(
+                f"- {str(result)}" for result in records
+            )
+            relevant_context = f"\n\nRelevant Context:\n{formatted_results}"
+            logger.info(f"SECRET VAULT INJECTION: {relevant_context}")
+            for message in req.messages:
+                if message.role == "system":
+                    if message.content is None:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="system message is empty",
+                        )
+                    message.content += (
+                        relevant_context  # Append the context to the system message
+                    )
+                    break
+            else:
+                # If no system message exists, add one
+                req.messages.insert(0, Message(role="system", content=relevant_context))
+        except Exception as e:
+            logger.error("An error occurred within secret vault: %s", str(e))
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+            )
+        
 
     if req.nilrag:
         """
@@ -416,13 +447,13 @@ async def chat_completion(
         tools=req.tools,  # type: ignore
     )  # type: ignore
 
-    if req.secret_vault:
+    if req.secret_vault and (schema_uuid := req.secret_vault.get("save_to")):
         try:
             logger.info("GOING TO SAVE RECORDS TO SECRET VAULT")
             vault = SecretVaultHelper(
                 org_did=req.secret_vault.get("org_did"),
                 secret_key=req.secret_vault.get("secret_key"),
-                schema_uuid=req.secret_vault.get("schema"),
+                schema_uuid=schema_uuid,
             )
             inference_result = response.choices[0].message.content
             my_schema = vault.schema_definition
@@ -478,7 +509,7 @@ async def chat_completion(
 
     model_response = SignedChatCompletion(
         **response.model_dump(),
-        **({"secret_vault": vault_res} if req.secret_vault else {}),
+        **({"secret_vault": vault_res} if (req.secret_vault and req.secret_vault.get("save_to")) else {}),
         signature="",
     )
     if model_response.usage is None:
