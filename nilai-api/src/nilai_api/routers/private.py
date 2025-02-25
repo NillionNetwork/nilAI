@@ -128,6 +128,24 @@ async def chat_completion_concurrent_rate_limit(request: Request) -> Tuple[int, 
     return limit, key
 
 
+async def client_builder(clientType, model_name: str):
+    endpoint = await state.get_model(model_name)
+    if endpoint is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid model name {model_name}, check /v1/models for options",
+        )
+
+    if not endpoint.metadata.tool_support and req.tools:
+        raise HTTPException(
+            status_code=400,
+            detail="Model does not support tool usage, remove tools from request",
+        )
+    model_url = endpoint.url + "/v1/"
+    
+    logger.info(f"Chat client built for {model_url}")
+    return  clientType(base_url=model_url, api_key="<not-needed>")
+
 @router.post("/v1/chat/completions", tags=["Chat"], response_model=None)
 async def chat_completion(
     req: ChatRequest = Body(
@@ -202,7 +220,7 @@ async def chat_completion(
     model_url = endpoint.url + "/v1/"
 
     logger.info(
-        f"Chat completion request for model {model_name} from user {user.userid} on url: {model_url}"
+        f"Chat completion request for model {req.model} from user {user.userid}"
     )
 
     logger.info(f"EXTRA INFO: {req}")
@@ -388,7 +406,7 @@ async def chat_completion(
             )
 
     if req.stream:
-        client = AsyncOpenAI(base_url=model_url, api_key="<not-needed>")
+        client = await client_builder(AsyncOpenAI, req.model)
 
         # Forwarding Streamed Responses
         async def chat_completion_stream_generator() -> AsyncGenerator[str, None]:
@@ -436,7 +454,7 @@ async def chat_completion(
             chat_completion_stream_generator(),
             media_type="text/event-stream",  # Ensure client interprets as Server-Sent Events
         )
-    client = OpenAI(base_url=model_url, api_key="<not-needed>")
+    client = await client_builder(OpenAI, req.model)
     response = client.chat.completions.create(
         model=req.model,
         messages=req.messages,  # type: ignore
@@ -465,11 +483,23 @@ async def chat_completion(
             ]
             max_retries = 3
             attempt = 0
+            tools_model = None
+            try:
+                for _model in [endpoint.metadata.dict() for endpoint in (await state.models).values()]:
+                    if _model.get("role", "default") == "worker":
+                        tools_model = _model["id"]
+                        break
+                assert tools_model is not None, "failed to discover tools model"
+            except Exception:
+                logger.error("failed to find worker model name")
+                raise
+            _client = await client_builder(OpenAI, tools_model)
             while attempt < max_retries:
                 try:
-                    remux_res = client.chat.completions.create(
-                        model=model_name,
+                    remux_res = _client.chat.completions.create(
+                        model=tools_model,
                         messages=messages,
+                        temperature=0.3,
                         response_format={"type": "json_object"},
                     )
                     json_response = remux_res.choices[0].message.content

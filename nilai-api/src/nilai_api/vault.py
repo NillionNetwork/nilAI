@@ -146,14 +146,14 @@ class SecretVaultHelper:
 
     def post(self, data_to_store: list) -> list:
         """Create/upload records in the specified node and schema."""
-        logger.info(f"fn:data_upload {self.schema_uuid} | {data_to_store}")
+        logger.info(f"fn:data_upload {self.schema_uuid} | {type(data_to_store)} | {data_to_store}")
         try:
 
             builder = self._validator_builder()
             validator = builder(self.schema_definition)
 
             logger.info(f"fn:data_upload <analysis> | got {len(data_to_store)} records")
-            for entry in data_to_store:
+            for entry in [data_to_store] if isinstance(data_to_store, dict) else data_to_store:
                 self._mutate_secret_attributes(entry)
 
             record_uuids = [x["_id"] for x in data_to_store]
