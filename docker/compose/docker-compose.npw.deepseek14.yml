@@ -1,0 +1,54 @@
+services:
+  deepseek_14b_gpu:
+    build:
+      context: .
+      dockerfile: docker/vllm.Dockerfile
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities:
+                - gpu
+              driver: nvidia
+              device_ids:
+                - "1"
+    ipc: host
+    depends_on:
+      etcd:
+        condition: service_healthy
+    command:
+      - --model
+      - deepseek-ai/DeepSeek-R1-Distill-Qwen-14B
+      - --max-model-len
+      - "45000"
+      - --device
+      - cuda
+      - --gpu-memory-utilization
+      - "0.95"
+    env_file:
+      - .env
+    environment:
+      SVC_HOST: "deepseek_14b_gpu"
+      SVC_PORT: "8000"
+      ETCD_HOST: "etcd"
+      ETCD_PORT: "2379"
+      TOOL_SUPPORT: true
+      MODEL_ROLE: "reasoning"
+    networks:
+      - backend_net
+    volumes:
+      - type: volume
+        source: hugging_face_models
+        target: /root/.cache/huggingface
+        volume: {}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"] 
+      interval: 30s
+      retries: 3
+      start_period: 60s
+      timeout: 10s
+volumes:
+  hugging_face_models:
+
+networks:
+  backend_net:
