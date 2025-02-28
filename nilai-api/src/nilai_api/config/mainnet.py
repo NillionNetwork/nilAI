@@ -8,7 +8,6 @@ MODEL_CONCURRENT_RATE_LIMIT = {
     "meta-llama/Llama-3.2-3B-Instruct": 30,
     "meta-llama/Llama-3.1-8B-Instruct": 15,
     "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B": 5,
-    "meta-llama/Llama-3.2-1B-Instruct": 10,
     "watt-ai/watt-tool-8B": 10,
 }
 

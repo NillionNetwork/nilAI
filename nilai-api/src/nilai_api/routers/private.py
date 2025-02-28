@@ -5,7 +5,6 @@ import asyncio
 from base64 import b64encode
 from typing import AsyncGenerator, Union, List, Tuple
 import numpy as np
-import uuid
 import json
 from jsonschema.exceptions import ValidationError
 
@@ -128,7 +127,7 @@ async def chat_completion_concurrent_rate_limit(request: Request) -> Tuple[int, 
     return limit, key
 
 
-async def client_builder(clientType, model_name: str):
+async def client_builder(clientType, model_name: str, req: ChatRequest):
     endpoint = await state.get_model(model_name)
     if endpoint is None:
         raise HTTPException(
@@ -142,9 +141,10 @@ async def client_builder(clientType, model_name: str):
             detail="Model does not support tool usage, remove tools from request",
         )
     model_url = endpoint.url + "/v1/"
-    
+
     logger.info(f"Chat client built for {model_url}")
-    return  clientType(base_url=model_url, api_key="<not-needed>")
+    return clientType(base_url=model_url, api_key="<not-needed>")
+
 
 @router.post("/v1/chat/completions", tags=["Chat"], response_model=None)
 async def chat_completion(
@@ -204,12 +204,11 @@ async def chat_completion(
     response = await chat_completion(request, user)
     """
 
-    model_name = req.model
-    endpoint = await state.get_model(model_name)
+    endpoint = await state.get_model(req.model)
     if endpoint is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid model name {model_name}, check /v1/models for options",
+            detail=f"Invalid model name {req.model}, check /v1/models for options",
         )
 
     if not endpoint.metadata.tool_support and req.tools:
@@ -217,7 +216,6 @@ async def chat_completion(
             status_code=400,
             detail="Model does not support tool usage, remove tools from request",
         )
-    model_url = endpoint.url + "/v1/"
 
     logger.info(
         f"Chat completion request for model {req.model} from user {user.userid}"
@@ -245,11 +243,9 @@ async def chat_completion(
                 secret_key=req.secret_vault.get("secret_key"),
                 schema_uuid=schema_uuid,
             )
-            
+
             records = vault.data_reveal(req.secret_vault.get("filter"))
-            formatted_results = "\n".join(
-                f"- {str(result)}" for result in records
-            )
+            formatted_results = "\n".join(f"- {str(result)}" for result in records)
             relevant_context = f"\n\nRelevant Context:\n{formatted_results}"
             logger.info(f"SECRET VAULT INJECTION: {relevant_context}")
             for message in req.messages:
@@ -271,7 +267,6 @@ async def chat_completion(
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
             )
-        
 
     if req.nilrag:
         """
@@ -406,7 +401,7 @@ async def chat_completion(
             )
 
     if req.stream:
-        client = await client_builder(AsyncOpenAI, req.model)
+        client = await client_builder(AsyncOpenAI, req.model, req)
 
         # Forwarding Streamed Responses
         async def chat_completion_stream_generator() -> AsyncGenerator[str, None]:
@@ -454,7 +449,7 @@ async def chat_completion(
             chat_completion_stream_generator(),
             media_type="text/event-stream",  # Ensure client interprets as Server-Sent Events
         )
-    client = await client_builder(OpenAI, req.model)
+    client = await client_builder(OpenAI, req.model, req)
     response = client.chat.completions.create(
         model=req.model,
         messages=req.messages,  # type: ignore
@@ -475,17 +470,23 @@ async def chat_completion(
             )
             inference_result = response.choices[0].message.content
             my_schema = vault.schema_definition
-            if '$schema' in my_schema:
+            if "$schema" in my_schema:
                 del my_schema["$schema"]
             messages = [
-                {"role": "system", "content": f"Output only minimal JSON according to this jsonschema: {json.dumps(vault.schema_definition)}"},
-                {"role": "user", "content": inference_result }
+                {
+                    "role": "system",
+                    "content": f"Output only minimal JSON according to this jsonschema: {json.dumps(vault.schema_definition)}",
+                },
+                {"role": "user", "content": inference_result},
             ]
             max_retries = 3
             attempt = 0
             tools_model = None
             try:
-                for _model in [endpoint.metadata.dict() for endpoint in (await state.models).values()]:
+                for _model in [
+                    endpoint.metadata.dict()
+                    for endpoint in (await state.models).values()
+                ]:
                     if _model.get("role", "default") == "worker":
                         tools_model = _model["id"]
                         break
@@ -493,7 +494,7 @@ async def chat_completion(
             except Exception:
                 logger.error("failed to find worker model name")
                 raise
-            _client = await client_builder(OpenAI, tools_model)
+            _client = await client_builder(OpenAI, tools_model, req)
             while attempt < max_retries:
                 try:
                     remux_res = _client.chat.completions.create(
@@ -523,13 +524,20 @@ async def chat_completion(
                 except (json.JSONDecodeError, ValidationError) as e:
                     attempt += 1
                     if attempt == max_retries:
-                        raise Exception(f"Failed to get valid response after {max_retries} attempts. Last error: {str(e)}")
-                    
+                        raise Exception(
+                            f"Failed to get valid response after {max_retries} attempts. Last error: {str(e)}"
+                        )
+
                     # Add the failed attempt and error to the conversation
-                    messages.extend([
-                        {"role": "assistant", "content": json_response},
-                        {"role": "user", "content": f"{str(e)}. Try again, ensuring the response exactly matches the schema. Format dates like: 2025-02-24T15:30:00Z"}
-                    ])
+                    messages.extend(
+                        [
+                            {"role": "assistant", "content": json_response},
+                            {
+                                "role": "user",
+                                "content": f"{str(e)}. Try again, ensuring the response exactly matches the schema. Format dates like: 2025-02-24T15:30:00Z",
+                            },
+                        ]
+                    )
                     print(f"Attempt {attempt} failed: {str(e)}. Retrying...")
         except Exception as e:
             logger.error("An error occurred within secret vault: %s", str(e))
@@ -539,7 +547,11 @@ async def chat_completion(
 
     model_response = SignedChatCompletion(
         **response.model_dump(),
-        **({"secret_vault": vault_res} if (req.secret_vault and req.secret_vault.get("save_to")) else {}),
+        **(
+            {"secret_vault": vault_res}
+            if (req.secret_vault and req.secret_vault.get("save_to"))
+            else {}
+        ),
         signature="",
     )
     if model_response.usage is None:

@@ -1,4 +1,3 @@
-from pdb import set_trace as bp
 from collections import defaultdict
 from ecdsa import SigningKey, SECP256k1
 import jwt
@@ -13,6 +12,7 @@ import uuid
 import time
 
 logger = logging.getLogger(__name__)
+
 
 class SecretVaultHelper:
     def __init__(self, org_did: str, secret_key: str, schema_uuid: str):
@@ -50,12 +50,14 @@ class SecretVaultHelper:
         self.schema_list = self.fetch_schemas()
         self.schema_definition = self.find_schema(schema_uuid)
         self.schema_uuid = schema_uuid
-        logger.info(f"fn:data_upload init complete: {len(self.nodes)} nodes | schema {schema_uuid}")
+        logger.info(
+            f"fn:data_upload init complete: {len(self.nodes)} nodes | schema {schema_uuid}"
+        )
 
     def fetch_schemas(self) -> list:
         """Get all my schemas from the first server."""
         headers = {
-            "Authorization": f'Bearer {self.nodes[0]["bearer"]}',
+            "Authorization": f"Bearer {self.nodes[0]['bearer']}",
             "Content-Type": "application/json",
         }
 
@@ -99,7 +101,6 @@ class SecretVaultHelper:
         """Build a validator to validate the candidate document against loaded schema."""
         return validators.extend(Draft7Validator)
 
-
     def data_reveal(self, filter: dict = {}) -> list[dict]:
         """Get filtered data from schema on all nodes then reconstruct secret.
 
@@ -116,23 +117,20 @@ class SecretVaultHelper:
             shares = defaultdict(list)
             for node in self.nodes:
                 headers = {
-                    "Authorization": f'Bearer {node["bearer"]}',
+                    "Authorization": f"Bearer {node['bearer']}",
                     "Content-Type": "application/json",
                 }
 
-                body = {
-                    "schema": self.schema_uuid,
-                    "filter": filter
-                }
+                body = {"schema": self.schema_uuid, "filter": filter}
 
                 response = requests.post(
                     f"{node['url']}/api/v1/data/read",
                     headers=headers,
                     json=body,
                 )
-                assert (
-                    response.status_code == 200
-                ), "upload failed: " + response.content.decode("utf8")
+                assert response.status_code == 200, (
+                    "upload failed: " + response.content.decode("utf8")
+                )
                 data = response.json().get("data")
                 for d in data:
                     shares[d["_id"]].append(d)
@@ -146,14 +144,17 @@ class SecretVaultHelper:
 
     def post(self, data_to_store: list) -> list:
         """Create/upload records in the specified node and schema."""
-        logger.info(f"fn:data_upload {self.schema_uuid} | {type(data_to_store)} | {data_to_store}")
+        logger.info(
+            f"fn:data_upload {self.schema_uuid} | {type(data_to_store)} | {data_to_store}"
+        )
         try:
-
             builder = self._validator_builder()
             validator = builder(self.schema_definition)
 
             logger.info(f"fn:data_upload <analysis> | got {len(data_to_store)} records")
-            for entry in [data_to_store] if isinstance(data_to_store, dict) else data_to_store:
+            for entry in (
+                [data_to_store] if isinstance(data_to_store, dict) else data_to_store
+            ):
                 self._mutate_secret_attributes(entry)
 
             record_uuids = [x["_id"] for x in data_to_store]
@@ -161,12 +162,11 @@ class SecretVaultHelper:
             logger.info(f"fn:data_upload <mutated> {payloads}")
 
             for idx, shard in enumerate(payloads):
-
                 validator.validate(shard)
 
                 node = self.nodes[idx]
                 headers = {
-                    "Authorization": f'Bearer {node["bearer"]}',
+                    "Authorization": f"Bearer {node['bearer']}",
                     "Content-Type": "application/json",
                 }
 
@@ -186,7 +186,7 @@ class SecretVaultHelper:
             logger.info(f"fn:data_upload COMPLETED: {record_uuids}")
             return record_uuids
         except Exception as e:
-            msg = ''.join(traceback.format_tb(e.__traceback__, limit=3))
+            msg = "".join(traceback.format_tb(e.__traceback__, limit=3))
             logger.info(f"Error creating records in node: {msg}")
             raise ValidationError(f"{e!r}")
 
