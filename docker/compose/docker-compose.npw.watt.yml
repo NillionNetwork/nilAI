@@ -10,18 +10,19 @@ services:
             - capabilities:
                 - gpu
               driver: nvidia
-              device_ids:
-                - "0"
     ipc: host
+    depends_on:
+      etcd:
+        condition: service_healthy
     command:
       - --model
       - watt-ai/watt-tool-8B
       - --max-model-len
-      - "65536"
+      - "10000"
       - --device
       - cuda
       - --gpu-memory-utilization
-      - "0.95"
+      - "0.45"
       - --enable-auto-tool-choice
       - --tool-call-parser
       - llama3_json
@@ -44,10 +45,16 @@ services:
         target: /root/.cache/huggingface
         volume: {}
       - type: bind
-        source: /home/niko/tool_chat_template_llama3.1_json.jinja
+        source: $PWD/docker/compose/tool_chat_template_llama3.1_json.jinja
         target: /tmp/tool_chat_template.jinja
         bind:
           create_host_path: true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"] 
+      interval: 30s
+      retries: 3
+      start_period: 60s
+      timeout: 10s
 volumes:
   hugging_face_models:
 

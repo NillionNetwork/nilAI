@@ -10,21 +10,21 @@ services:
             - capabilities:
                 - gpu
               driver: nvidia
-              device_ids:
-                - "1"
     ipc: host
     depends_on:
       etcd:
+        condition: service_healthy
+      watt_tool_gpu:
         condition: service_healthy
     command:
       - --model
       - deepseek-ai/DeepSeek-R1-Distill-Qwen-14B
       - --max-model-len
-      - "45000"
+      - "10000"
       - --device
       - cuda
       - --gpu-memory-utilization
-      - "0.95"
+      - "0.45"
     env_file:
       - .env
     environment:
