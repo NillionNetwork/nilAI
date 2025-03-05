@@ -204,19 +204,6 @@ async def chat_completion(
     response = await chat_completion(request, user)
     """
 
-    endpoint = await state.get_model(req.model)
-    if endpoint is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid model name {req.model}, check /v1/models for options",
-        )
-
-    if not endpoint.metadata.tool_support and req.tools:
-        raise HTTPException(
-            status_code=400,
-            detail="Model does not support tool usage, remove tools from request",
-        )
-
     logger.info(
         f"Chat completion request for model {req.model} from user {user.userid}"
     )
