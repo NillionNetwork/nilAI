@@ -1,5 +1,5 @@
 services:
-  llama_8b_gpu:
+  dolphin_8b_gpu:
     build:
       context: .
       dockerfile: docker/vllm.Dockerfile
@@ -21,7 +21,7 @@ services:
       etcd:
         condition: service_healthy
     command: >
-      --model meta-llama/Llama-3.1-8B-Instruct
+      --model cognitivecomputations/Dolphin3.0-Llama3.1-8B
       --gpu-memory-utilization 0.5
       --max-model-len 10000
       --tensor-parallel-size 1
@@ -29,7 +29,7 @@ services:
       --tool-call-parser llama3_json
       --uvicorn-log-level WARNING
     environment:
-      - SVC_HOST=llama_8b_gpu
+      - SVC_HOST=dolphin_8b_gpu
       - SVC_PORT=8000
       - ETCD_HOST=etcd
       - ETCD_PORT=2379

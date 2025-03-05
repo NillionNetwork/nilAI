@@ -1188,7 +1188,6 @@ dependencies = [
     { name = "nilai-api" },
     { name = "nilai-common" },
     { name = "nilai-models" },
-    { name = "pre-commit" },
     { name = "verifier" },
 ]
 
@@ -1196,6 +1195,7 @@ dependencies = [
 dev = [
     { name = "black" },
     { name = "isort" },
+    { name = "pre-commit" },
     { name = "pyright" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -1210,7 +1210,6 @@ requires-dist = [
     { name = "nilai-api", editable = "nilai-api" },
     { name = "nilai-common", editable = "packages/nilai-common" },
     { name = "nilai-models", editable = "nilai-models" },
-    { name = "pre-commit", specifier = ">=4.1.0" },
     { name = "verifier", editable = "packages/verifier" },
 ]
 
@@ -1218,6 +1217,7 @@ requires-dist = [
 dev = [
     { name = "black", specifier = ">=24.10.0" },
     { name = "isort", specifier = ">=5.13.2" },
+    { name = "pre-commit", specifier = ">=4.1.0" },
     { name = "pyright", specifier = ">=1.1" },
     { name = "pytest", specifier = ">=8.3.3" },
     { name = "pytest-asyncio", specifier = ">=0.25.0" },

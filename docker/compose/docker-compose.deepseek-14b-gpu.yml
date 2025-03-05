@@ -23,8 +23,9 @@ services:
     command: >
       --model deepseek-ai/DeepSeek-R1-Distill-Qwen-14B
       --gpu-memory-utilization 0.4
-      --max-model-len 10000 
+      --max-model-len 10000
       --tensor-parallel-size 1
+      --uvicorn-log-level WARNING
     environment:
       - SVC_HOST=deepseek_14b_gpu
       - SVC_PORT=8000
@@ -36,7 +37,7 @@ services:
     networks:
       - backend_net
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"] 
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       retries: 3
       start_period: 60s
