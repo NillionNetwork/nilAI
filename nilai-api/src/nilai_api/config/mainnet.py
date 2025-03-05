@@ -5,8 +5,9 @@ AUTH_STRATEGY = "api_key"
 # there can be 45 + 30 + 15 + 5 = 85 concurrent requests in the system
 MODEL_CONCURRENT_RATE_LIMIT = {
     "meta-llama/Llama-3.2-1B-Instruct": 45,
-    "meta-llama/Llama-3.2-3B-Instruct": 30,
-    "meta-llama/Llama-3.1-8B-Instruct": 15,
+    "meta-llama/Llama-3.2-3B-Instruct": 50,
+    "meta-llama/Llama-3.1-8B-Instruct": 30,
+    "cognitivecomputations/Dolphin3.0-Llama3.1-8B": 30,
     "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B": 5,
 }
 

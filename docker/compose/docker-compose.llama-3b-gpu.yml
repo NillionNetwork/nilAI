@@ -20,14 +20,16 @@ services:
     depends_on:
       etcd:
         condition: service_healthy
+      deepseek_14b_gpu:
+        condition: service_healthy
     command: >
       --model meta-llama/Llama-3.2-3B-Instruct
-      --gpu-memory-utilization 0.3
-      --max-model-len 10000
+      --gpu-memory-utilization 0.085
+      --max-model-len 4300
       --tensor-parallel-size 1
       --enable-auto-tool-choice
       --tool-call-parser llama3_json
-      --uvicorn-log-level WARNING
+      --uvicorn-log-level warning
     environment:
       - SVC_HOST=llama_3b_gpu
       - SVC_PORT=8000

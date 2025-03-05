@@ -20,12 +20,14 @@ services:
     depends_on:
       etcd:
         condition: service_healthy
+      llama_8b_gpu:
+        condition: service_healthy
     command: >
       --model deepseek-ai/DeepSeek-R1-Distill-Qwen-14B
-      --gpu-memory-utilization 0.4
+      --gpu-memory-utilization 0.39
       --max-model-len 10000
       --tensor-parallel-size 1
-      --uvicorn-log-level WARNING
+      --uvicorn-log-level warning
     environment:
       - SVC_HOST=deepseek_14b_gpu
       - SVC_PORT=8000
