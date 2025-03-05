@@ -1,68 +1,134 @@
 # nilAI
 
-Copy the `.env.sample` to `.env` and replace the value of the `HUGGINGFACE_API_TOKEN` with the appropriate value. The `HUGGINGFACE_API_TOKEN` is used to determine whether a user has permission to access certain models. For example, for Llama models, you usually need to have requested access to the model on its [Hugging Face page](https://huggingface.co/meta-llama/Llama-3.2-1B).
+## Overview
+nilAI is a platform designed to run on Confidential VMs with Trusted Execution Environments (TEEs). It ensures secure deployment and management of multiple AI models across different environments, providing a unified API interface for accessing various AI models with robust user management and model lifecycle handling.
 
-There are two ways to deploy **nilAI**. The recommended way is to use docker-compose as it is the easiest and most straightforward.
+## Prerequisites
 
-## Docker
+- Docker
+- Docker Compose
+- Hugging Face API Token (for accessing certain models)
 
-For development environments with
+## Configuration
+
+1. **Environment Setup**
+   - Copy the `.env.sample` file to `.env`
+   - Replace `HUGGINGFACE_API_TOKEN` with your Hugging Face API token
+   - Obtain token by requesting access on the specific model's [Hugging Face page](https://huggingface.co/meta-llama/Llama-3.2-1B)
+
+## Deployment Options
+
+### 1. Docker Compose Deployment (Recommended)
+
+#### Development Environment
 ```shell
 docker compose -f docker-compose.yml \
--f docker-compose.dev.yml \
--f docker/compose/docker-compose.llama-3b-gpu.yml \
--f docker/compose/docker-compose.llama-8b-gpu.yml \
-up --build
+  -f docker-compose.dev.yml \
+  -f docker/compose/docker-compose.llama-3b-gpu.yml \
+  -f docker/compose/docker-compose.llama-8b-gpu.yml \
+  -f docker/compose/docker-compose.dolphin-8b-gpu.yml \
+  -f docker/compose/docker-compose.deepseek-14b-gpu.yml \
+  up --build
 ```
 
-For production environments:
+#### Production Environment
 ```shell
 docker compose -f docker-compose.yml \
--f docker-compose.prod.yml \
--f docker/compose/docker-compose.llama-3b-gpu.yml \
--f docker/compose/docker-compose.llama-8b-gpu.yml \
-up --build
+  -f docker-compose.prod.yml \
+  -f docker/compose/docker-compose.llama-3b-gpu.yml \
+  -f docker/compose/docker-compose.llama-8b-gpu.yml \
+  -f docker/compose/docker-compose.dolphin-8b-gpu.yml \
+  -f docker/compose/docker-compose.deepseek-14b-gpu.yml \
+  up -d --build
 ```
 
-## Manual Deployment
+**Note**: Remove lines for models you do not wish to deploy.
 
-**nilAI** consists of the following components:
- - **API Frontend**: Receives user requests and handles them appropriately. For model requests, it forwards them to the appropriate backend model.
- - **Two Databases**:
-    - **SQLite**: The main registry of users on the platform. This will be changed as we move to more production-ready environments. It tracks which users are allowed on the platform, their API keys, and their usage.
-    - **etcd3**: A distributed key-value database used in Kubernetes. It creates key-value pairs with a lifetime. When a key-value pair's lifetime expires, it is automatically removed. Models register their address information on the etcd3 database with a lifetime and keep this lifetime alive. If a model ever disconnects due to an error, the database removes the entry, and the API Frontend no longer advertises that model.
- - **Models**: There may be zero or more model deployments. Model deployments contain a basic API that responds in the same format to the `/v1/chat/completions` endpoint. The `Model` class defines how models connect to the database and manage their lifecycle.
+### 2. Manual Deployment
 
-To deploy the components, first create the `etcd3` instance. The easiest way is to expose it with Docker:
+#### Components
 
-```shell
-# This command runs in the background. If it fails, you may already be running etcd-server on ports 2379 and 2380.
-docker run -d --name etcd-server -p 2379:2379 -p 2380:2380 -e ALLOW_NONE_AUTHENTICATION=yes bitnami/etcd:latest
-```
+- **API Frontend**: Handles user requests and routes model interactions
+- **Databases**:
+  - **SQLite**: User registry and access management
+  - **etcd3**: Distributed key-value store for model lifecycle management
 
-Run the **nilAI** API server:
-```shell
-# Shell 1
-## For development environment (auto reloads on file changes):
-uv run fastapi dev nilai-api/src/nilai_api/__main__.py --port 8080
-## For production environment:
-uv run fastapi run nilai-api/src/nilai_api/__main__.py --port 8080
-```
+#### Setup Steps
 
-Run the **nilAI** Llama 3.2 1B model. For different models, adapt the command below:
-```shell
-# Shell 2
-## For development environment (auto reloads on file changes):
-uv run fastapi dev nilai-models/src/nilai_models/models/llama_1b_cpu/__init__.py
-## For production environment:
-uv run fastapi run nilai-models/src/nilai_models/models/llama_1b_cpu/__init__.py
-```
+1. **Start etcd3 Instance**
+   ```shell
+   docker run -d --name etcd-server \
+     -p 2379:2379 -p 2380:2380 \
+     -e ALLOW_NONE_AUTHENTICATION=yes \
+     bitnami/etcd:latest
 
-## Developer Instructions
+   docker run -d --name redis \
+     -p 6379:6379 \
+     redis:latest
 
-If you are developping, you can use `pre-commit` configurations to ensure make the development smoother and not having to wait for CI checks. These are executed before you commit, and perform automatic changes to format your code.
+   docker run -d --name postgres \
+     -e POSTGRES_USER=user \
+     -e POSTGRES_PASSWORD=<ASECUREPASSWORD> \
+     -e POSTGRES_DB=yourdb \
+     -p 5432:5432 \
+     postgres:latest
+   ```
 
-You can install those with:
+2. **Run API Server**
+   ```shell
+   # Development Environment
+   uv run fastapi dev nilai-api/src/nilai_api/__main__.py --port 8080
+
+   # Production Environment
+   uv run fastapi run nilai-api/src/nilai_api/__main__.py --port 8080
+   ```
+
+3. **Run Model Instances**
+   ```shell
+   # Example: Llama 3.2 1B Model
+   # Development Environment
+   uv run fastapi dev nilai-models/src/nilai_models/models/llama_1b_cpu/__init__.py
+
+   # Production Environment
+   uv run fastapi run nilai-models/src/nilai_models/models/llama_1b_cpu/__init__.py
+   ```
+
+## Developer Workflow
+
+### Code Quality and Formatting
+
+Install pre-commit hooks to automatically format code and run checks:
+
 ```shell
 uv run pre-commit install
 ```
+
+## Model Lifecycle Management
+
+- Models register themselves in the etcd3 database
+- Registration includes address information with an auto-expiring lifetime
+- If a model disconnects, it is automatically removed from the available models
+
+## Security
+
+- Hugging Face API token controls model access
+- SQLite database manages user permissions
+- Distributed architecture allows for flexible security configurations
+
+## Troubleshooting
+
+- Ensure Hugging Face API token is valid
+- Check etcd3 and Docker container logs for connection issues
+- Verify network ports are not blocked or in use
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Install pre-commit hooks
+4. Make your changes
+5. Submit a pull request
+
+## License
+
+[Add your project's license information here]
