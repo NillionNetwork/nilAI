@@ -7,6 +7,7 @@ MODEL_CONCURRENT_RATE_LIMIT = {
     "meta-llama/Llama-3.2-1B-Instruct": 10,
     "meta-llama/Llama-3.2-3B-Instruct": 10,
     "meta-llama/Llama-3.1-8B-Instruct": 5,
+    "cognitivecomputations/Dolphin3.0-Llama3.1-8B": 5,
     "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B": 5,
 }
 
