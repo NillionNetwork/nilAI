@@ -10,6 +10,7 @@ SETTINGS = {
     "etcd_host": os.getenv("ETCD_HOST", "localhost"),
     "etcd_port": os.getenv("ETCD_PORT", 2379),
     "tool_support": os.getenv("TOOL_SUPPORT", False),
+    "role": os.getenv("MODEL_ROLE", "default"),
 }
 # if environment == "docker":
 #     config = "docker_settings.py"

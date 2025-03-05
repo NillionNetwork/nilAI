@@ -22,7 +22,7 @@ __all__ = [
 
 
 class Message(ChatCompletionMessage):
-    role: Literal["system", "user", "assistant"]
+    role: Literal["system", "user", "assistant", "tool"]
 
 
 class Choice(OpenaAIChoice):
@@ -38,10 +38,12 @@ class ChatRequest(BaseModel):
     stream: Optional[bool] = False
     tools: Optional[Iterable[ChatCompletionToolParam]] = None
     nilrag: Optional[dict] = {}
+    secret_vault: Optional[dict] = {}
 
 
 class SignedChatCompletion(ChatCompletion):
     signature: str
+    secret_vault: List[str] = []
 
 
 class AttestationResponse(BaseModel):
@@ -58,6 +60,7 @@ class ModelMetadata(BaseModel):
     author: str
     license: str
     source: str
+    role: Optional[str] = "unknown"
     supported_features: List[str]
     tool_support: bool
 
