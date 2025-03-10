@@ -22,7 +22,7 @@ __all__ = [
 
 
 class Message(ChatCompletionMessage):
-    role: Literal["system", "user", "assistant"]
+    role: Literal["system", "user", "assistant", "tool"]
 
 
 class Choice(OpenaAIChoice):
@@ -31,7 +31,7 @@ class Choice(OpenaAIChoice):
 
 class ChatRequest(BaseModel):
     model: str
-    messages: List[Message]
+    messages: List[Message] = Field(..., min_items=1)
     temperature: Optional[float] = 0.2
     top_p: Optional[float] = 0.95
     max_tokens: Optional[int] = 2048
