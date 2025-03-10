@@ -104,10 +104,7 @@ services:
 
   api:
     container_name: nilai-api
-    build:
-      context: .
-      dockerfile: docker/api.Dockerfile
-      target: nilai
+    image: nillion/nilai-api:latest
     depends_on:
       etcd:
         condition: service_healthy
