@@ -2,10 +2,7 @@ import pytest
 import json
 from openai import OpenAI
 from openai.types.chat import ChatCompletion
-
-# Configuration and constants
-BASE_URL = "https://nilai-e176.nillion.network/v1"
-API_KEY = "7922132e-bc3a-4140-a072-320ef03843f6"
+from .config import BASE_URL, AUTH_TOKEN as API_KEY
 
 
 class TestOpenAIClient:

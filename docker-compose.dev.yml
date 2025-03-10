@@ -1,6 +1,9 @@
 services:
   api:
     privileged: true
+    ports:
+      - "8080:8080"
+      - "8443:8443"
     volumes:
       - /dev/sev-guest:/dev/sev-guest # for AMD SEV
     networks:
