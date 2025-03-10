@@ -1,7 +1,7 @@
 import pytest
 from base64 import urlsafe_b64encode
 import json
-from tests.nilai_api.auth import (
+from ...nilai_api.auth import (
     keplr_jwt_valid_forever,
     keplr_jwt_expired,
     metamask_jwt_valid_forever,

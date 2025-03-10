@@ -22,6 +22,12 @@ nilAI is a platform designed to run on Confidential VMs with Trusted Execution E
 
 #### Development Environment
 ```shell
+# Build vLLM docker container
+docker build -t nillion/nilai-vllm:latest -f docker/vllm.Dockerfile .
+# Build nilai_api container
+docker build -t nillion/nilai-api:latest -f docker/api.Dockerfile --target nilai .
+```
+```shell
 docker compose -f docker-compose.yml \
   -f docker-compose.dev.yml \
   -f docker/compose/docker-compose.llama-3b-gpu.yml \
@@ -82,7 +88,7 @@ up -d
 2. **Run API Server**
    ```shell
    # Development Environment
-   uv run fastapi dev nilai-api/src/nilai_api/__main__.py --port 8080
+    fastapi dev nilai-api/src/nilai_api/__main__.py --port 8080
 
    # Production Environment
    uv run fastapi run nilai-api/src/nilai_api/__main__.py --port 8080
