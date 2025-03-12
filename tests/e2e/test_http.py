@@ -1,8 +1,26 @@
-import httpx
-import pytest
 import json
 
 from .config import BASE_URL, AUTH_TOKEN
+import httpx
+import pytest
+
+
+models = {
+    "mainnet": [
+        "meta-llama/Llama-3.2-3B-Instruct",
+        "meta-llama/Llama-3.1-8B-Instruct",
+        "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B",
+    ],
+    "testnet": [
+        "meta-llama/Llama-3.2-1B-Instruct",
+        "meta-llama/Llama-3.1-8B-Instruct",
+    ],
+    "test": [
+        "meta-llama/Llama-3.2-1B-Instruct",
+    ],
+}
+
+test_models = models["test"]
 
 
 class TestHTTPX:
@@ -22,7 +40,8 @@ class TestHTTPX:
 
     def test_health_endpoint(self, client):
         """Test the health endpoint"""
-        response = client.get("/health")
+        response = client.get("health")
+        print(response.json())
         assert response.status_code == 200, "Health endpoint should return 200 OK"
         assert "status" in response.json(), "Health response should contain status"
 
@@ -33,11 +52,7 @@ class TestHTTPX:
         assert isinstance(response.json(), list), "Models should be returned as a list"
 
         # Check for specific models mentioned in the requests
-        expected_models = [
-            "meta-llama/Llama-3.2-3B-Instruct",
-            "meta-llama/Llama-3.1-8B-Instruct",
-            "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B",
-        ]
+        expected_models = test_models
         model_names = [model.get("id") for model in response.json()]
         for model in expected_models:
             assert model in model_names, f"Expected model {model} not found"
@@ -81,11 +96,7 @@ class TestHTTPX:
 
     @pytest.mark.parametrize(
         "model",
-        [
-            "meta-llama/Llama-3.2-3B-Instruct",
-            "meta-llama/Llama-3.1-8B-Instruct",
-            "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B",
-        ],
+        test_models,
     )
     def test_model_standard_request(self, client, model):
         """Test standard (non-streaming) request for different models"""
@@ -107,6 +118,7 @@ class TestHTTPX:
         )
 
         response_json = response.json()
+        print(response_json)
         assert "choices" in response_json, "Response should contain choices"
         assert len(response_json["choices"]) > 0, (
             "At least one choice should be present"
@@ -116,6 +128,24 @@ class TestHTTPX:
         content = response_json["choices"][0].get("message", {}).get("content", "")
         assert content, f"No content returned for {model}"
 
+        # Check finish reason
+        assert response_json["choices"][0].get("finish_reason") == "stop", (
+            f"Finish reason should be stop for {model}"
+        )
+
+        # Check that the response is not empty
+        assert content.strip(), f"Empty response returned for {model}"
+
+        # Check that the usage is not 0
+        assert response_json["usage"]["prompt_tokens"] > 0, (
+            f"Prompt tokens are 0 for {model}"
+        )
+        assert response_json["usage"]["completion_tokens"] > 0, (
+            f"Completion tokens are 0 for {model}"
+        )
+        assert response_json["usage"]["total_tokens"] > 0, (
+            f"Total tokens are 0 for {model}"
+        )
         # Log response for debugging
         print(
             f"\nModel {model} standard response: {content[:100]}..."
@@ -125,11 +155,7 @@ class TestHTTPX:
 
     @pytest.mark.parametrize(
         "model",
-        [
-            "meta-llama/Llama-3.2-3B-Instruct",
-            "meta-llama/Llama-3.1-8B-Instruct",
-            "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B",
-        ],
+        test_models,
     )
     def test_model_streaming_request(self, client, model):
         """Test streaming request for different models"""
@@ -158,23 +184,34 @@ class TestHTTPX:
 
             # Read a few chunks to verify streaming works
             chunk_count = 0
+            content = ""
+            had_usage = False
             for chunk in response.iter_lines():
-                if chunk and chunk.strip():
+                if chunk and chunk.strip() and chunk.startswith("data:"):
                     chunk_count += 1
-                    if chunk_count <= 3:  # Just log first few chunks
-                        print(f"\nModel {model} stream chunk {chunk_count}: {chunk}")
-                if chunk_count >= 10:  # Limit how many chunks we process
-                    break
-
+                    chunk = chunk[6:]  # Remove the data: prefix
+                    print(
+                        f"\nModel {model} stream chunk {chunk_count}: [{type(chunk)}] {chunk}"
+                    )
+                    chunk_json = json.loads(chunk)
+                    # Check for content in the chunk
+                    if (
+                        chunk_json.get("choices")
+                        and chunk_json["choices"][0].get("delta")
+                        and chunk_json["choices"][0]["delta"].get("content")
+                    ):
+                        content += chunk_json["choices"][0]["delta"]["content"]
+                    # Check for usage data in the chunk at least once in the stream
+                    if chunk_json.get("usage"):
+                        print(f"Usage: {chunk_json.get('usage')}")
+                        had_usage = True
+            assert had_usage, f"No usage data received for {model} streaming request"
             assert chunk_count > 0, f"No chunks received for {model} streaming request"
             print(f"Received {chunk_count} chunks for {model} streaming request")
 
     @pytest.mark.parametrize(
         "model",
-        [
-            "meta-llama/Llama-3.2-3B-Instruct",
-            "meta-llama/Llama-3.1-8B-Instruct",
-        ],
+        test_models,
     )
     def test_model_tools_request(self, client, model):
         """Test tools request for different models"""
@@ -261,6 +298,71 @@ class TestHTTPX:
             # Re-raise if it's an assertion error
             raise e
 
+    @pytest.mark.parametrize("model", test_models)
+    def test_function_calling_with_streaming_httpx(self, client, model):
+        """Test function calling with streaming using httpx, verifying tool calls and usage data."""
+        payload = {
+            "model": model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "You are a helpful assistant that provides accurate and concise information.",
+                },
+                {
+                    "role": "user",
+                    "content": "What is the weather like in Paris today?",
+                },
+            ],
+            "tools": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "get_weather",
+                        "description": "Get current temperature for a given location.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "location": {
+                                    "type": "string",
+                                    "description": "City and country e.g. Paris, France",
+                                }
+                            },
+                            "required": ["location"],
+                            "additionalProperties": False,
+                        },
+                        "strict": True,
+                    },
+                }
+            ],
+            "temperature": 0.2,
+            "stream": True,
+        }
+
+        with client.stream("POST", "/chat/completions", json=payload) as response:
+            assert response.status_code == 200, (
+                f"Streaming request for {model} failed with status {response.status_code}"
+            )
+            had_tool_call = False
+            had_usage = False
+            for line in response.iter_lines():
+                if line and line.strip() and line.startswith("data:"):
+                    data_line = line[6:].strip()
+                    try:
+                        chunk_json = json.loads(data_line)
+                    except json.JSONDecodeError:
+                        continue
+                    choices = chunk_json.get("choices", [])
+                    if choices and isinstance(choices, list) and len(choices) > 0:
+                        delta = choices[0].get("delta", {})
+                        if "tool_calls" in delta and delta["tool_calls"]:
+                            had_tool_call = True
+                    if chunk_json.get("usage"):
+                        had_usage = True
+            assert had_tool_call, (
+                f"No tool calls received for {model} streaming request"
+            )
+            assert had_usage, f"No usage data received for {model} streaming request"
+
 
 class TestHTTPXAdditional:
     """Additional test cases for Yaak HTTP API"""
@@ -269,7 +371,7 @@ class TestHTTPXAdditional:
     def client(self):
         """Create an HTTPX client with default headers"""
         return httpx.Client(
-            base_url="https://nilai-e176.nillion.network/v1",
+            base_url=BASE_URL,
             headers={
                 "accept": "application/json",
                 "Content-Type": "application/json",
@@ -280,7 +382,7 @@ class TestHTTPXAdditional:
     def test_invalid_auth_token(self, client):
         """Test behavior with an invalid or expired authentication token"""
         invalid_client = httpx.Client(
-            base_url="https://nilai-e176.nillion.network/v1",
+            base_url=BASE_URL,
             headers={
                 "accept": "application/json",
                 "Content-Type": "application/json",
@@ -289,15 +391,16 @@ class TestHTTPXAdditional:
         )
 
         response = invalid_client.get("/attestation/report")
-        assert response.status_code in [401, 403], (
-            "Invalid token should result in unauthorized access"
-        )
+        assert response.status_code in [
+            401,
+            403,
+        ], "Invalid token should result in unauthorized access"
 
     def test_rate_limiting(self, client):
         """Test rate limiting by sending multiple rapid requests"""
         # Payload for repeated requests
         payload = {
-            "model": "meta-llama/Llama-3.1-8B-Instruct",
+            "model": test_models[0],
             "messages": [{"role": "user", "content": "Generate a short poem"}],
         }
 
@@ -323,7 +426,7 @@ class TestHTTPXAdditional:
         large_system_message = "Hello " * 10000  # 100KB of text
 
         payload = {
-            "model": "meta-llama/Llama-3.1-8B-Instruct",
+            "model": test_models[0],
             "messages": [
                 {"role": "system", "content": large_system_message},
                 {"role": "user", "content": "Respond briefly"},
@@ -332,11 +435,13 @@ class TestHTTPXAdditional:
         }
 
         response = client.post("/chat/completions", json=payload)
+        print(response)
 
         # Check for appropriate handling of large payload
-        assert response.status_code in [200, 413], (
-            "Large payload should be handled gracefully"
-        )
+        assert response.status_code in [
+            200,
+            413,
+        ], "Large payload should be handled gracefully"
 
         if response.status_code == 200:
             response_json = response.json()
@@ -356,14 +461,15 @@ class TestHTTPXAdditional:
         response = client.post("/chat/completions", json=payload)
 
         # Expect a 400 (Bad Request) or 404 (Not Found) for invalid models
-        assert response.status_code in [400, 404], (
-            f"Invalid model {invalid_model} should return an error"
-        )
+        assert response.status_code in [
+            400,
+            404,
+        ], f"Invalid model {invalid_model} should return an error"
 
     def test_timeout_handling(self, client):
         """Test request timeout behavior"""
         payload = {
-            "model": "meta-llama/Llama-3.1-8B-Instruct",
+            "model": test_models[0],
             "messages": [
                 {
                     "role": "user",
@@ -383,21 +489,22 @@ class TestHTTPXAdditional:
 
     def test_empty_messages_handling(self, client):
         """Test handling of empty messages list"""
-        payload = {"model": "meta-llama/Llama-3.1-8B-Instruct", "messages": []}
+        payload = {"model": test_models[0], "messages": []}
 
         response = client.post("/chat/completions", json=payload)
+        print(response)
 
         # Expect a 400 Bad Request for empty messages
         assert response.status_code == 400, "Empty messages should return a Bad Request"
 
         # Check error response structure
         response_json = response.json()
-        assert "error" in response_json, "Error response should contain an error key"
+        assert "detail" in response_json, "Error response should contain an invalid key"
 
     def test_unsupported_parameters(self, client):
         """Test handling of unsupported or unexpected parameters"""
         payload = {
-            "model": "meta-llama/Llama-3.1-8B-Instruct",
+            "model": test_models[0],
             "messages": [{"role": "user", "content": "Test unsupported parameters"}],
             "unsupported_param": "some_value",
             "another_weird_param": 42,
@@ -406,6 +513,7 @@ class TestHTTPXAdditional:
         response = client.post("/chat/completions", json=payload)
 
         # Expect either successful response ignoring extra params or a 400 Bad Request
-        assert response.status_code in [200, 400], (
-            "Unsupported parameters should be handled gracefully"
-        )
+        assert response.status_code in [
+            200,
+            400,
+        ], "Unsupported parameters should be handled gracefully"

@@ -27,6 +27,8 @@ docker build -t nillion/nilai-vllm:latest -f docker/vllm.Dockerfile .
 # Build nilai_api container
 docker build -t nillion/nilai-api:latest -f docker/api.Dockerfile --target nilai .
 ```
+Then, to deploy:
+
 ```shell
 docker compose -f docker-compose.yml \
   -f docker-compose.dev.yml \
@@ -52,8 +54,23 @@ docker compose -f docker-compose.yml \
 -f docker/compose/docker-compose.llama-8b-gpu.yml \
 up -d
 ```
-
 **Note**: Remove lines for models you do not wish to deploy.
+
+For testing environment:
+
+```shell
+# Build vLLM docker container
+docker build -t nillion/nilai-vllm:latest -f docker/vllm.Dockerfile .
+# Build nilai_api container
+docker build -t nillion/nilai-api:latest -f docker/api.Dockerfile --target nilai .
+```
+To deploy:
+```shell
+docker compose -f docker-compose.yml \
+-f docker-compose.dev.yml \
+-f docker/compose/docker-compose.llama-1b-gpu.yml \
+up -d
+```
 
 ### 2. Manual Deployment
 

@@ -1,9 +1,26 @@
-import pytest
 import json
+
+import pytest
 from openai import OpenAI
 from openai.types.chat import ChatCompletion
 from .config import BASE_URL, AUTH_TOKEN as API_KEY
 
+models = {
+    "mainnet": [
+        "meta-llama/Llama-3.2-3B-Instruct",
+        "meta-llama/Llama-3.1-8B-Instruct",
+        "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B",
+    ],
+    "testnet": [
+        "meta-llama/Llama-3.2-1B-Instruct",
+        "meta-llama/Llama-3.1-8B-Instruct",
+    ],
+    "test": [
+        "meta-llama/Llama-3.2-1B-Instruct",
+    ],
+}
+
+test_models = models["test"]
 
 class TestOpenAIClient:
     """Test suite for Nilai API using the OpenAI client"""
@@ -13,36 +30,9 @@ class TestOpenAIClient:
         """Create an OpenAI client configured to use the Nilai API"""
         return OpenAI(base_url=BASE_URL, api_key=API_KEY)
 
-    def test_models_list(self, client):
-        """Test listing available models"""
-        models = client.models
-
-        print(models)
-        # Verify we got a list of models
-        assert len(models.data) > 0, "Should return at least one model"
-
-        # Check for specific models
-        expected_models = [
-            "meta-llama/Llama-3.2-3B-Instruct",
-            "meta-llama/Llama-3.1-8B-Instruct",
-            "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B",
-        ]
-
-        model_ids = [model.id for model in models.data]
-        print(f"Available models: {model_ids}")
-
-        for expected_model in expected_models:
-            assert expected_model in model_ids, (
-                f"Expected model {expected_model} not found"
-            )
-
     @pytest.mark.parametrize(
         "model",
-        [
-            "meta-llama/Llama-3.2-3B-Instruct",
-            "meta-llama/Llama-3.1-8B-Instruct",
-            "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B",
-        ],
+        test_models,
     )
     def test_chat_completion(self, client, model):
         """Test basic chat completion with different models"""
@@ -78,6 +68,19 @@ class TestOpenAIClient:
                 else content
             )
 
+            assert response.usage, f"No usage data returned for {model}"
+            print(f"Model {model} usage: {response.usage}")
+
+            assert response.usage.prompt_tokens > 0, (
+                f"No prompt tokens returned for {model}"
+            )
+            assert response.usage.completion_tokens > 0, (
+                f"No completion tokens returned for {model}"
+            )
+            assert response.usage.total_tokens > 0, (
+                f"No total tokens returned for {model}"
+            )
+
             # Check for Paris in the response
             assert "paris" in content.lower() or "Paris" in content, (
                 "Response should mention Paris as the capital of France"
@@ -88,11 +91,7 @@ class TestOpenAIClient:
 
     @pytest.mark.parametrize(
         "model",
-        [
-            "meta-llama/Llama-3.2-3B-Instruct",
-            "meta-llama/Llama-3.1-8B-Instruct",
-            "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B",
-        ],
+        test_models,
     )
     def test_streaming_chat_completion(self, client, model):
         """Test streaming chat completion with different models"""
@@ -114,6 +113,7 @@ class TestOpenAIClient:
             # Process the stream
             chunk_count = 0
             full_content = ""
+            had_usage = False
 
             for chunk in stream:
                 chunk_count += 1
@@ -121,15 +121,15 @@ class TestOpenAIClient:
                     content_piece = chunk.choices[0].delta.content
                     full_content += content_piece
 
-                    if chunk_count <= 3:
-                        print(
-                            f"Model {model} stream chunk {chunk_count}: {content_piece}"
-                        )
+                    print(f"Model {model} stream chunk {chunk_count}: {chunk}")
+                    if chunk.usage:
+                        had_usage = True
+                        print(f"Model {model} usage: {chunk.usage}")
 
                 # Limit processing to avoid long tests
                 if chunk_count >= 20:
                     break
-
+            assert had_usage, f"No usage data received for {model} streaming request"
             assert chunk_count > 0, f"No chunks received for {model} streaming request"
             assert full_content, f"No content assembled from stream for {model}"
             print(f"Received {chunk_count} chunks for {model} streaming request")
@@ -146,7 +146,7 @@ class TestOpenAIClient:
 
     @pytest.mark.parametrize(
         "model",
-        ["meta-llama/Llama-3.2-3B-Instruct", "meta-llama/Llama-3.1-8B-Instruct"],
+        test_models,
     )
     def test_function_calling(self, client, model):
         """Test function calling with different models"""
@@ -220,12 +220,13 @@ class TestOpenAIClient:
                 # Test function response
                 function_response = "The weather in Paris is currently 22°C and sunny."
 
+                prompt = "You are Llama 1B, a detail-oriented AI tasked with verifying and analyzing the output of a recent tool call. Your first responsibility is to review, line by line, the produced output. Check that every section conforms to the expected format and contains all required information. Look for any discrepancies, missing data, or anomalies—be it in structure, content, or data types. Once you have completed your review, list any errors or inconsistencies found and suggest specific corrections if needed. Do not proceed with any further processing until you have fully validated and reported on the integrity of the tool calls output."
                 follow_up_response = client.chat.completions.create(
                     model=model,
                     messages=[
                         {
                             "role": "system",
-                            "content": "You are a helpful assistant that provides accurate and concise information.",
+                            "content": prompt,
                         },
                         {
                             "role": "user",
@@ -274,6 +275,70 @@ class TestOpenAIClient:
         except Exception as e:
             pytest.fail(f"Error testing function calling with {model}: {str(e)}")
 
+    @pytest.mark.parametrize(
+        "model",
+        test_models,
+    )
+    def test_function_calling_with_streaming(self, client, model):
+        """Test function calling with different models"""
+        try:
+            response = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a helpful assistant that provides accurate and concise information.",
+                    },
+                    {
+                        "role": "user",
+                        "content": "What is the weather like in Paris today?",
+                    },
+                ],
+                tools=[
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": "get_weather",
+                            "description": "Get current temperature for a given location.",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {
+                                    "location": {
+                                        "type": "string",
+                                        "description": "City and country e.g. Paris, France",
+                                    }
+                                },
+                                "required": ["location"],
+                                "additionalProperties": False,
+                            },
+                            "strict": True,
+                        },
+                    }
+                ],
+                temperature=0.2,
+                stream=True,
+            )
+
+            had_tool_call = False
+            had_usage = False
+            for chunk in response:
+                print(f"Model {model} stream chunk: {chunk}")
+                if chunk.choices and chunk.choices[0].delta.tool_calls:
+                    assert chunk.choices[0].delta.tool_calls, "No tool calls in chunk"
+                    had_tool_call = True
+
+                if chunk.usage:
+                    had_usage = True
+                    print(f"Model {model} usage: {chunk.usage}")
+
+            assert had_tool_call, (
+                f"No tool calls received for {model} streaming request"
+            )
+            assert had_usage, f"No usage data received for {model} streaming request"
+
+        except Exception as e:
+            pytest.fail(f"Error testing function calling with {model}: {str(e)}")
+
     def test_usage_endpoint(self, client):
         """Test retrieving usage statistics"""
         try:
@@ -281,8 +346,9 @@ class TestOpenAIClient:
             # The OpenAI client doesn't have a built-in method for this
             import requests
 
+            url = BASE_URL + "usage"
             response = requests.get(
-                f"{BASE_URL}/usage",
+                url,
                 headers={
                     "Authorization": f"Bearer {API_KEY}",
                     "Content-Type": "application/json",
@@ -315,8 +381,9 @@ class TestOpenAIClient:
             # This is a custom endpoint, so we need to use a raw request
             import requests
 
+            url = BASE_URL + "attestation/report"
             response = requests.get(
-                f"{BASE_URL}/attestation/report",
+                url,
                 headers={
                     "Authorization": f"Bearer {API_KEY}",
                     "Content-Type": "application/json",
@@ -348,10 +415,16 @@ class TestOpenAIClient:
             # This is a custom endpoint, so we need to use a raw request
             import requests
 
+            url = BASE_URL + "health"
             response = requests.get(
-                f"{BASE_URL}/health", headers={"Accept": "application/json"}
+                url,
+                headers={
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                },
             )
 
+            print(f"Health response: {response.status_code} {response.text}")
             assert response.status_code == 200, "Health endpoint should return 200 OK"
 
             health_data = response.json()
