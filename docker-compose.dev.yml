@@ -6,6 +6,7 @@ services:
       - "8443:8443"
     volumes:
       - /dev/sev-guest:/dev/sev-guest # for AMD SEV
+      - ./nilai-api/:/app/nilai-api/
     networks:
       - proxy_net
   redis:
