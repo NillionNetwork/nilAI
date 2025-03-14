@@ -1,0 +1,20 @@
+[project]
+name = "gpuverifier-api"
+version = "0.1.0"
+description = "Simple fastapi to wrap the verifier package"
+readme = "README.md"
+authors = [
+    { name = "José Cabrero-Holgueras", email = "jose.cabrero@nillion.com" },
+    { name = "Nicholas Wehr", email = "nicholas.wehr@nillion.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi[standard]>=0.115.5",
+    "gunicorn>=23.0.0",
+    "nv-local-gpu-verifier",
+    "prometheus_fastapi_instrumentator>=7.0.2",
+    "uvicorn>=0.32.1"
+]
+
+[tool.uv.sources]
+nv-local-gpu-verifier = { git = "https://github.com/Azure/az-cgpu-onboarding.git", subdirectory = "src/local_gpu_verifier", tag = "V3.2.3" }

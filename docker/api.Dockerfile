@@ -14,12 +14,13 @@ COPY --from=sev /app/sev/libsevguest.h /app/nilai-api/src/nilai_api/sev/libsevgu
 WORKDIR /app/nilai-api/
 
 RUN apt-get update && \
-apt-get install build-essential curl git -y && \
+apt-get install build-essential curl -y && \
 apt-get clean && \
 apt-get autoremove && \
 rm -rf /var/lib/apt/lists/* && \
-pip install uv && \
+pip install --upgrade uv && \
 uv sync
+
 
 EXPOSE 8080 8443
 

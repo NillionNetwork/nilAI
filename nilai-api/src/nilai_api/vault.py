@@ -85,7 +85,7 @@ class SecretVaultHelper:
         return my_schema
 
     def _mutate_secret_attributes(self, entry: dict) -> None:
-        """Apply encrypotion or secret sharing to all fields in schema that are indicated w/ $share keyname."""
+        """Apply encryption or secret sharing to all fields in schema that are indicated w/ $share keyname."""
         keys = list(entry.keys())
         for key in keys:
             value = entry[key]

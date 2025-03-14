@@ -10,6 +10,7 @@ ENVIRONMENT = os.getenv("ENVIRONMENT", "testnet")
 ETCD_HOST = os.getenv("ETCD_HOST", "localhost")
 ETCD_PORT = int(os.getenv("ETCD_PORT", 2379))
 
+GPUVERIFIER_API = os.getenv("GPUVERIFIER_API", "http://localhost:8000")
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 

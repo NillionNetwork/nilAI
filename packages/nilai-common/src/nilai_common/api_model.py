@@ -1,11 +1,14 @@
 import uuid
-from typing import List, Optional, Literal, Iterable
+from enum import Enum
+from typing import Dict, List, Optional, Literal, Iterable
+from uuid import UUID
+
 
 from openai.types.chat import ChatCompletion, ChatCompletionMessage
 from openai.types.chat.chat_completion import Choice as OpenaAIChoice
 from openai.types.chat.chat_completion import CompletionUsage
 from openai.types.chat import ChatCompletionToolParam
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 __all__ = [
@@ -28,6 +31,19 @@ class Message(ChatCompletionMessage):
 class Choice(OpenaAIChoice):
     pass
 
+class SecretVaultPayload(BaseModel):
+    org_did: str
+    secret_key: str
+    inject_from: Optional[UUID] = None
+    filter_: Optional[Dict] = Field(None, alias="filter")
+    save_to: Optional[UUID] = None
+
+    @model_validator(mode='after')
+    def check_required_fields(self):
+        if not self.save_to and not (self.inject_from and self.filter):
+            raise ValueError("Either 'save_to' must be provided or both 'inject_from' and 'filter' must be provided")
+        return self
+
 
 class ChatRequest(BaseModel):
     model: str
@@ -38,7 +54,7 @@ class ChatRequest(BaseModel):
     stream: Optional[bool] = False
     tools: Optional[Iterable[ChatCompletionToolParam]] = None
     nilrag: Optional[dict] = {}
-    secret_vault: Optional[dict] = {}
+    secret_vault: Optional[SecretVaultPayload] = None
 
 
 class SignedChatCompletion(ChatCompletion):
@@ -52,6 +68,11 @@ class AttestationResponse(BaseModel):
     gpu_attestation: str  # Base64 encoded GPU attestation
 
 
+class AllowedModelRoles(str, Enum):
+    WORKER = "worker"
+    GENERATION = "generation"
+    REASONING = "reasoning"
+
 class ModelMetadata(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
@@ -60,7 +81,7 @@ class ModelMetadata(BaseModel):
     author: str
     license: str
     source: str
-    role: Optional[str] = "unknown"
+    role: AllowedModelRoles
     supported_features: List[str]
     tool_support: bool
 
