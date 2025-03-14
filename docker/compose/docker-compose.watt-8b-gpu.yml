@@ -52,8 +52,8 @@ services:
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"] 
       interval: 30s
-      retries: 3
-      start_period: 60s
+      retries: 4
+      start_period: 180s
       timeout: 10s
 volumes:
   hugging_face_models:
