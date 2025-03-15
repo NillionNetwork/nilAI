@@ -7,4 +7,4 @@ export PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus-metrics
 rm -rf "$PROMETHEUS_MULTIPROC_DIR"
 mkdir -p "$PROMETHEUS_MULTIPROC_DIR"
 
-exec uv run gunicorn -c gunicorn.conf.py gpuverifier_api.__main__:app
+exec gunicorn -c gunicorn.conf.py gpuverifier_api.__main__:app
