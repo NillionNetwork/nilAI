@@ -1,4 +1,5 @@
 import uuid
+from enum import Enum
 from typing import Dict, List, Optional, Literal, Iterable
 from uuid import UUID
 
@@ -67,6 +68,11 @@ class AttestationResponse(BaseModel):
     gpu_attestation: str  # Base64 encoded GPU attestation
 
 
+class AllowedModelRoles(str, Enum):
+    WORKER = "worker"
+    GENERATION = "generation"
+    REASONING = "reasoning"
+
 class ModelMetadata(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
@@ -75,7 +81,7 @@ class ModelMetadata(BaseModel):
     author: str
     license: str
     source: str
-    role: Optional[str] = "unknown"
+    role: AllowedModelRoles
     supported_features: List[str]
     tool_support: bool
 

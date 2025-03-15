@@ -208,9 +208,6 @@ async def chat_completion(
         f"Chat completion request for model {req.model} from user {user.userid}"
     )
 
-    logger.info(f"EXTRA INFO: {req}")
-    logger.info(f"VAULT INFO: {req.secret_vault}")
-
     if req.secret_vault and (schema_uuid := req.secret_vault.get("inject_from")):
         """
         Endpoint activated with SecretVault support
@@ -224,7 +221,7 @@ async def chat_completion(
         4c. ... append payload to LLM query
         """
         try:
-            logger.info(f"SECRET VAULT INJECTION REQUESTED ({schema_uuid})")
+            logger.info("SECRET VAULT INJECTION REQUESTED")
             vault = SecretVaultHelper(
                 org_did=req.secret_vault.get("org_did"),
                 secret_key=req.secret_vault.get("secret_key"),
@@ -234,7 +231,6 @@ async def chat_completion(
             records = vault.data_reveal(req.secret_vault.get("filter"))
             formatted_results = "\n".join(f"- {str(result)}" for result in records)
             relevant_context = f"\n\nRelevant Context:\n{formatted_results}"
-            logger.info(f"SECRET VAULT INJECTION: {relevant_context}")
             for message in req.messages:
                 if message.role == "system":
                     if message.content is None:
@@ -491,16 +487,6 @@ async def chat_completion(
                         response_format={"type": "json_object"},
                     )
                     json_response = remux_res.choices[0].message.content
-                    logger.info(f"""
-                    INPUT:
-                    {inference_result} 
-
-                    SCHEMA:
-                    {vault.schema_definition}
-
-                    OUTPUT:
-                    {json_response}
-                    """)
                     parsed_data = json.loads(json_response)
                     vault_res = vault.post(
                         parsed_data["items"] if "items" in parsed_data else parsed_data,

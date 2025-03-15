@@ -31,7 +31,7 @@ services:
       - ETCD_HOST=etcd
       - ETCD_PORT=2379
       - TOOL_SUPPORT=false
-      - MODEL_ROLE: "reasoning"
+      - MODEL_ROLE=reasoning
     volumes:
       - hugging_face_models:/root/.cache/huggingface  # cache models
     networks:
