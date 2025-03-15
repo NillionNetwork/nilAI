@@ -102,6 +102,19 @@ services:
       retries: 3
       start_period: 10s
 
+  gpuverifier:
+    container_name: gpuverifier-api
+    build:
+      context: .
+      dockerfile: docker/verifier.Dockerfile
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      - backend_net
   api:
     container_name: nilai-api
     build:
@@ -112,6 +125,8 @@ services:
       etcd:
         condition: service_healthy
       postgres:
+        condition: service_healthy
+      gpuverifier:
         condition: service_healthy
     deploy:
       resources:
@@ -124,6 +139,8 @@ services:
     networks:
       - frontend_net
       - backend_net
+    environment:
+      - GPUVERIFIER_API=http://gpuverifier:8000
     env_file:
       - .env
     healthcheck:

@@ -1,6 +1,7 @@
 import logging
 import time
 from asyncio import Semaphore
+import os
 from typing import Dict, Optional
 
 from nilai_api import config
@@ -8,10 +9,8 @@ from nilai_api.crypto import generate_key_pair
 from nilai_api.sev.sev import sev
 from nilai_common import ModelServiceDiscovery
 from nilai_common.api_model import ModelEndpoint
-from verifier.cc_admin import collect_gpu_evidence, attest
-import secrets
-import json
-import base64
+# from verifier.cc_admin import collect_gpu_evidence, attest
+import requests
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -40,31 +39,10 @@ class AppState:
 
     @property
     def gpu_attestation(self) -> str:
-        # Check if GPU is available
         try:
-            nonce = secrets.token_bytes(32).hex()
-            arguments_as_dictionary = {
-                "nonce": nonce,
-                "verbose": False,
-                "test_no_gpu": False,
-                "rim_root_cert": None,
-                "rim_service_url": None,
-                "ocsp_service_url": None,
-                "ocsp_attestation_settings": "default",
-                "allow_hold_cert": None,
-                "ocsp_validity_extension": None,
-                "ocsp_cert_revocation_extension_device": None,
-                "ocsp_cert_revocation_extension_driver_rim": None,
-                "ocsp_cert_revocation_extension_vbios_rim": None,
-            }
-            evidence_list = collect_gpu_evidence(
-                nonce,
-            )
-            result, jwt_token = attest(arguments_as_dictionary, nonce, evidence_list)
-            self._gpu_quote = base64.b64encode(
-                json.dumps({"result": result, "jwt_token": jwt_token}).encode()
-            ).decode()
-            return self._gpu_quote
+            res = requests.get(config.GPUVERIFIER_API)
+            res.raise_for_status()
+            return str(res.content)
         except Exception as e:
             logging.error("Could not attest GPU: %s", e)
             return self._gpu_quote
