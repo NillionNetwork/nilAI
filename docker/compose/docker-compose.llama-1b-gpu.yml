@@ -1,6 +1,7 @@
 services:
   llama_1b_gpu:
     image: nillion/nilai-vllm:latest
+    container_name: nilai-llama_1b_gpu
     deploy:
       resources:
         reservations:

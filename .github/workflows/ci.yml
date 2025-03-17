@@ -103,7 +103,10 @@ jobs:
         run: docker build -t nillion/nilai-api:latest -f docker/api.Dockerfile --target nilai .
 
       - name: Create .env
-        run: cp .env.sample .env
+        run: |
+         cp .env.sample .env
+         # Copy secret into .env replacing the existing HF_TOKEN
+         sed -i 's/HF_TOKEN=.*/HF_TOKEN=${{ secrets.HF_TOKEN }}/' .env
 
       - name: Start Services
         run: |
@@ -118,11 +121,20 @@ jobs:
           set -e
           # Wait for the services to be ready
           API_HEALTH_STATUS="unhealthy"
-          while [ $API_HEALTH_STATUS != "healthy" ]; do
-              echo "Waiting for nilai-api to become healthy... [$API_HEALTH_STATUS]"
-              sleep 2
+          MODEL_HEALTH_STATUS="unhealthy"
+          MAX_ATTEMPTS=20
+          ATTEMPT=1
+          while [ $API_HEALTH_STATUS != "healthy" ] && [ $MODEL_HEALTH_STATUS != "healthy" ] && [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+              echo "Waiting for nilai to become healthy... API:[$API_HEALTH_STATUS] MODEL:[$MODEL_HEALTH_STATUS] (Attempt $ATTEMPT/$MAX_ATTEMPTS)"
+              sleep 30
               API_HEALTH_STATUS=$(docker inspect --format='{{.State.Health.Status}}' nilai-api 2>/dev/null)
+              MODEL_HEALTH_STATUS=$(docker inspect --format='{{.State.Health.Status}}' nilai-llama_1b_gpu 2>/dev/null)
+              ATTEMPT=$((ATTEMPT + 1))
           done
+          if [ $API_HEALTH_STATUS != "healthy" ]; then
+              echo "Error: nilai-api failed to become healthy after $MAX_ATTEMPTS attempts"
+              exit 1
+          fi
           export AUTH_TOKEN=$(docker exec nilai-api uv run src/nilai_api/commands/add_user.py --name test1 --email test1@test.com | jq ".apikey" -r)
           export ENVIRONMENT=ci
           uv run pytest -v tests/e2e
