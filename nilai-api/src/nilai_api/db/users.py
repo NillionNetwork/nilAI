@@ -87,8 +87,8 @@ class UserManager:
         email: str,
         apikey: str | None = None,
         userid: str | None = None,
-        ratelimit_day: int | None = None,
-        ratelimit_hour: int | None = None,
+        ratelimit_day: int | None = USER_RATE_LIMIT_DAY,
+        ratelimit_hour: int | None = USER_RATE_LIMIT_HOUR,
         ratelimit_minute: int | None = USER_RATE_LIMIT_MINUTE,
     ) -> UserModel:
         """

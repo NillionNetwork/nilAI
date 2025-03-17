@@ -1,4 +1,4 @@
-FROM vllm/vllm-openai:latest
+FROM vllm/vllm-openai:v0.7.3
 
 # # Specify model name and path during build
 # ARG MODEL_NAME=llama_1b_cpu
@@ -19,7 +19,7 @@ RUN apt-get update && \
     uv sync && \
     apt-get clean && \
     apt-get autoremove && \
-    rm -rf /var/lib/apt/lists/* 
+    rm -rf /var/lib/apt/lists/*
 
 # Expose port 8000 for incoming requests
 EXPOSE 8000
