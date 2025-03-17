@@ -111,13 +111,14 @@ jobs:
           -f docker-compose.dev.yml \
           -f docker/compose/docker-compose.llama-1b-gpu.yml \
           up -d
+          docker ps -a
 
       - name: Run E2E tests
         run: |
           set -e
           sleep 30 # wait for tables in bbdd to be created to be able to add the user
-
-          export AUTH_TOKEN=$(docker exec nilai-api uv run src/nilai_api/commands/add_user.py --name test1 --email test1@test.com | jq ".apikey")
+          docker ps -a
+          export AUTH_TOKEN=$(docker exec nilai-api uv run src/nilai_api/commands/add_user.py --name test1 --email test1@test.com | jq ".apikey" -r)
           export ENVIRONMENT=ci
           uv run pytest -v tests/e2e
 
