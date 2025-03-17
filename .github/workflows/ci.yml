@@ -38,7 +38,7 @@ jobs:
 
       - name: Run tests
         run: uv run pytest -v tests/unit
-        
+
       # - name: pyright
       #   run: uv run pyright nilai-api
 
@@ -109,15 +109,14 @@ jobs:
         run: |
           docker-compose -f docker-compose.yml \
           -f docker-compose.dev.yml \
-          -f docker/compose/docker-compose.llama-3b-gpu.yml \
-          -f docker/compose/docker-compose.llama-8b-gpu.yml \
+          -f docker/compose/docker-compose.llama-1b-gpu.yml \
           up -d
 
       - name: Run E2E tests
         run: |
           set -e
           sleep 30 # wait for tables in bbdd to be created to be able to add the user
-          
+
           export AUTH_TOKEN=$(docker exec nilai-api uv run src/nilai_api/commands/add_user.py --name test1 --email test1@test.com | jq ".apikey")
           export ENVIRONMENT=ci
           uv run pytest -v tests/e2e
@@ -125,8 +124,7 @@ jobs:
       - name: Stop Services
         run: docker-compose -f docker-compose.yml \
           -f docker-compose.dev.yml \
-          -f docker/compose/docker-compose.llama-3b-gpu.yml \
-          -f docker/compose/docker-compose.llama-8b-gpu.yml \
+          -f docker/compose/docker-compose.llama-1b-gpu.yml \
           down
 
   stop-runner:

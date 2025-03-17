@@ -3,24 +3,8 @@ import json
 import pytest
 from openai import OpenAI
 from openai.types.chat import ChatCompletion
-from .config import BASE_URL, AUTH_TOKEN as API_KEY
+from .config import BASE_URL, AUTH_TOKEN, test_models
 
-models = {
-    "mainnet": [
-        "meta-llama/Llama-3.2-3B-Instruct",
-        "meta-llama/Llama-3.1-8B-Instruct",
-        "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B",
-    ],
-    "testnet": [
-        "meta-llama/Llama-3.2-1B-Instruct",
-        "meta-llama/Llama-3.1-8B-Instruct",
-    ],
-    "test": [
-        "meta-llama/Llama-3.2-1B-Instruct",
-    ],
-}
-
-test_models = models["test"]
 
 class TestOpenAIClient:
     """Test suite for Nilai API using the OpenAI client"""
@@ -28,7 +12,7 @@ class TestOpenAIClient:
     @pytest.fixture
     def client(self):
         """Create an OpenAI client configured to use the Nilai API"""
-        return OpenAI(base_url=BASE_URL, api_key=API_KEY)
+        return OpenAI(base_url=BASE_URL, api_key=AUTH_TOKEN)
 
     @pytest.mark.parametrize(
         "model",
@@ -346,15 +330,14 @@ class TestOpenAIClient:
             # The OpenAI client doesn't have a built-in method for this
             import requests
 
-            url = BASE_URL + "usage"
+            url = BASE_URL + "/usage"
             response = requests.get(
                 url,
                 headers={
-                    "Authorization": f"Bearer {API_KEY}",
+                    "Authorization": f"Bearer {AUTH_TOKEN}",
                     "Content-Type": "application/json",
                 },
             )
-
             assert response.status_code == 200, "Usage endpoint should return 200 OK"
 
             usage_data = response.json()
@@ -381,11 +364,11 @@ class TestOpenAIClient:
             # This is a custom endpoint, so we need to use a raw request
             import requests
 
-            url = BASE_URL + "attestation/report"
+            url = BASE_URL + "/attestation/report"
             response = requests.get(
                 url,
                 headers={
-                    "Authorization": f"Bearer {API_KEY}",
+                    "Authorization": f"Bearer {AUTH_TOKEN}",
                     "Content-Type": "application/json",
                 },
             )
@@ -415,7 +398,7 @@ class TestOpenAIClient:
             # This is a custom endpoint, so we need to use a raw request
             import requests
 
-            url = BASE_URL + "health"
+            url = BASE_URL + "/health"
             response = requests.get(
                 url,
                 headers={
