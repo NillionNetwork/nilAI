@@ -116,8 +116,13 @@ jobs:
       - name: Run E2E tests
         run: |
           set -e
-          sleep 30 # wait for tables in bbdd to be created to be able to add the user
-          docker ps -a
+          # Wait for the services to be ready
+          API_HEALTH_STATUS="unhealthy"
+          while [ $API_HEALTH_STATUS != "healthy" ]; do
+              echo "Waiting for nilai-api to become healthy... [$API_HEALTH_STATUS]"
+              sleep 2
+              API_HEALTH_STATUS=$(docker inspect --format='{{.State.Health.Status}}' nilai-api 2>/dev/null)
+          done
           export AUTH_TOKEN=$(docker exec nilai-api uv run src/nilai_api/commands/add_user.py --name test1 --email test1@test.com | jq ".apikey" -r)
           export ENVIRONMENT=ci
           uv run pytest -v tests/e2e
