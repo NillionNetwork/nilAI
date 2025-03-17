@@ -105,18 +105,12 @@ services:
   api:
     container_name: nilai-api
     image: nillion/nilai-api:latest
+    platform: linux/amd64
     depends_on:
       etcd:
         condition: service_healthy
       postgres:
         condition: service_healthy
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
     restart: unless-stopped
     networks:
       - frontend_net

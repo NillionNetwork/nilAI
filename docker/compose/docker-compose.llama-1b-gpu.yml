@@ -1,13 +1,6 @@
 services:
   llama_1b_gpu:
     image: nillion/nilai-vllm:latest
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
     ipc: host
     ulimits:
       memlock: -1
