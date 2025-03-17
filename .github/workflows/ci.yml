@@ -126,6 +126,12 @@ jobs:
           ATTEMPT=1
           while [ $API_HEALTH_STATUS != "healthy" ] && [ $MODEL_HEALTH_STATUS != "healthy" ] && [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
               echo "Waiting for nilai to become healthy... API:[$API_HEALTH_STATUS] MODEL:[$MODEL_HEALTH_STATUS] (Attempt $ATTEMPT/$MAX_ATTEMPTS)"
+              if [ $API_HEALTH_STATUS != "healthy" ] && [ $ATTEMPT -gt 5 ]; then
+                docker logs nilai-api
+              fi
+              if [ $MODEL_HEALTH_STATUS == "unhealthy" ]; then
+                docker logs nilai-llama_1b_gpu
+              fi
               sleep 30
               API_HEALTH_STATUS=$(docker inspect --format='{{.State.Health.Status}}' nilai-api 2>/dev/null)
               MODEL_HEALTH_STATUS=$(docker inspect --format='{{.State.Health.Status}}' nilai-llama_1b_gpu 2>/dev/null)
