@@ -9,7 +9,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v4
 
@@ -29,13 +29,13 @@ jobs:
       - name: Install dependencies
         run: |
           uv sync
-          
+
       - name: Run Ruff format check
         run: uv run ruff format --check
 
       - name: Run Ruff linting
         run: uv run ruff check --exclude packages/verifier/
-      
+
       - name: Run tests
         run: uv run pytest -v tests/unit
         
@@ -149,4 +149,3 @@ jobs:
           github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
           label: ${{ needs.start-runner.outputs.label }}
           ec2-instances-ids: ${{ needs.start-runner.outputs.ec2-instances-ids }}
-
