@@ -517,3 +517,91 @@ class TestHTTPXAdditional:
             200,
             400,
         ], "Unsupported parameters should be handled gracefully"
+
+    def test_chat_completion_invalid_temperature(self, client):
+        """Test chat completion with invalid temperature type that should trigger a validation error"""
+        payload = {
+            "model": test_models[0],
+            "messages": [{"role": "user", "content": "What is the weather like?"}],
+            "temperature": "hot",
+        }
+        response = client.post("/chat/completions", json=payload)
+        print(response)
+        assert response.status_code == 400, (
+            "Invalid temperature type should return a 422 error"
+        )
+
+    def test_chat_completion_missing_model(self, client):
+        """Test chat completion with missing model field to trigger a validation error"""
+        payload = {
+            "messages": [{"role": "user", "content": "What is your name?"}],
+            "temperature": 0.2,
+        }
+        response = client.post("/chat/completions", json=payload)
+        assert response.status_code == 400, (
+            "Missing model should return a 422 validation error"
+        )
+
+    def test_chat_completion_negative_max_tokens(self, client):
+        """Test chat completion with negative max_tokens value triggering a validation error"""
+        payload = {
+            "model": test_models[0],
+            "messages": [{"role": "user", "content": "Tell me a joke."}],
+            "temperature": 0.2,
+            "max_tokens": -10,
+        }
+        response = client.post("/chat/completions", json=payload)
+        assert response.status_code == 400, (
+            "Negative max_tokens should return a 422 validation error"
+        )
+
+    def test_chat_completion_high_temperature(self, client):
+        """Test chat completion with a high temperature value to check model's creative generation under extreme conditions"""
+        payload = {
+            "model": test_models[0],
+            "messages": [
+                {"role": "system", "content": "You are a creative assistant."},
+                {
+                    "role": "user",
+                    "content": "Write an imaginative story about a wizard.",
+                },
+            ],
+            "temperature": 5.0,  # Extremely high temperature for creative responses
+            "max_tokens": 50,
+        }
+        response = client.post("/chat/completions", json=payload)
+        assert response.status_code == 200, (
+            "High temperature request should return a valid response"
+        )
+        response_json = response.json()
+        assert "choices" in response_json, "Response should contain choices"
+        assert len(response_json["choices"]) > 0, (
+            "At least one choice should be present"
+        )
+
+    def test_model_streaming_request_high_token(self, client):
+        """Test streaming request with high max_tokens to verify response streaming over longer texts"""
+        payload = {
+            "model": test_models[0],
+            "messages": [
+                {"role": "system", "content": "You are a creative assistant."},
+                {
+                    "role": "user",
+                    "content": "Tell me a long story about a superhero's journey.",
+                },
+            ],
+            "temperature": 0.7,
+            "max_tokens": 100,
+            "stream": True,
+        }
+        with client.stream("POST", "/chat/completions", json=payload) as response:
+            assert response.status_code == 200, (
+                "Streaming with high max_tokens should return 200 status"
+            )
+            chunk_count = 0
+            for line in response.iter_lines():
+                if line and line.strip() and line.startswith("data:"):
+                    chunk_count += 1
+            assert chunk_count > 0, (
+                "Should receive at least one chunk for high token streaming request"
+            )
