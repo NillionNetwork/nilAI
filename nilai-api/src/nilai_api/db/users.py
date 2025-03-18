@@ -23,18 +23,20 @@ logger = logging.getLogger(__name__)
 class UserModel(Base):
     __tablename__ = "users"
 
-    userid = Column(String(50), primary_key=True, index=True)
-    name = Column(String(100), nullable=False)
-    email = Column(String(255), unique=True, nullable=False, index=True)
-    apikey = Column(String(50), unique=True, nullable=False, index=True)
-    prompt_tokens = Column(Integer, default=0, nullable=False)
-    completion_tokens = Column(Integer, default=0, nullable=False)
-    queries = Column(Integer, default=0, nullable=False)
-    signup_date = Column(DateTime, server_default=sqlalchemy.func.now(), nullable=False)
-    last_activity = Column(DateTime, nullable=True)
-    ratelimit_day = Column(Integer, default=1000, nullable=True)
-    ratelimit_hour = Column(Integer, default=100, nullable=True)
-    ratelimit_minute = Column(Integer, default=10, nullable=True)
+    userid: str = Column(String(50), primary_key=True, index=True)  # type: ignore
+    name: str = Column(String(100), nullable=False)  # type: ignore
+    email: str = Column(String(255), unique=True, nullable=False, index=True)  # type: ignore
+    apikey: str = Column(String(50), unique=True, nullable=False, index=True)  # type: ignore
+    prompt_tokens: int = Column(Integer, default=0, nullable=False)  # type: ignore
+    completion_tokens: int = Column(Integer, default=0, nullable=False)  # type: ignore
+    queries: int = Column(Integer, default=0, nullable=False)  # type: ignore
+    signup_date: datetime = Column(
+        DateTime, server_default=sqlalchemy.func.now(), nullable=False
+    )  # type: ignore
+    last_activity: datetime = Column(DateTime, nullable=True)  # type: ignore
+    ratelimit_day: int = Column(Integer, default=1000, nullable=True)  # type: ignore
+    ratelimit_hour: int = Column(Integer, default=100, nullable=True)  # type: ignore
+    ratelimit_minute: int = Column(Integer, default=10, nullable=True)  # type: ignore
 
     def __repr__(self):
         return f"<User(userid={self.userid}, name={self.name}, email={self.email})>"
@@ -82,7 +84,7 @@ class UserManager:
             logger.error(f"Error updating last activity: {e}")
 
     @staticmethod
-    async def insert_user(name: str, email: str) -> Dict[str, str]:
+    async def insert_user(name: str, email: str) -> UserModel:
         """
         Insert a new user into the database.
 
@@ -104,10 +106,10 @@ class UserManager:
             ratelimit_hour=USER_RATE_LIMIT_HOUR,
             ratelimit_minute=USER_RATE_LIMIT_MINUTE,
         )
-        UserManager.insert_user_model(user)
+        return await UserManager.insert_user_model(user)
 
     @staticmethod
-    async def insert_user_model(user: UserModel):
+    async def insert_user_model(user: UserModel) -> UserModel:
         """
         Insert a new user model into the database.
 
@@ -119,6 +121,7 @@ class UserManager:
                 session.add(user)
                 await session.commit()
                 logger.info(f"User {user.name} added successfully.")
+                return user
         except SQLAlchemyError as e:
             logger.error(f"Error inserting user: {e}")
             raise
@@ -136,9 +139,8 @@ class UserManager:
         """
         try:
             async with get_db_session() as session:
-                user = await session.execute(
-                    sqlalchemy.select(UserModel).filter(UserModel.apikey == api_key)
-                )
+                query = sqlalchemy.select(UserModel).filter(UserModel.apikey == api_key)  # type: ignore
+                user = await session.execute(query)
                 user = user.scalar_one_or_none()
                 return user
         except SQLAlchemyError as e:
