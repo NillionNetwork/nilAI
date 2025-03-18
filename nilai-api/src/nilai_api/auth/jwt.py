@@ -58,7 +58,7 @@ def serialize_sign_doc(sign_doc: dict) -> bytes:
 
 
 def keplr_validate(
-    message: str, header: dict, payload: dict, signature: str
+    message: str, header: dict, payload: dict, signature: bytes
 ) -> JWTAuthResult:
     # Validate the algorithm
     if header["alg"] != "ES256":
@@ -95,13 +95,15 @@ def keplr_validate(
         serialized_sign_doc,
     )
 
-    return JWTAuthResult(
-        pub_key=payload.get("pub_key"), user_address=payload.get("user_address")
-    )
+    pub_key = payload.get("pub_key")
+    user_address = payload.get("user_address")
+    if not pub_key or not user_address:
+        raise ValueError("Invalid payload, missing pub_key or user_address")
+    return JWTAuthResult(pub_key=pub_key, user_address=user_address)
 
 
 def metamask_validate(
-    message: str, header: dict, payload: dict, signature: str
+    message: str, header: dict, payload: dict, signature: bytes
 ) -> JWTAuthResult:
     # Validate the algorithm
     if header["alg"] != "ES256K":
@@ -110,20 +112,23 @@ def metamask_validate(
     if payload.get("exp") and payload["exp"] < int(time.time()):
         raise ValueError("Token has expired")
     w3 = Web3(Web3.HTTPProvider(""))
-    message = encode_defunct(text=message)
+    signable_message = encode_defunct(text=message)
     address = w3.eth.account.recover_message(
-        message, signature=HexBytes("0x" + signature.hex())
+        signable_message, signature=HexBytes("0x" + signature.hex())
     )
 
     if address.lower() != payload.get("user_address"):
         raise ValueError("Invalid signature")
 
-    return JWTAuthResult(
-        pub_key=payload.get("pub_key"), user_address=payload.get("user_address")
-    )
+    pub_key = payload.get("pub_key")
+    user_address = payload.get("user_address")
+    if not pub_key or not user_address:
+        raise ValueError("Invalid payload, missing pub_key or user_address")
+
+    return JWTAuthResult(pub_key=pub_key, user_address=user_address)
 
 
-def extract_fields(jwt: str) -> tuple[str, dict, dict, str]:
+def extract_fields(jwt: str) -> tuple[str, dict, dict, bytes]:
     # Split and decode JWT components
     header_b64, payload_b64, signature_b64 = jwt.split(".")
     if not all([header_b64, payload_b64, signature_b64]):
