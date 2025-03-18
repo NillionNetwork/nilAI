@@ -104,7 +104,7 @@ jobs:
 
       - name: Create .env
         run: |
-         cp .env.sample .env
+         cp .env.ci .env
          # Copy secret into .env replacing the existing HF_TOKEN
          sed -i 's/HF_TOKEN=.*/HF_TOKEN=${{ secrets.HF_TOKEN }}/' .env
 
