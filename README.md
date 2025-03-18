@@ -149,6 +149,19 @@ uv run pre-commit install
 - Check etcd3 and Docker container logs for connection issues
 - Verify network ports are not blocked or in use
 
+### vLLM for Local Execution on macOS
+To configure vLLM for **local execution on macOS**, execute the following steps:
+```shell
+# Clone vLLM repository (root folder)
+git clone https://github.com/vllm-project/vllm.git
+# Build vLLM OpenAI (vllm folder)
+docker build -f Dockerfile.arm -t vllm/vllm-openai . --shm-size=4g
+# Build vLLM docker container (root folder)
+docker build -t nillion/nilai-vllm:latest -f docker/vllm.Dockerfile .
+# Build nilai_api container
+docker build -t nillion/nilai-api:latest -f docker/api.Dockerfile --target nilai --platform linux/amd64 .
+````
+
 ## Contributing
 
 1. Fork the repository
