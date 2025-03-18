@@ -112,7 +112,7 @@ jobs:
         run: |
           docker-compose -f docker-compose.yml \
           -f docker-compose.dev.yml \
-          -f docker/compose/docker-compose.llama-1b-gpu.yml \
+          -f docker/compose/docker-compose.llama-1b-gpu.ci.yml \
           up -d
           docker ps -a
 
@@ -124,9 +124,9 @@ jobs:
           MODEL_HEALTH_STATUS="unhealthy"
           MAX_ATTEMPTS=20
           ATTEMPT=1
-          
+
           while [ true ]; do sleep 30; done;
-          
+
           while [ $API_HEALTH_STATUS != "healthy" ] && [ $MODEL_HEALTH_STATUS != "healthy" ] && [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
               echo "Waiting for nilai to become healthy... API:[$API_HEALTH_STATUS] MODEL:[$MODEL_HEALTH_STATUS] (Attempt $ATTEMPT/$MAX_ATTEMPTS)"
               if [ $API_HEALTH_STATUS != "healthy" ] && [ $ATTEMPT -gt 5 ]; then
@@ -157,7 +157,7 @@ jobs:
       - name: Stop Services
         run: docker-compose -f docker-compose.yml \
           -f docker-compose.dev.yml \
-          -f docker/compose/docker-compose.llama-1b-gpu.yml \
+          -f docker/compose/docker-compose.llama-1b-gpu.ci.yml \
           down
 
   stop-runner:
