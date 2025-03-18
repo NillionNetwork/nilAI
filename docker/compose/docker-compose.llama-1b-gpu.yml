@@ -27,6 +27,7 @@ services:
       --enable-auto-tool-choice
       --tool-call-parser llama3_json
       --uvicorn-log-level warning
+      --dtype half
     environment:
       - SVC_HOST=llama_1b_gpu
       - SVC_PORT=8000
