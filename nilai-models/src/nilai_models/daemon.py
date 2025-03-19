@@ -19,6 +19,7 @@ async def get_metadata(num_retries=30):
     service and return as ModelMetadata object"""
     current_retries = 0
     while True:
+        url = None
         try:
             url = f"http://{SETTINGS['host']}:{SETTINGS['port']}/v1/models"
             # Request model metadata from localhost:8000/v1/models
@@ -40,7 +41,10 @@ async def get_metadata(num_retries=30):
                 )
 
         except Exception as e:
-            logger.warning(f"Failed to fetch model metadata from {url}: {e}")
+            if not url:
+                logger.warning(f"Failed to build url: {e}")
+            else:
+                logger.warning(f"Failed to fetch model metadata from {url}: {e}")
             current_retries += 1
             if current_retries >= num_retries:
                 raise e
