@@ -1194,6 +1194,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "black" },
+    { name = "httpx" },
     { name = "isort" },
     { name = "pre-commit" },
     { name = "pyright" },
@@ -1216,6 +1217,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "black", specifier = ">=24.10.0" },
+    { name = "httpx", specifier = ">=0.28.1" },
     { name = "isort", specifier = ">=5.13.2" },
     { name = "pre-commit", specifier = ">=4.1.0" },
     { name = "pyright", specifier = ">=1.1" },
@@ -1236,6 +1238,7 @@ dependencies = [
     { name = "alembic" },
     { name = "asyncpg" },
     { name = "authlib" },
+    { name = "click" },
     { name = "cryptography" },
     { name = "fastapi", extra = ["standard"] },
     { name = "greenlet" },
@@ -1262,6 +1265,7 @@ requires-dist = [
     { name = "alembic", specifier = ">=1.14.1" },
     { name = "asyncpg", specifier = ">=0.30.0" },
     { name = "authlib", specifier = ">=1.4.1" },
+    { name = "click", specifier = ">=8.1.8" },
     { name = "cryptography", specifier = ">=43.0.1" },
     { name = "fastapi", extras = ["standard"], specifier = ">=0.115.5" },
     { name = "greenlet", specifier = ">=3.1.1" },

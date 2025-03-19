@@ -84,27 +84,45 @@ class UserManager:
             logger.error(f"Error updating last activity: {e}")
 
     @staticmethod
-    async def insert_user(name: str, email: str) -> UserModel:
+    async def insert_user(
+        name: str,
+        email: str,
+        apikey: str | None = None,
+        userid: str | None = None,
+        ratelimit_day: int | None = USER_RATE_LIMIT_DAY,
+        ratelimit_hour: int | None = USER_RATE_LIMIT_HOUR,
+        ratelimit_minute: int | None = USER_RATE_LIMIT_MINUTE,
+    ) -> UserModel:
         """
         Insert a new user into the database.
 
         Args:
             name (str): Name of the user
             email (str): Email of the user
+            apikey (str): API key for the user
+            userid (str): Unique ID for the user
+            ratelimit_day (int): Daily rate limit
+            ratelimit_hour (int): Hourly rate limit
+            ratelimit_minute (int): Minute rate limit
 
         Returns:
             Dict containing userid and apikey
         """
-        userid = UserManager.generate_user_id()
-        apikey = UserManager.generate_api_key()
+        userid = userid if userid else UserManager.generate_user_id()
+        apikey = apikey if apikey else UserManager.generate_api_key()
+        ratelimit_day = ratelimit_day if ratelimit_day else USER_RATE_LIMIT_DAY
+        ratelimit_hour = ratelimit_hour if ratelimit_hour else USER_RATE_LIMIT_HOUR
+        ratelimit_minute = (
+            ratelimit_minute if ratelimit_minute else USER_RATE_LIMIT_MINUTE
+        )
         user = UserModel(
             userid=userid,
             name=name,
             email=email,
             apikey=apikey,
-            ratelimit_day=USER_RATE_LIMIT_DAY,
-            ratelimit_hour=USER_RATE_LIMIT_HOUR,
-            ratelimit_minute=USER_RATE_LIMIT_MINUTE,
+            ratelimit_day=ratelimit_day,
+            ratelimit_hour=ratelimit_hour,
+            ratelimit_minute=ratelimit_minute,
         )
         return await UserManager.insert_user_model(user)
 

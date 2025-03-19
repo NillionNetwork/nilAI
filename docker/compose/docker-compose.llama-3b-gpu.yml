@@ -1,8 +1,6 @@
 services:
   llama_3b_gpu:
-    build:
-      context: .
-      dockerfile: docker/vllm.Dockerfile
+    image: nillion/nilai-vllm:latest
     deploy:
       resources:
         reservations:
@@ -19,8 +17,6 @@ services:
     restart: unless-stopped
     depends_on:
       etcd:
-        condition: service_healthy
-      deepseek_14b_gpu:
         condition: service_healthy
     command: >
       --model meta-llama/Llama-3.2-3B-Instruct

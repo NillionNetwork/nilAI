@@ -1,31 +1,30 @@
 # Fast API and serving
+import asyncio
 import logging
 import os
-import asyncio
 from base64 import b64encode
-from typing import AsyncGenerator, Union, List, Tuple
-import numpy as np
+from typing import AsyncGenerator, List, Tuple, Union
 
 import nilql
 import nilrag
-from fastapi import APIRouter, Body, Depends, HTTPException, status, Request
+import numpy as np
+from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 from nilai_api.auth import get_user
 from nilai_api.config import MODEL_CONCURRENT_RATE_LIMIT
 from nilai_api.crypto import sign_message
-from nilai_api.db.users import UserManager, UserModel
 from nilai_api.db.logs import QueryLogManager
+from nilai_api.db.users import UserManager, UserModel
 from nilai_api.rate_limiting import RateLimit
 from nilai_api.state import state
-from openai import OpenAI, AsyncOpenAI
 
 # Internal libraries
 from nilai_common import (
     AttestationResponse,
     ChatRequest,
-    SignedChatCompletion,
     Message,
     ModelMetadata,
+    SignedChatCompletion,
     Usage,
 )
 from nilrag.util import (
@@ -34,7 +33,7 @@ from nilrag.util import (
     generate_embeddings_huggingface,
     group_shares_by_id,
 )
-
+from openai import AsyncOpenAI, OpenAI
 
 logger = logging.getLogger(__name__)
 
@@ -115,7 +114,10 @@ async def get_models(user: UserModel = Depends(get_user)) -> List[ModelMetadata]
 
 async def chat_completion_concurrent_rate_limit(request: Request) -> Tuple[int, str]:
     body = await request.json()
-    chat_request = ChatRequest(**body)
+    try:
+        chat_request = ChatRequest(**body)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid request body")
     key = f"chat:{chat_request.model}"
     try:
         limit = MODEL_CONCURRENT_RATE_LIMIT[chat_request.model]
@@ -350,13 +352,14 @@ async def chat_completion(
                     extra_body={
                         "stream_options": {
                             "include_usage": True,
-                            # "continuous_usage_stats": True,
+                            "continuous_usage_stats": True,
                         }
                     },
                 )  # type: ignore
 
                 async for chunk in response:
                     if chunk.usage is not None:
+                        logging.warning(f"[AAAAA] Usage: {chunk.usage}")
                         await UserManager.update_token_usage(
                             user.userid,
                             prompt_tokens=chunk.usage.prompt_tokens,
@@ -368,10 +371,12 @@ async def chat_completion(
                             prompt_tokens=chunk.usage.prompt_tokens,
                             completion_tokens=chunk.usage.completion_tokens,
                         )
-                    else:
-                        data = chunk.model_dump_json(exclude_unset=True)
-                        yield f"data: {data}\n\n"
-                        await asyncio.sleep(0)
+
+                    logging.warning(f"Chunk: {chunk}")
+                    data = chunk.model_dump_json(exclude_unset=True)
+                    # logging.warning(f"Chunk: {data}")
+                    yield f"data: {data}\n\n"
+                    await asyncio.sleep(0)
 
             except Exception as e:
                 logger.error(f"Error streaming response: {e}")

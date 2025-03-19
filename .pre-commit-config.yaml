@@ -23,4 +23,5 @@ repos:
         entry: pytest  # The command to execute
         language: system  # Uses the system-installed pytest instead of a virtual environment
         types: [python]  # Applies only to Python files
-        pass_filenames: false  # Prevents passing filenames, so pytest runs on all tests
+        pass_filenames: true  # Prevents passing filenames, so pytest runs on all tests
+        args: ["-v", "tests/unit"]  # Runs pytest with verbose output and only unit tests

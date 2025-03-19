@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 
 from nilai_api.db.users import UserModel
 from nilai_api.state import state
-from tests import model_endpoint, model_metadata, response as RESPONSE
+from ... import model_endpoint, model_metadata, response as RESPONSE
 
 
 @pytest.mark.asyncio

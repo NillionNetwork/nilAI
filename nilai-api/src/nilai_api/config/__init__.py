@@ -28,3 +28,6 @@ if ENVIRONMENT == "mainnet":
     from .mainnet import *  # noqa
 elif ENVIRONMENT == "testnet":
     from .testnet import *  # noqa
+else:
+    # default to testnet
+    from .testnet import *  # noqa

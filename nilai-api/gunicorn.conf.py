@@ -4,7 +4,7 @@
 bind = ["0.0.0.0:8080", "0.0.0.0:8443"]
 
 # Set the number of workers (2)
-workers = 50
+workers = 10
 
 # Set the number of threads per worker (16)
 threads = 1

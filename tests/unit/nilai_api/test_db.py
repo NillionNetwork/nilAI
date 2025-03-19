@@ -1,5 +1,5 @@
 import pytest
-from tests.nilai_api import MockUserDatabase
+from ..nilai_api import MockUserDatabase
 
 
 # Pytest fixture for MockUserDatabase
