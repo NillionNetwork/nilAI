@@ -136,7 +136,7 @@ jobs:
               echo "Error: nilai-api failed to become healthy after $MAX_ATTEMPTS attempts"
               exit 1
           fi
-          export AUTH_TOKEN=$(docker exec nilai-api uv run src/nilai_api/commands/add_user.py --name test1 --email test1@test.com | jq ".apikey" -r)
+          export AUTH_TOKEN=$(docker exec nilai-api uv run src/nilai_api/commands/add_user.py --name test1 --email test1@test.com --ratelimit-minute 1000 --ratelimit-hour 1000 --ratelimit-day 1000 | jq ".apikey" -r)
           export ENVIRONMENT=ci
           uv run pytest -v tests/e2e
 
