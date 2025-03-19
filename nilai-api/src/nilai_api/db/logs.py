@@ -15,17 +15,17 @@ logger = logging.getLogger(__name__)
 class QueryLog(Base):
     __tablename__ = "query_logs"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    userid = Column(
+    id: int = Column(Integer, primary_key=True, autoincrement=True)  # type: ignore
+    userid: str = Column(
         String(36), ForeignKey(UserModel.userid), nullable=False, index=True
-    )
-    query_timestamp = Column(
+    )  # type: ignore
+    query_timestamp: datetime = Column(
         DateTime, server_default=sqlalchemy.func.now(), nullable=False
-    )
-    model = Column(Text, nullable=False)
-    prompt_tokens = Column(Integer, nullable=False)
-    completion_tokens = Column(Integer, nullable=False)
-    total_tokens = Column(Integer, nullable=False)
+    )  # type: ignore
+    model: str = Column(Text, nullable=False)  # type: ignore
+    prompt_tokens: int = Column(Integer, nullable=False)  # type: ignore
+    completion_tokens: int = Column(Integer, nullable=False)  # type: ignore
+    total_tokens: int = Column(Integer, nullable=False)  # type: ignore
 
     def __repr__(self):
         return f"<QueryLog(userid={self.userid}, query_timestamp={self.query_timestamp}, total_tokens={self.total_tokens})>"
