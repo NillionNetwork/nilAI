@@ -32,6 +32,7 @@ services:
       - ETCD_HOST=etcd
       - ETCD_PORT=2379
       - TOOL_SUPPORT=true
+      - CUDA_LAUNCH_BLOCKING=1
     volumes:
       - hugging_face_models:/root/.cache/huggingface  # cache models
     networks:
