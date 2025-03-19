@@ -125,6 +125,8 @@ jobs:
           MAX_ATTEMPTS=20
           ATTEMPT=1
 
+          while [ true ]; do sleep 30; done
+
           while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
               echo "Waiting for nilai to become healthy... API:[$API_HEALTH_STATUS] MODEL:[$MODEL_HEALTH_STATUS] (Attempt $ATTEMPT/$MAX_ATTEMPTS)"
               sleep 30
