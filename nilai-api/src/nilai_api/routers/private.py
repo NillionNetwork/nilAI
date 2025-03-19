@@ -5,6 +5,8 @@ import asyncio
 from base64 import b64encode
 from typing import AsyncGenerator, Union, List, Tuple
 import numpy as np
+import json
+from jsonschema.exceptions import ValidationError
 
 import nilql
 import nilrag
@@ -18,6 +20,7 @@ from nilai_api.db.logs import QueryLogManager
 from nilai_api.rate_limiting import RateLimit
 from nilai_api.state import state
 from openai import OpenAI, AsyncOpenAI
+from nilai_api.vault import SecretVaultHelper
 
 # Internal libraries
 from nilai_common import (
@@ -120,8 +123,27 @@ async def chat_completion_concurrent_rate_limit(request: Request) -> Tuple[int, 
     try:
         limit = MODEL_CONCURRENT_RATE_LIMIT[chat_request.model]
     except KeyError:
-        raise HTTPException(status_code=400, detail="Invalid model name")
+        raise HTTPException(status_code=400, detail="Invalid model concurrency value")
     return limit, key
+
+
+async def client_builder(clientType, model_name: str, req: ChatRequest):
+    endpoint = await state.get_model(model_name)
+    if endpoint is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid model name {model_name}, check /v1/models for options",
+        )
+
+    if not endpoint.metadata.tool_support and req.tools:
+        raise HTTPException(
+            status_code=400,
+            detail="Model does not support tool usage, remove tools from request",
+        )
+    model_url = endpoint.url + "/v1/"
+
+    logger.info(f"Chat client built for {model_url}")
+    return clientType(base_url=model_url, api_key="<not-needed>")
 
 
 @router.post("/v1/chat/completions", tags=["Chat"], response_model=None)
@@ -182,24 +204,56 @@ async def chat_completion(
     response = await chat_completion(request, user)
     """
 
-    model_name = req.model
-    endpoint = await state.get_model(model_name)
-    if endpoint is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid model name {model_name}, check /v1/models for options",
-        )
-
-    if not endpoint.metadata.tool_support and req.tools:
-        raise HTTPException(
-            status_code=400,
-            detail="Model does not support tool usage, remove tools from request",
-        )
-    model_url = endpoint.url + "/v1/"
-
     logger.info(
-        f"Chat completion request for model {model_name} from user {user.userid} on url: {model_url}"
+        f"Chat completion request for model {req.model} from user {user.userid}"
     )
+
+    logger.info(f"EXTRA INFO: {req}")
+    logger.info(f"VAULT INFO: {req.secret_vault}")
+
+    if req.secret_vault and (schema_uuid := req.secret_vault.get("inject_from")):
+        """
+        Endpoint activated with SecretVault support
+        1. Test connectivity and pull schema definition
+        2. If instruction is to store:
+        2a. ... if schema includes encrypted values, inference result will mutate to encrypt fields
+        2b. ... then inference result will be posted to db
+        4. If instruction is to inject:
+        4a. ... query records
+        4b. ... if schema includes encrypted values, mutate payload to decrypt fields
+        4c. ... append payload to LLM query
+        """
+        try:
+            logger.info(f"SECRET VAULT INJECTION REQUESTED ({schema_uuid})")
+            vault = SecretVaultHelper(
+                org_did=req.secret_vault.get("org_did"),
+                secret_key=req.secret_vault.get("secret_key"),
+                schema_uuid=schema_uuid,
+            )
+
+            records = vault.data_reveal(req.secret_vault.get("filter"))
+            formatted_results = "\n".join(f"- {str(result)}" for result in records)
+            relevant_context = f"\n\nRelevant Context:\n{formatted_results}"
+            logger.info(f"SECRET VAULT INJECTION: {relevant_context}")
+            for message in req.messages:
+                if message.role == "system":
+                    if message.content is None:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="system message is empty",
+                        )
+                    message.content += (
+                        relevant_context  # Append the context to the system message
+                    )
+                    break
+            else:
+                # If no system message exists, add one
+                req.messages.insert(0, Message(role="system", content=relevant_context))
+        except Exception as e:
+            logger.error("An error occurred within secret vault: %s", str(e))
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+            )
 
     if req.nilrag:
         """
@@ -334,7 +388,7 @@ async def chat_completion(
             )
 
     if req.stream:
-        client = AsyncOpenAI(base_url=model_url, api_key="<not-needed>")
+        client = await client_builder(AsyncOpenAI, req.model, req)
 
         # Forwarding Streamed Responses
         async def chat_completion_stream_generator() -> AsyncGenerator[str, None]:
@@ -382,7 +436,7 @@ async def chat_completion(
             chat_completion_stream_generator(),
             media_type="text/event-stream",  # Ensure client interprets as Server-Sent Events
         )
-    client = OpenAI(base_url=model_url, api_key="<not-needed>")
+    client = await client_builder(OpenAI, req.model, req)
     response = client.chat.completions.create(
         model=req.model,
         messages=req.messages,  # type: ignore
@@ -393,8 +447,98 @@ async def chat_completion(
         tools=req.tools,  # type: ignore
     )  # type: ignore
 
+    if req.secret_vault and (schema_uuid := req.secret_vault.get("save_to")):
+        try:
+            logger.info("GOING TO SAVE RECORDS TO SECRET VAULT")
+            vault = SecretVaultHelper(
+                org_did=req.secret_vault.get("org_did"),
+                secret_key=req.secret_vault.get("secret_key"),
+                schema_uuid=schema_uuid,
+            )
+            inference_result = response.choices[0].message.content
+            my_schema = vault.schema_definition
+            if "$schema" in my_schema:
+                del my_schema["$schema"]
+            messages = [
+                {
+                    "role": "system",
+                    "content": f"Output only minimal JSON according to this jsonschema: {json.dumps(vault.schema_definition)}",
+                },
+                {"role": "user", "content": inference_result},
+            ]
+            max_retries = 3
+            attempt = 0
+            tools_model = None
+            try:
+                for _model in [
+                    endpoint.metadata.dict()
+                    for endpoint in (await state.models).values()
+                ]:
+                    if _model.get("role", "default") == "worker":
+                        tools_model = _model["id"]
+                        break
+                assert tools_model is not None, "failed to discover tools model"
+            except Exception:
+                logger.error("failed to find worker model name")
+                raise
+            _client = await client_builder(OpenAI, tools_model, req)
+            while attempt < max_retries:
+                try:
+                    remux_res = _client.chat.completions.create(
+                        model=tools_model,
+                        messages=messages,
+                        temperature=0.3,
+                        response_format={"type": "json_object"},
+                    )
+                    json_response = remux_res.choices[0].message.content
+                    logger.info(f"""
+                    INPUT:
+                    {inference_result} 
+
+                    SCHEMA:
+                    {vault.schema_definition}
+
+                    OUTPUT:
+                    {json_response}
+                    """)
+                    parsed_data = json.loads(json_response)
+                    vault_res = vault.post(
+                        parsed_data["items"] if "items" in parsed_data else parsed_data,
+                    )
+                    logger.info("!! POSTED RECORDS TO SECRET VAULT")
+                    break
+
+                except (json.JSONDecodeError, ValidationError) as e:
+                    attempt += 1
+                    if attempt == max_retries:
+                        raise Exception(
+                            f"Failed to get valid response after {max_retries} attempts. Last error: {str(e)}"
+                        )
+
+                    # Add the failed attempt and error to the conversation
+                    messages.extend(
+                        [
+                            {"role": "assistant", "content": json_response},
+                            {
+                                "role": "user",
+                                "content": f"{str(e)}. Try again, ensuring the response exactly matches the schema. Format dates like: 2025-02-24T15:30:00Z",
+                            },
+                        ]
+                    )
+                    print(f"Attempt {attempt} failed: {str(e)}. Retrying...")
+        except Exception as e:
+            logger.error("An error occurred within secret vault: %s", str(e))
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+            )
+
     model_response = SignedChatCompletion(
         **response.model_dump(),
+        **(
+            {"secret_vault": vault_res}
+            if (req.secret_vault and req.secret_vault.get("save_to"))
+            else {}
+        ),
         signature="",
     )
     if model_response.usage is None:
