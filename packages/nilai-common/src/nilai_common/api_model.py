@@ -22,7 +22,7 @@ __all__ = [
 
 
 class Message(ChatCompletionMessage):
-    role: Literal["system", "user", "assistant"] # type: ignore
+    role: Literal["system", "user", "assistant"]  # type: ignore
 
 
 class Choice(OpenaAIChoice):

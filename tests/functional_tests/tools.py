@@ -35,7 +35,7 @@ def test_tools():
         messages=[
             {"role": "user", "content": "What is the weather like in Paris today?"}
         ],
-        tools=tools, # type: ignore
+        tools=tools,  # type: ignore
     )
     print(response)
     # raise Exception(f"Response: {response}")

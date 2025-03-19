@@ -1,4 +1,3 @@
-
 from openai import OpenAI
 
 
@@ -14,10 +13,10 @@ def test_stream():
     ]
     print(messages)
     response = client.chat.completions.create(
-        model="meta-llama/Llama-3.1-8B-Instruct", 
-        messages=messages, # type: ignore 
-        stream=True
-    ) # type: ignore
+        model="meta-llama/Llama-3.1-8B-Instruct",
+        messages=messages,  # type: ignore
+        stream=True,
+    )  # type: ignore
 
     content = ""
     for chunk in response:
@@ -45,10 +44,10 @@ def test_non_stream():
     ]
     print(messages)
     response = client.chat.completions.create(
-        model="meta-llama/Llama-3.1-8B-Instruct", 
-        messages=messages, # type: ignore 
-        stream=False
-    ) # type: ignore
+        model="meta-llama/Llama-3.1-8B-Instruct",
+        messages=messages,  # type: ignore
+        stream=False,
+    )  # type: ignore
     print(response)
     # raise Exception(f"Response: {response}")
 

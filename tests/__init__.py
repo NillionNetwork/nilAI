@@ -37,7 +37,7 @@ response: SignedChatCompletion = SignedChatCompletion(
             finish_reason="stop",
             logprobs=ChoiceLogprobs(),
         )
-    ], # type: ignore
+    ],  # type: ignore
     usage=Usage(prompt_tokens=100, completion_tokens=50, total_tokens=150),
     signature="test-signature",
 )
