@@ -3,7 +3,7 @@ from typing import List, Optional, Literal, Iterable
 
 from openai.types.chat import ChatCompletion, ChatCompletionMessage
 from openai.types.chat.chat_completion import Choice as OpenaAIChoice
-from openai.types.chat.chat_completion import CompletionUsage
+from openai.types.completion_usage import CompletionUsage
 from openai.types.chat import ChatCompletionToolParam
 from pydantic import BaseModel, Field
 
@@ -22,7 +22,7 @@ __all__ = [
 
 
 class Message(ChatCompletionMessage):
-    role: Literal["system", "user", "assistant"]
+    role: Literal["system", "user", "assistant"] # type: ignore
 
 
 class Choice(OpenaAIChoice):

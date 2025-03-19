@@ -44,3 +44,4 @@ jobs:
           uv run pyright nilai-api
           uv run pyright tests
           uv run pyright nilai-models
+          uv run pyright packages/nilai-common
