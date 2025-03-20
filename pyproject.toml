@@ -49,3 +49,6 @@ verifier = { workspace = true }
 
 [tool.pyright]
 exclude = [".venv", "packages/verifier/"]
+
+[tool.ruff]
+exclude = [".venv", "packages/verifier"]
