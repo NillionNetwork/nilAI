@@ -194,7 +194,7 @@ async def chat_completion(
     )
 
     if req.nilrag:
-        return handle_nilrag(req)
+        handle_nilrag(req)
 
     if req.stream:
         client = AsyncOpenAI(base_url=model_url, api_key="<not-needed>")

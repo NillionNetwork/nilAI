@@ -53,6 +53,11 @@ def handle_nilrag(req: ChatRequest):
         logger.debug("Rag is starting.")
         # Step 1: Initialization
         # Get NilDB instance from request
+        if not req.nilrag or "nodes" not in req.nilrag:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="nilrag configuration is missing or invalid",
+            )
         nodes = []
         for node_data in req.nilrag["nodes"]:
             nodes.append(
