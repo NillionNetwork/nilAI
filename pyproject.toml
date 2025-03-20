@@ -48,4 +48,4 @@ verifier = { workspace = true }
 
 
 [tool.pyright]
-exclude = [".venv"]
+exclude = [".venv", "packages/verifier/"]
