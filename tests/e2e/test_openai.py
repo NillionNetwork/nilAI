@@ -249,11 +249,12 @@ class TestOpenAIClient:
             else:
                 # If no tool calls, check content
                 content = message.content
-                print(
-                    f"\nModel {model} response (no tool call): {content[:100]}..."
-                    if len(content) > 100
-                    else content
-                )
+                if content:
+                    print(
+                        f"\nModel {model} response (no tool call): {content[:100]}..."
+                        if len(content) > 100
+                        else content
+                    )
                 assert content, f"No content or tool calls returned for {model}"
 
         except Exception as e:

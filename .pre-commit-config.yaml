@@ -15,7 +15,15 @@ repos:
       - id: ruff  # Runs Ruff's linter
         exclude: "packages/verifier/"  # Excludes the "packages/verifier/" directory from linting
 
-  # Second repository: Local hooks (custom pre-commit checks)
+  # Second repository: Pyright for static type checking
+  - repo: local
+    hooks:
+      - id: pyright
+        name: pyright
+        entry: pyright
+        language: system
+        types: [python]
+  # Third repository: Local hooks (custom pre-commit checks)
   - repo: local
     hooks:
       - id: pytest  # Defines a local hook for running pytest
@@ -23,5 +31,5 @@ repos:
         entry: pytest  # The command to execute
         language: system  # Uses the system-installed pytest instead of a virtual environment
         types: [python]  # Applies only to Python files
-        pass_filenames: true  # Prevents passing filenames, so pytest runs on all tests
-        args: ["-v", "tests/unit"]  # Runs pytest with verbose output and only unit tests
+        pass_filenames: false  # Run pytest on the entire test suite rather than just changed files
+        args: ["-vvv", "tests/unit"]  # Runs pytest with verbose output and only unit tests
