@@ -7,7 +7,7 @@ from openai.types.chat import (
     ChatCompletionToolParam,
 )
 from openai.types.chat.chat_completion import Choice as OpenaAIChoice
-from openai.types.chat.chat_completion import CompletionUsage
+from openai.types.completion_usage import CompletionUsage
 from pydantic import BaseModel, Field
 
 __all__ = [

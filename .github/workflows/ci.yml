@@ -39,8 +39,8 @@ jobs:
       - name: Run tests
         run: uv run pytest -v tests/unit
 
-      # - name: pyright
-      #   run: uv run pyright nilai-api
+      - name: pyright
+        run: uv run pyright
 
   start-runner:
     name: Start self-hosted EC2 runner
