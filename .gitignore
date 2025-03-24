@@ -170,3 +170,10 @@ grafana/runtime-data/*
 
 prometheus/data/*
 !prometheus/data/.gitkeep
+
+# JS framework test
+tests/e2e/node_modules/
+tests/e2e/package-lock.json
+tests/e2e/coverage/
+tests/e2e/*.log
+tests/e2e/package.json
