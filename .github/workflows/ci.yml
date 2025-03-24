@@ -63,7 +63,7 @@ jobs:
           github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
           runners-per-machine: 1
           number-of-machines: 1
-          ec2-image-id: ami-0e53ca906f30585ea
+          ec2-image-id: ami-0ac221d824dd88706
           ec2-instance-type: g5.xlarge
           subnet-id: subnet-0ec4c353621eabae2
           security-group-id: sg-03ee5c56e1f467aa0
