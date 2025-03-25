@@ -155,10 +155,11 @@ jobs:
           uv run pytest -v tests/e2e
 
       - name: Stop Services
-        run: docker-compose -f docker-compose.yml \
+        run: |
+          docker-compose -f docker-compose.yml \
           -f docker-compose.dev.yml \
           -f docker/compose/docker-compose.llama-1b-gpu.ci.yml \
-          down
+          down -v
 
   stop-runner:
     name: Stop self-hosted EC2 runner
