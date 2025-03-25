@@ -7,8 +7,8 @@ from nilai_common.api_model import (
     Message,
     ModelEndpoint,
     ModelMetadata,
-    CompletionUsage as Usage,
 )
+from openai.types.completion_usage import CompletionUsage as Usage
 from nilai_common.config import SETTINGS
 from nilai_common.discovery import ModelServiceDiscovery
 
@@ -17,9 +17,6 @@ __all__ = [
     "ChatRequest",
     "SignedChatCompletion",
     "Choice",
-    "ChoiceChunk",
-    "ChoiceChunkContent",
-    "ChatCompletionChunk",
     "ModelMetadata",
     "Usage",
     "AttestationResponse",

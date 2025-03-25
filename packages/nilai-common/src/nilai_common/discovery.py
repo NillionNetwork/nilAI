@@ -171,6 +171,7 @@ async def main():
         license="MIT",
         source="https://github.com/example/model",
         supported_features=["image_classification", "transfer_learning"],
+        tool_support=False,
     )
 
     model_endpoint = ModelEndpoint(
