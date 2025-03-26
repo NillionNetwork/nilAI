@@ -45,7 +45,7 @@ class GoldenMeasurement:
             size (int): the size of the measurement value in number of bytes.
             alternatives (int): number of valid/alternative measurements.
             active (bool): True if the measurement is to be used for
-                           comparision with the runtime measurement else False.
+                           comparison with the runtime measurement else False.
         """
         self.set_component(component)
         self.set_value(values)
