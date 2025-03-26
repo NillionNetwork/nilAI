@@ -222,7 +222,6 @@ async def chat_completion(
 
                 async for chunk in response:
                     if chunk.usage is not None:
-                        logging.warning(f"[AAAAA] Usage: {chunk.usage}")
                         await UserManager.update_token_usage(
                             user.userid,
                             prompt_tokens=chunk.usage.prompt_tokens,
@@ -235,9 +234,7 @@ async def chat_completion(
                             completion_tokens=chunk.usage.completion_tokens,
                         )
 
-                    logging.warning(f"Chunk: {chunk}")
                     data = chunk.model_dump_json(exclude_unset=True)
-                    # logging.warning(f"Chunk: {data}")
                     yield f"data: {data}\n\n"
                     await asyncio.sleep(0)
 
