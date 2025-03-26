@@ -10,7 +10,7 @@ from openai.types.chat.chat_completion import CompletionUsage
 from openai.types.chat import ChatCompletionToolParam
 from pydantic import BaseModel, Field, model_validator
 
-from mongodb_filter_validator import MongoFilter
+from .mongodb_filter_validator import MongoFilter
 
 
 __all__ = [
