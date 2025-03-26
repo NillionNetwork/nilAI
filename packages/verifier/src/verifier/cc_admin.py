@@ -464,7 +464,7 @@ def attest(arguments_as_dictionary, nonce, gpu_evidence_list):
                 subject = cert.subject.public_bytes()
 
                 if issuer == subject:
-                    event_log.debug("Root certificate is a available.")
+                    event_log.debug("Root certificate is available.")
 
             if len(gpu_attestation_cert_chain) > 1:
                 common_name = (

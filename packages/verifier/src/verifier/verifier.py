@@ -160,7 +160,7 @@ class Verifier:
 
         Args:
             attestation_report_obj (AttestationReport): the attestation report.
-            driver_rim_obj (rim.RIM): the driver RIM object containing the the driver golden measurements.
+            driver_rim_obj (rim.RIM): the driver RIM object containing the driver golden measurements.
             vbios_rim_obj (rim.RIM): the vbios RIM object containing the vbios golden measurement.
             settings (config.HopperSettings): the object containing the various config info.
         """
