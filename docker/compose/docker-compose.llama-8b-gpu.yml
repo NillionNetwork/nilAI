@@ -1,8 +1,6 @@
 services:
   llama_8b_gpu:
-    build:
-      context: .
-      dockerfile: docker/vllm.Dockerfile
+    image: nillion/nilai-vllm:latest
     deploy:
       resources:
         reservations:
