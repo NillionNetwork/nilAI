@@ -10,6 +10,8 @@ from openai.types.chat.chat_completion import CompletionUsage
 from openai.types.chat import ChatCompletionToolParam
 from pydantic import BaseModel, Field, model_validator
 
+from mongodb_filter_validator import MongoFilter
+
 
 __all__ = [
     "Message",
@@ -35,7 +37,7 @@ class SecretVaultPayload(BaseModel):
     org_did: str
     secret_key: str
     inject_from: Optional[UUID] = None
-    filter_: Optional[Dict] = Field(None, alias="filter")
+    filter_: Optional[MongoFilter] = Field(None, alias="filter")
     save_to: Optional[UUID] = None
 
     @model_validator(mode='after')

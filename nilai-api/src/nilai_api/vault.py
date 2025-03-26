@@ -10,6 +10,8 @@ from jsonschema import validators, Draft7Validator
 from jsonschema.exceptions import ValidationError
 import uuid
 import time
+from typing import Any, Dict
+
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +56,7 @@ class SecretVaultHelper:
             f"fn:data_upload init complete: {len(self.nodes)} nodes | schema {schema_uuid}"
         )
 
-    def fetch_schemas(self) -> list:
+    def fetch_schemas(self) -> list[Dict[str, Any]]:
         """Get all my schemas from the first server."""
         headers = {
             "Authorization": f"Bearer {self.nodes[0]['bearer']}",
@@ -128,9 +130,9 @@ class SecretVaultHelper:
                     headers=headers,
                     json=body,
                 )
-                assert response.status_code == 200, (
-                    "upload failed: " + response.content.decode("utf8")
-                )
+                assert (
+                    response.status_code == 200
+                ), "upload failed: " + response.content.decode("utf8")
                 data = response.json().get("data")
                 for d in data:
                     shares[d["_id"]].append(d)
@@ -142,7 +144,7 @@ class SecretVaultHelper:
             logger.info(f"Error retrieving records in node: {e!r}")
             return []
 
-    def post(self, data_to_store: list) -> list:
+    def post(self, data_to_store: list[Dict[str, Any]]) -> list[str]:
         """Create/upload records in the specified node and schema."""
         logger.info(
             f"fn:data_upload {self.schema_uuid} | {type(data_to_store)} | {data_to_store}"
@@ -152,6 +154,8 @@ class SecretVaultHelper:
             validator = builder(self.schema_definition)
 
             logger.info(f"fn:data_upload <analysis> | got {len(data_to_store)} records")
+
+            # even with proper llm tool registration, a model might pass a plain dict to this function
             for entry in (
                 [data_to_store] if isinstance(data_to_store, dict) else data_to_store
             ):
