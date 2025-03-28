@@ -1,0 +1,27 @@
+{
+    "nodes": [
+        {
+            "url": "https://nildb-nx8v.nillion.network/api/v1",
+            "node_id": "did:nil:testnet:nillion1qfrl8nje3nvwh6cryj63mz2y6gsdptvn07nx8v",
+            "bearer_token": "eyJhbGciOiJFUzI1NksiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJkaWQ6bmlsOnRlc3RuZXQ6bmlsbGlvbjFjODJuZzdkbXh1cjZ5aDJ4OXllZDVwcDd5OGNyOTlseW5ucjQ0OSIsImF1ZCI6ImRpZDpuaWw6dGVzdG5ldDpuaWxsaW9uMXFmcmw4bmplM252d2g2Y3J5ajYzbXoyeTZnc2RwdHZuMDdueDh2IiwiZXhwIjoxNzQzMTgyMDAwfQ.DJFWB9nriR6sisoSweJLGuYvCCWaAOInCkeUIfBQDogBPZVcwmi0bV1LNDjCcKFC6ZpA7siVjBaFW9t1b2CoQA",
+            "schema_id": "7ed9b355-a0fb-471e-9e6c-e4dc368ed52b",
+            "diff_query_id": "b727a328-5bf1-4d92-b23b-ee37ff4ba032"
+        },
+        {
+            "url": "https://nildb-p3mx.nillion.network/api/v1",
+            "node_id": "did:nil:testnet:nillion1uak7fgsp69kzfhdd6lfqv69fnzh3lprg2mp3mx",
+            "bearer_token": "eyJhbGciOiJFUzI1NksiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJkaWQ6bmlsOnRlc3RuZXQ6bmlsbGlvbjFjODJuZzdkbXh1cjZ5aDJ4OXllZDVwcDd5OGNyOTlseW5ucjQ0OSIsImF1ZCI6ImRpZDpuaWw6dGVzdG5ldDpuaWxsaW9uMXVhazdmZ3NwNjlremZoZGQ2bGZxdjY5Zm56aDNscHJnMm1wM214IiwiZXhwIjoxNzQzMTgyMDAwfQ.dGetu6SP6JyKMNBjfi6tLO5ivkYrIWq_tVTxG3sCshL9UgokEODAfk0Hfck4inY4wzX6zmZut5AwKnHNar8EyA",
+            "schema_id": "7ed9b355-a0fb-471e-9e6c-e4dc368ed52b",
+            "diff_query_id": "b727a328-5bf1-4d92-b23b-ee37ff4ba032"
+        },
+        {
+            "url": "https://nildb-rugk.nillion.network/api/v1",
+            "node_id": "did:nil:testnet:nillion1kfremrp2mryxrynx66etjl8s7wazxc3rssrugk",
+            "bearer_token": "eyJhbGciOiJFUzI1NksiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJkaWQ6bmlsOnRlc3RuZXQ6bmlsbGlvbjFjODJuZzdkbXh1cjZ5aDJ4OXllZDVwcDd5OGNyOTlseW5ucjQ0OSIsImF1ZCI6ImRpZDpuaWw6dGVzdG5ldDpuaWxsaW9uMWtmcmVtcnAybXJ5eHJ5bng2NmV0amw4czd3YXp4YzNyc3NydWdrIiwiZXhwIjoxNzQzMTgyMDAwfQ.k8cGLM6B6cYJwEv0tva4w-sNL9ZlVLnC-XdpgZ2JYowAvatCTRLZp9WFE3uBIpUXTjRfPGQJHq3pfRJRoMDHdg",
+            "schema_id": "7ed9b355-a0fb-471e-9e6c-e4dc368ed52b",
+            "diff_query_id": "b727a328-5bf1-4d92-b23b-ee37ff4ba032"
+        }
+    ],
+    "org_secret_key": "0000000000000000000000000000000000000000000000000000000000000000",
+    "org_did": "0000000000000000000000000000000000000000000000000000000000000000"
+}

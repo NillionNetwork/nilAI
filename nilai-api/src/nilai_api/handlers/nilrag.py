@@ -74,8 +74,8 @@ def handle_nilrag(req: ChatRequest):
 
         # Initialize secret keys
         num_parties = len(nilDB.nodes)
-        additive_key = nilql.secret_key({"nodes": [{}] * num_parties}, {"sum": True})
-        xor_key = nilql.secret_key({"nodes": [{}] * num_parties}, {"store": True})
+        additive_key = nilql.secret_key({"nodes": [{}] * num_parties}, {"sum": True})  # type: ignore
+        xor_key = nilql.secret_key({"nodes": [{}] * num_parties}, {"store": True})  # type: ignore
 
         # Step 2: Secret share query
         logger.debug("Secret sharing query and sending to NilDB...")

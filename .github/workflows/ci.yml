@@ -107,6 +107,8 @@ jobs:
          cp .env.ci .env
          # Copy secret into .env replacing the existing HF_TOKEN
          sed -i 's/HF_TOKEN=.*/HF_TOKEN=${{ secrets.HF_TOKEN }}/' .env
+         sed -i 's/"org_secret_key":.*/"org_secret_key":"${{ secrets.NILLION_ORG_SECRET_KEY }}",/' tests/e2e/nilrag/config.json
+         sed -i 's/"org_did":.*/"org_did":"${{ secrets.NILLION_ORG_DID }}"/' tests/e2e/nilrag/config.json
 
       - name: Start Services
         run: |
