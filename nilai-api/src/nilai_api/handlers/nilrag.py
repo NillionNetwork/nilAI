@@ -2,7 +2,6 @@ import logging
 import numpy as np
 import time
 import sys
-import os
 
 import nilql
 import nilrag
@@ -22,9 +21,6 @@ logger = logging.getLogger(__name__)
 embeddings_model = SentenceTransformer(
     "sentence-transformers/all-MiniLM-L6-v2", device="cpu"
 )  # FIXME: Use a GPU model and move to a separate container
-
-#Retrieve the ENABLE_MEASUREMENTS flag from environment variable
-ENABLE_MEASUREMENTS = os.getenv("ENABLE_MEASUREMENTS", "0") in ["1", "True"]
 
 def get_size_in_MB(obj):
     return sys.getsizeof(obj) / (1024 * 1024)
@@ -85,9 +81,8 @@ def handle_nilrag(req: ChatRequest):
         num_parties = len(nilDB.nodes)
         additive_key = nilql.secret_key({"nodes": [{}] * num_parties}, {"sum": True})
         xor_key = nilql.secret_key({"nodes": [{}] * num_parties}, {"store": True})
-        if ENABLE_MEASUREMENTS:
-            end_time = time.time()
-            print(f"Initialization of secret keys took {end_time - start_time:.2f} seconds")
+        end_time = time.time()
+        secret_keys_initialization_time = end_time - start_time
 
         # Step 2: Secret share query
         logger.debug("Secret sharing query and sending to NilDB...")
@@ -101,31 +96,24 @@ def handle_nilrag(req: ChatRequest):
 
         if query is None:
             raise HTTPException(status_code=400, detail="No user query found")
-        if ENABLE_MEASUREMENTS:
-            end_time = time.time()
-            print(f"Time to extract user query {end_time - start_time:.2f} seconds")
+        end_time = time.time()
+        extract_user_query_time = end_time - start_time
 
         # 2.2 Generate query embeddings: one string query is assumed.
         start_time = time.time()
         query_embedding = generate_embeddings_huggingface([query])[0]
         nilql_query_embedding = encrypt_float_list(additive_key, query_embedding)
-        if ENABLE_MEASUREMENTS:
-            end_time = time.time()
-            print(f"Time to generate query embedding {end_time - start_time:.2f} seconds")
-            query_size = get_size_in_MB(nilql_query_embedding)
-            print(f"Size of secret-shared query sent to NilDB: {query_size:.3f} MB")
-
+        end_time = time.time()
+        embedding_generation_time = end_time - start_time
+        query_size = get_size_in_MB(nilql_query_embedding)
 
         # Step 3: Ask NilDB to compute the differences
         logger.debug("Requesting computation from NilDB...")
         start_time = time.time()
         difference_shares = nilDB.diff_query_execute(nilql_query_embedding)
-        if ENABLE_MEASUREMENTS:
-            end_time = time.time()
-            print(f"Time to ask nilDB to compute the differences {end_time - start_time:.2f} seconds")
-            diff_shares_size = get_size_in_MB(difference_shares)
-            print(f"Size of difference shares received: {diff_shares_size:.3f} MB")
-
+        end_time = time.time()
+        asking_nilDB_time = end_time - start_time
+        difference_shares_size = get_size_in_MB(difference_shares)
 
         # Step 4: Compute distances and sort
         logger.debug("Compute distances and sort...")
@@ -135,18 +123,16 @@ def handle_nilrag(req: ChatRequest):
             difference_shares,  # type: ignore
             lambda share: share["difference"],
         )
-        if ENABLE_MEASUREMENTS:
-            end_time = time.time()
-            print(f"Time to Group difference shares by ID {end_time - start_time:.2f} seconds")
+        end_time = time.time()
+        group_shares_by_id_time = end_time - start_time
         # 4.2 Transpose the lists for each _id
         start_time = time.time()
         difference_shares_by_id = {
             id: np.array(differences).T.tolist()
             for id, differences in difference_shares_by_id.items()
         }
-        if ENABLE_MEASUREMENTS:
-            end_time = time.time()
-            print(f"Time to Transpose the lists for each _id {end_time - start_time:.2f} seconds")
+        end_time = time.time()
+        transpose_lists_time = end_time - start_time
         # 4.3 Decrypt and compute distances
         start_time = time.time()
         reconstructed = [
@@ -158,15 +144,15 @@ def handle_nilrag(req: ChatRequest):
             }
             for id, difference_shares in difference_shares_by_id.items()
         ]
-        if ENABLE_MEASUREMENTS:
-            end_time = time.time()
-            print(f"Time to Decrypt and compute distances {end_time - start_time:.2f} seconds")
+        end_time = time.time()
+        decryption_time = end_time - start_time
+
         # 4.4 Sort id list based on the corresponding distances
         start_time = time.time()
         sorted_ids = sorted(reconstructed, key=lambda x: x["distances"])
-        if ENABLE_MEASUREMENTS:
-            end_time = time.time()
-            print(f"Time to Sort id list based on the corresponding distances {end_time - start_time:.2f} seconds")
+        end_time = time.time()
+        sort_id_list_time = end_time - start_time
+
         # Step 5: Query the top k
         logger.debug("Query top k chunks...")
         top_k = 2
@@ -175,21 +161,17 @@ def handle_nilrag(req: ChatRequest):
         # 5.1 Query top k
         start_time = time.time()
         chunk_shares = nilDB.chunk_query_execute(top_k_ids)
-        if ENABLE_MEASUREMENTS:
-            end_time = time.time()
-            print(f"Time to Query {top_k} chunks {end_time - start_time:.2f} seconds")
-            chunk_shares_size = get_size_in_MB(chunk_shares)
-            print(f"Size of chunk shares received: {chunk_shares_size:.3f} MB")
-
+        end_time = time.time()
+        query_top_chunks_time = end_time - start_time
+        chunks_shares_size = get_size_in_MB(chunk_shares)
         # 5.2 Group chunk shares by ID
         start_time = time.time()
         chunk_shares_by_id = group_shares_by_id(
             chunk_shares,  # type: ignore
             lambda share: share["chunk"],
         )
-        if ENABLE_MEASUREMENTS:
-            end_time = time.time()
-            print(f"Time to Group chunk shares by ID {end_time - start_time:.2f} seconds")
+        end_time = time.time()
+        group_chunks_time = end_time - start_time
 
         # 5.3 Decrypt chunks
         start_time = time.time()
@@ -197,9 +179,8 @@ def handle_nilrag(req: ChatRequest):
             {"_id": id, "distances": nilql.decrypt(xor_key, chunk_shares)}
             for id, chunk_shares in chunk_shares_by_id.items()
         ]
-        if ENABLE_MEASUREMENTS:
-            end_time = time.time()
-            print(f"Time to decrypt chunk {end_time - start_time:.2f} seconds")
+        end_time = time.time()
+        decrypt_chunks_time = end_time - start_time
 
         # Step 6: Format top results
         start_time = time.time()
@@ -207,9 +188,8 @@ def handle_nilrag(req: ChatRequest):
             f"- {str(result['distances'])}" for result in top_results
         )
         relevant_context = f"\n\nRelevant Context:\n{formatted_results}"
-        if ENABLE_MEASUREMENTS:
-            end_time = time.time()
-            print(f"Time to format top resuls {end_time - start_time:.2f} seconds")
+        end_time = time.time()
+        format_results_time = end_time - start_time
 
         # Step 7: Update system message
         start_time = time.time()
@@ -227,10 +207,27 @@ def handle_nilrag(req: ChatRequest):
         else:
             # If no system message exists, add one
             req.messages.insert(0, Message(role="system", content=relevant_context))
-        if ENABLE_MEASUREMENTS:
-            end_time = time.time()
-            print(f"Time to update system message {end_time - start_time:.2f} seconds")
+        end_time = time.time()
+        update_system_message_time = end_time - start_time
         logger.debug(f"System message updated with relevant context:\n {req.messages}")
+        return {
+            "secret_keys_initialization_time": secret_keys_initialization_time,
+            "extract_user_query_time": extract_user_query_time,
+            "embedding_generation_time": embedding_generation_time,
+            "query_size": query_size,
+            "asking_nilDB_time": asking_nilDB_time,
+            "group_shares_by_id_time": group_shares_by_id_time,
+            "transpose_lists_time": transpose_lists_time,
+            "decryption_time": decryption_time,
+            "sort_id_list_time": sort_id_list_time,
+            "query_top_chunks_time": query_top_chunks_time,
+            "group_chunks_time": group_chunks_time,
+            "decrypt_chunks_time": decrypt_chunks_time,
+            "format_results_time": format_results_time,
+            "update_system_message_time": update_system_message_time,
+            "difference_shares_size": difference_shares_size,
+            "chunks_shares_size": chunks_shares_size,
+        }
 
     except Exception as e:
         logger.error("An error occurred within nilrag: %s", str(e))

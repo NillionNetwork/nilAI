@@ -42,6 +42,22 @@ class ChatRequest(BaseModel):
 
 class SignedChatCompletion(ChatCompletion):
     signature: str
+    secret_keys_initialization_time: Optional[float] = None
+    extract_user_query_time: Optional[float] = None
+    embedding_generation_time: Optional[float] = None
+    asking_nilDB_time: Optional[float] = None
+    group_shares_by_id_time: Optional[float] = None
+    transpose_lists_time: Optional[float] = None
+    decryption_time: Optional[float] = None
+    sort_id_list_time: Optional[float] = None
+    query_top_chunks_time: Optional[float] = None
+    group_chunks_time: Optional[float] = None
+    decrypt_chunks_time: Optional[float] = None
+    format_results_time: Optional[float] = None
+    update_system_message_time: Optional[float] = None
+    query_size: Optional[float] = None
+    chunks_shares_size: Optional[float] = None
+    difference_shares_size: Optional[float] = None
 
 
 class AttestationResponse(BaseModel):

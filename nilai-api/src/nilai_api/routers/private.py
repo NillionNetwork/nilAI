@@ -195,8 +195,10 @@ async def chat_completion(
         f"Chat completion request for model {model_name} from user {user.userid} on url: {model_url}"
     )
 
+    nilrag_metrics = {}
     if req.nilrag:
-        handle_nilrag(req)
+        nilrag_metrics = handle_nilrag(req)
+        logger.info(f"NilRag metrics: {nilrag_metrics}")
 
     if req.stream:
         client = AsyncOpenAI(base_url=model_url, api_key="<not-needed>")
@@ -261,6 +263,7 @@ async def chat_completion(
     model_response = SignedChatCompletion(
         **response.model_dump(),
         signature="",
+        **nilrag_metrics,
     )
     if model_response.usage is None:
         raise HTTPException(
