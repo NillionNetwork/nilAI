@@ -412,7 +412,7 @@ def test_large_payload_handling(client):
         "max_tokens": 50,
     }
 
-    response = client.post("/chat/completions", json=payload)
+    response = client.post("/chat/completions", json=payload, timeout=30)
     print(response)
 
     # Check for appropriate handling of large payload
