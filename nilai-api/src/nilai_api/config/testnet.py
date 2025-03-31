@@ -9,6 +9,7 @@ MODEL_CONCURRENT_RATE_LIMIT = {
     "meta-llama/Llama-3.1-8B-Instruct": 5,
     "cognitivecomputations/Dolphin3.0-Llama3.1-8B": 5,
     "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B": 5,
+    "hugging-quants/Meta-Llama-3.1-70B-Instruct-AWQ-INT4": 5,
 }
 
 # It defines the number of requests allowed for each user for a given time frame.
