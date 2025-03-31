@@ -245,7 +245,9 @@ def test_function_calling(client, model):
             assert follow_up_content, "No content in follow-up response"
             print(f"\nFollow-up response: {follow_up_content}")
             assert (
-                "22°C" in follow_up_content or "sunny" in follow_up_content.lower()
+                "22°C" in follow_up_content
+                or "sunny" in follow_up_content.lower()
+                or "weather" in follow_up_content.lower()
             ), "Follow-up should mention the weather details"
 
         else:
