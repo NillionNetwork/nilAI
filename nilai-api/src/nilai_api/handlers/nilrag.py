@@ -25,6 +25,9 @@ embeddings_model = SentenceTransformer(
 def get_size_in_MB(obj):
     return sys.getsizeof(obj) / (1024 * 1024)
 
+def get_size_in_KB(obj):
+    return sys.getsizeof(obj) / 1024
+
 def generate_embeddings_huggingface(
     chunks_or_query: Union[str, list],
 ):
@@ -82,7 +85,7 @@ def handle_nilrag(req: ChatRequest):
         additive_key = nilql.secret_key({"nodes": [{}] * num_parties}, {"sum": True})
         xor_key = nilql.secret_key({"nodes": [{}] * num_parties}, {"store": True})
         end_time = time.time()
-        secret_keys_initialization_time = end_time - start_time
+        secret_keys_initialization_time = round(end_time - start_time, 2)
 
         # Step 2: Secret share query
         logger.debug("Secret sharing query and sending to NilDB...")
@@ -97,23 +100,23 @@ def handle_nilrag(req: ChatRequest):
         if query is None:
             raise HTTPException(status_code=400, detail="No user query found")
         end_time = time.time()
-        extract_user_query_time = end_time - start_time
+        extract_user_query_time = round(end_time - start_time, 2)
 
         # 2.2 Generate query embeddings: one string query is assumed.
         start_time = time.time()
         query_embedding = generate_embeddings_huggingface([query])[0]
         nilql_query_embedding = encrypt_float_list(additive_key, query_embedding)
         end_time = time.time()
-        embedding_generation_time = end_time - start_time
-        query_size = get_size_in_MB(nilql_query_embedding)
+        embedding_generation_time = round(end_time - start_time, 2)
+        query_size = round(get_size_in_KB(nilql_query_embedding),2)
 
         # Step 3: Ask NilDB to compute the differences
         logger.debug("Requesting computation from NilDB...")
         start_time = time.time()
         difference_shares = nilDB.diff_query_execute(nilql_query_embedding)
         end_time = time.time()
-        asking_nilDB_time = end_time - start_time
-        difference_shares_size = get_size_in_MB(difference_shares)
+        asking_nilDB_time = round(end_time - start_time, 2)
+        difference_shares_size = round(get_size_in_KB(difference_shares),2)
 
         # Step 4: Compute distances and sort
         logger.debug("Compute distances and sort...")
@@ -124,7 +127,7 @@ def handle_nilrag(req: ChatRequest):
             lambda share: share["difference"],
         )
         end_time = time.time()
-        group_shares_by_id_time = end_time - start_time
+        group_shares_by_id_time = round(end_time - start_time, 2)
         # 4.2 Transpose the lists for each _id
         start_time = time.time()
         difference_shares_by_id = {
@@ -132,7 +135,7 @@ def handle_nilrag(req: ChatRequest):
             for id, differences in difference_shares_by_id.items()
         }
         end_time = time.time()
-        transpose_lists_time = end_time - start_time
+        transpose_lists_time = round(end_time - start_time, 2)
         # 4.3 Decrypt and compute distances
         start_time = time.time()
         reconstructed = [
@@ -145,13 +148,13 @@ def handle_nilrag(req: ChatRequest):
             for id, difference_shares in difference_shares_by_id.items()
         ]
         end_time = time.time()
-        decryption_time = end_time - start_time
+        decryption_time = round(end_time - start_time, 2)
 
         # 4.4 Sort id list based on the corresponding distances
         start_time = time.time()
         sorted_ids = sorted(reconstructed, key=lambda x: x["distances"])
         end_time = time.time()
-        sort_id_list_time = end_time - start_time
+        sort_id_list_time = round(end_time - start_time, 2)
 
         # Step 5: Query the top k
         logger.debug("Query top k chunks...")
@@ -162,8 +165,8 @@ def handle_nilrag(req: ChatRequest):
         start_time = time.time()
         chunk_shares = nilDB.chunk_query_execute(top_k_ids)
         end_time = time.time()
-        query_top_chunks_time = end_time - start_time
-        chunks_shares_size = get_size_in_MB(chunk_shares)
+        query_top_chunks_time = round(end_time - start_time, 2)
+        chunks_shares_size = round(get_size_in_KB(chunk_shares), 2)
         # 5.2 Group chunk shares by ID
         start_time = time.time()
         chunk_shares_by_id = group_shares_by_id(
@@ -171,7 +174,7 @@ def handle_nilrag(req: ChatRequest):
             lambda share: share["chunk"],
         )
         end_time = time.time()
-        group_chunks_time = end_time - start_time
+        group_chunks_time = round(end_time - start_time, 2)
 
         # 5.3 Decrypt chunks
         start_time = time.time()
@@ -180,7 +183,7 @@ def handle_nilrag(req: ChatRequest):
             for id, chunk_shares in chunk_shares_by_id.items()
         ]
         end_time = time.time()
-        decrypt_chunks_time = end_time - start_time
+        decrypt_chunks_time = round(end_time - start_time, 2)
 
         # Step 6: Format top results
         start_time = time.time()
@@ -189,7 +192,7 @@ def handle_nilrag(req: ChatRequest):
         )
         relevant_context = f"\n\nRelevant Context:\n{formatted_results}"
         end_time = time.time()
-        format_results_time = end_time - start_time
+        format_results_time = round(end_time - start_time, 2)
 
         # Step 7: Update system message
         start_time = time.time()
@@ -208,25 +211,25 @@ def handle_nilrag(req: ChatRequest):
             # If no system message exists, add one
             req.messages.insert(0, Message(role="system", content=relevant_context))
         end_time = time.time()
-        update_system_message_time = end_time - start_time
+        update_system_message_time = round(end_time - start_time, 2)
         logger.debug(f"System message updated with relevant context:\n {req.messages}")
         return {
-            "secret_keys_initialization_time": secret_keys_initialization_time,
-            "extract_user_query_time": extract_user_query_time,
-            "embedding_generation_time": embedding_generation_time,
-            "query_size": query_size,
-            "asking_nilDB_time": asking_nilDB_time,
-            "group_shares_by_id_time": group_shares_by_id_time,
-            "transpose_lists_time": transpose_lists_time,
-            "decryption_time": decryption_time,
-            "sort_id_list_time": sort_id_list_time,
-            "query_top_chunks_time": query_top_chunks_time,
-            "group_chunks_time": group_chunks_time,
-            "decrypt_chunks_time": decrypt_chunks_time,
-            "format_results_time": format_results_time,
-            "update_system_message_time": update_system_message_time,
-            "difference_shares_size": difference_shares_size,
-            "chunks_shares_size": chunks_shares_size,
+            "secret_keys_initialization_seconds": secret_keys_initialization_time,
+            "extract_user_query_seconds": extract_user_query_time,
+            "embedding_generation_seconds": embedding_generation_time,
+            "asking_nilDB_seconds": asking_nilDB_time,
+            "group_shares_by_id_seconds": group_shares_by_id_time,
+            "transpose_lists_seconds": transpose_lists_time,
+            "decryption_seconds": decryption_time,
+            "sort_id_list_seconds": sort_id_list_time,
+            "query_top_chunks_seconds": query_top_chunks_time,
+            "group_chunks_seconds": group_chunks_time,
+            "decrypt_chunks_seconds": decrypt_chunks_time,
+            "format_results_seconds": format_results_time,
+            "update_system_message_seconds": update_system_message_time,
+            "query_size_kbs": query_size,
+            "difference_shares_size_kbs": difference_shares_size,
+            "chunks_shares_size_kbs": chunks_shares_size,
         }
 
     except Exception as e:
