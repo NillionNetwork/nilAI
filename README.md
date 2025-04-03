@@ -37,13 +37,13 @@ Then, to deploy:
 # Deploy with CPU-only configuration
 docker compose -f docker-compose.yml \
   -f docker-compose.dev.yml \
-  -f docker/compose/docker-compose.llama-1b-cpu.yml \
+  -f docker/compose/docker-compose.llama-1b-gpu.yml \
   up -d
 
 # Monitor logs
 docker compose -f docker-compose.yml \
   -f docker-compose.dev.yml \
-  -f docker/compose/docker-compose.llama-1b-cpu.yml \
+  -f docker/compose/docker-compose.llama-1b-gpu.yml \
   logs -f
 ```
 
