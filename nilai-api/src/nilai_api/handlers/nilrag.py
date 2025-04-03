@@ -29,8 +29,6 @@ def generate_embeddings_huggingface(
 
     Args:
         chunks_or_query (str or list): Text string(s) to generate embeddings for
-        model_name (str, optional): Name of the HuggingFace model to use.
-            Defaults to 'sentence-transformers/all-MiniLM-L6-v2'.
 
     Returns:
         numpy.ndarray: Array of embeddings for the input text
@@ -39,7 +37,7 @@ def generate_embeddings_huggingface(
     return embeddings
 
 
-def handle_nilrag(req: ChatRequest):
+async def handle_nilrag(req: ChatRequest):
     """
     Endpoint to process a client query.
     1. Initialization: Secret share keys and NilDB instance.
@@ -95,7 +93,7 @@ def handle_nilrag(req: ChatRequest):
 
         # Step 3: Ask NilDB to compute the differences
         logger.debug("Requesting computation from NilDB...")
-        difference_shares = nilDB.diff_query_execute(nilql_query_embedding)
+        difference_shares = await nilDB.diff_query_execute(nilql_query_embedding)
 
         # Step 4: Compute distances and sort
         logger.debug("Compute distances and sort...")
@@ -106,8 +104,7 @@ def handle_nilrag(req: ChatRequest):
         )
         # 4.2 Transpose the lists for each _id
         difference_shares_by_id = {
-            id: np.array(differences).T.tolist()
-            for id, differences in difference_shares_by_id.items()
+            id: list(map(list, zip(*differences))) for id, differences in difference_shares_by_id.items()
         }
         # 4.3 Decrypt and compute distances
         reconstructed = [
@@ -124,11 +121,13 @@ def handle_nilrag(req: ChatRequest):
 
         # Step 5: Query the top k
         logger.debug("Query top k chunks...")
-        top_k = 2
+        top_k = req.nilrag.get('num_chunks', 2)
+        if not isinstance(top_k, int):
+            raise HTTPException(status_code=400, detail="num_chunks must be an integer as it represents the number of chunks to be retrieved.")
         top_k_ids = [item["_id"] for item in sorted_ids[:top_k]]
 
         # 5.1 Query top k
-        chunk_shares = nilDB.chunk_query_execute(top_k_ids)
+        chunk_shares = await nilDB.chunk_query_execute(top_k_ids)
 
         # 5.2 Group chunk shares by ID
         chunk_shares_by_id = group_shares_by_id(

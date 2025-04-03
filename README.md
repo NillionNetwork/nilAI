@@ -115,7 +115,7 @@ docker run -d --name postgres \
 2. **Run API Server**
    ```shell
    # Development Environment
-    fastapi dev nilai-api/src/nilai_api/__main__.py --port 8080
+   uv run fastapi dev nilai-api/src/nilai_api/__main__.py --port 8080
 
    # Production Environment
    uv run fastapi run nilai-api/src/nilai_api/__main__.py --port 8080
