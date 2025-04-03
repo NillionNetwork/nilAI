@@ -1,5 +1,6 @@
 services:
   api:
+    platform: linux/amd64
     ports:
       - "8080:8080"
       - "8443:8443"
@@ -11,6 +12,3 @@ services:
   postgres:
     ports:
       - "5432:5432"
-  grafana:
-    ports:
-      - "3000:3000"
