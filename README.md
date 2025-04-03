@@ -18,7 +18,7 @@ nilAI is a platform designed to run on Confidential VMs with Trusted Execution E
    ```
    - Update the environment variables in `.env`:
      - `HUGGINGFACE_API_TOKEN`: Your Hugging Face API token
-   - Obtain Hugging Face token by requesting access on the specific model's [Hugging Face page](https://huggingface.co/meta-llama/Llama-3.2-1B)
+   - Obtain token by requesting access on the specific model's Hugging Face page. For example, to request access for the Llama 1B model, you can ask [here](https://huggingface.co/meta-llama/Llama-3.2-1B). Note that for the Llama-8B model, you need to make a separate request.
 
 ## Deployment Options
 
