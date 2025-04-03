@@ -3,8 +3,16 @@
 		protocols tls1.2 tls1.3
 	}
  }
- 
- https://test.nilai.sandbox.nilogy.xyz {
+
+{$NILAI_SERVER_DOMAIN} {
 	import ssl_config
-	reverse_proxy api:8443
+
+	handle_path /grafana/* {
+		uri strip_prefix /grafana
+		reverse_proxy grafana:3000
+	}
+
+	handle {
+		reverse_proxy api:8443
+	}
  }

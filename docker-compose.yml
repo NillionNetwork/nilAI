@@ -90,12 +90,11 @@ services:
       - ${PWD}/grafana/runtime-data:/var/lib/grafana
       - ${PWD}/grafana/datasources/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
       - ${PWD}/grafana/dashboards/filesystem.yml:/etc/grafana/provisioning/dashboards/filesystem.yml
+      - ${PWD}/grafana/config/grafana.ini:/etc/grafana/grafana.ini
     env_file:
       - .env
     environment:
       - GF_USERS_ALLOW_SIGN_UP=false
-    ports:
-      - "127.0.0.1:3000:3000"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
       interval: 30s
@@ -137,6 +136,8 @@ services:
       - "80:80"
       - "443:443"
       - "443:443/udp"
+    env_file:
+      - .env
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile
       - ./caddy/caddy_data:/data
