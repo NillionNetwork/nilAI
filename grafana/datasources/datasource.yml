@@ -9,3 +9,22 @@ datasources:
     isDefault: true
     # Fix the UID so we can provision dashboards that reference this.
     uid": "PBFA97CFB590B2093"
+
+  - name: PostgreSQL
+    type: postgres
+    access: proxy
+    orgId: 1
+    url: ${POSTGRES_HOST}:${POSTGRES_PORT}
+    isDefault: false
+    uid: "eehsf95n2at4we"
+    database: ${POSTGRES_DB}
+    user: ${POSTGRES_USER}
+    secureJsonData:
+      password: ${POSTGRES_PASSWORD}
+    jsonData:
+      sslmode: 'disable'
+      maxOpenConns: 100
+      maxIdleConns: 100
+      connMaxLifetime: 14400
+      postgresVersion: 1200
+      timescaledb: false

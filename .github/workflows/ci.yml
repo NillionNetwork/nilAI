@@ -112,6 +112,7 @@ jobs:
         run: |
           docker-compose -f docker-compose.yml \
           -f docker-compose.dev.yml \
+          -f docker-compose.prod.yml \
           -f docker/compose/docker-compose.llama-1b-gpu.ci.yml \
           up -d
           docker ps -a
@@ -130,6 +131,7 @@ jobs:
         run: |
           docker-compose -f docker-compose.yml \
           -f docker-compose.dev.yml \
+          -f docker-compose.prod.yml \
           -f docker/compose/docker-compose.llama-1b-gpu.ci.yml \
           down -v
 

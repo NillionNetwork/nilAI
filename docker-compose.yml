@@ -82,6 +82,7 @@ services:
     restart: unless-stopped
     networks:
       - frontend_net
+      - proxy_net
     user: "$UID:$GID"
     depends_on:
       - prometheus
@@ -89,12 +90,11 @@ services:
       - ${PWD}/grafana/runtime-data:/var/lib/grafana
       - ${PWD}/grafana/datasources/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
       - ${PWD}/grafana/dashboards/filesystem.yml:/etc/grafana/provisioning/dashboards/filesystem.yml
+      - ${PWD}/grafana/config/grafana.ini:/etc/grafana/grafana.ini
     env_file:
       - .env
     environment:
       - GF_USERS_ALLOW_SIGN_UP=false
-    ports:
-      - "127.0.0.1:3000:3000"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
       interval: 30s
@@ -105,22 +105,19 @@ services:
   api:
     container_name: nilai-api
     image: nillion/nilai-api:latest
+    privileged: true
+    volumes:
+      - /dev/sev-guest:/dev/sev-guest # for AMD SEV
     depends_on:
       etcd:
         condition: service_healthy
       postgres:
         condition: service_healthy
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
     restart: unless-stopped
     networks:
       - frontend_net
       - backend_net
+      - proxy_net
     env_file:
       - .env
     healthcheck:
@@ -129,7 +126,22 @@ services:
       retries: 3
       start_period: 15s
       timeout: 10s
-
+  caddy:
+    image: caddy:latest
+    container_name: caddy
+    restart: unless-stopped
+    networks:
+      - proxy_net
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    env_file:
+      - .env
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+      - ./caddy/caddy_data:/data
+      - ./caddy/caddy_config:/config
 networks:
   # This is the network that is used for the "api" related services
   ## API, user management (postgres), caching (redis) and monitoring (prometheus, grafana)
@@ -137,6 +149,9 @@ networks:
   # This is the network that is used for the model related services:
   ## API, models, and etcd
   backend_net:
+  # This network is meant to connect from the outside world to the API
+  ## This connects the API and Caddy
+  proxy_net:
 
 volumes:
   postgres_data:

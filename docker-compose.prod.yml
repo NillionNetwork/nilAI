@@ -1,25 +1,9 @@
 services:
   api:
-    privileged: true
-    volumes:
-      - /dev/sev-guest:/dev/sev-guest # for AMD SEV
-    networks:
-      - proxy_net
-  caddy:
-    image: caddy:latest
-    container_name: caddy
-    restart: unless-stopped
-    networks:
-      - proxy_net
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    volumes:
-      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
-      - ./caddy/caddy_data:/data
-      - ./caddy/caddy_config:/config
-networks:
-  # This network is meant to connect from the outside world to the API
-  ## This connects the API and Caddy
-  proxy_net:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
