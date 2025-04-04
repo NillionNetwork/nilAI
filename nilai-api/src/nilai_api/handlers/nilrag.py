@@ -173,6 +173,9 @@ async def handle_nilrag(req: ChatRequest):
 
         logger.debug(f"System message updated with relevant context:\n {req.messages}")
 
+    except HTTPException as e:
+        raise e
+
     except Exception as e:
         logger.error("An error occurred within nilrag: %s", str(e))
         raise HTTPException(
