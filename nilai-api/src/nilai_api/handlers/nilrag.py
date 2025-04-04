@@ -72,8 +72,12 @@ async def handle_nilrag(req: ChatRequest):
 
         # Initialize secret keys
         num_parties = len(nilDB.nodes)
-        additive_key = nilql.secret_key({"nodes": [{}] * num_parties}, {"sum": True})
-        xor_key = nilql.secret_key({"nodes": [{}] * num_parties}, {"store": True})
+        additive_key = nilql.ClusterKey.generate(
+            {"nodes": [{}] * num_parties}, {"sum": True}
+        )
+        xor_key = nilql.ClusterKey.generate(
+            {"nodes": [{}] * num_parties}, {"store": True}
+        )
 
         # Step 2: Secret share query
         logger.debug("Secret sharing query and sending to NilDB...")
@@ -104,7 +108,8 @@ async def handle_nilrag(req: ChatRequest):
         )
         # 4.2 Transpose the lists for each _id
         difference_shares_by_id = {
-            id: list(map(list, zip(*differences))) for id, differences in difference_shares_by_id.items()
+            id: list(map(list, zip(*differences)))
+            for id, differences in difference_shares_by_id.items()
         }
         # 4.3 Decrypt and compute distances
         reconstructed = [
@@ -121,9 +126,12 @@ async def handle_nilrag(req: ChatRequest):
 
         # Step 5: Query the top k
         logger.debug("Query top k chunks...")
-        top_k = req.nilrag.get('num_chunks', 2)
+        top_k = req.nilrag.get("num_chunks", 2)
         if not isinstance(top_k, int):
-            raise HTTPException(status_code=400, detail="num_chunks must be an integer as it represents the number of chunks to be retrieved.")
+            raise HTTPException(
+                status_code=400,
+                detail="num_chunks must be an integer as it represents the number of chunks to be retrieved.",
+            )
         top_k_ids = [item["_id"] for item in sorted_ids[:top_k]]
 
         # 5.1 Query top k
