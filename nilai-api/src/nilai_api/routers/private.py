@@ -93,15 +93,6 @@ async def get_models(user: UserModel = Depends(get_user)) -> List[ModelMetadata]
     """
     logger.info(f"Retrieving models for user {user.userid} from pid {os.getpid()}")
     return [endpoint.metadata for endpoint in (await state.models).values()]
-    # result = [Model(
-    #     id = endpoint.metadata.id,
-    #     created = 0,
-    #     object = "model",
-    #     owned_by = endpoint.metadata.author,
-    #     data = endpoint.metadata.dict(),
-    # ) for endpoint in (await state.models).values()]
-
-    # return result[0]
 
 
 async def chat_completion_concurrent_rate_limit(request: Request) -> Tuple[int, str]:
@@ -196,7 +187,7 @@ async def chat_completion(
     )
 
     if req.nilrag:
-        handle_nilrag(req)
+        await handle_nilrag(req)
 
     if req.stream:
         client = AsyncOpenAI(base_url=model_url, api_key="<not-needed>")
