@@ -28,7 +28,6 @@ class Message(ChatCompletionMessage):
 class Choice(OpenaAIChoice):
     pass
 
-
 class ChatRequest(BaseModel):
     model: str
     messages: List[Message] = Field(..., min_length=1)
@@ -37,7 +36,20 @@ class ChatRequest(BaseModel):
     max_tokens: Optional[int] = Field(default=2048, ge=1, le=100000)
     stream: Optional[bool] = False
     tools: Optional[Iterable[ChatCompletionToolParam]] = None
-    nilrag: Optional[dict] = {}
+    nilrag: Optional[NilRag] = {}
+
+class Node(BaseModel):
+    url: str
+    node_id: str
+    bearer_token: str
+    schema_id: str
+    diff_query_id: str
+
+class NilRag(BaseModel):
+    nodes: List[Node]
+    org_secret_key: str
+    org_did: str
+    num_chunks: Optional[int] = Field(default=2, ge=1, le=100)
 
 
 class SignedChatCompletion(ChatCompletion):
