@@ -40,17 +40,15 @@ def generate_embeddings_huggingface(
 async def handle_nilrag(req: ChatRequest):
     """
     Endpoint to process a client query.
-    1. Initialization: Secret share keys and NilDB instance.
-    2. Secret share query and send to NilDB.
-    3. Ask NilDB to compute the differences.
-    4. Compute distances and sort.
-    5. Ask NilDB to return top k chunks.
-    6. Append top results to LLM query
+    1. Get inputs from request.
+    2. Execute nilRAG using nilrag library.
+    3. & 4. Format and append top results to LLM query
     """
     try:
         logger.debug("Rag is starting.")
-        # Step 1: Initialization
-        # Get NilDB instance from request
+        
+        # Step 1: Get inputs
+        # Get nilDB instances
         if not req.nilrag or "nodes" not in req.nilrag:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -70,18 +68,8 @@ async def handle_nilrag(req: ChatRequest):
             )
         nilDB = nilrag.NilDB(nodes)
 
-        # Initialize secret keys
-        num_parties = len(nilDB.nodes)
-        additive_key = nilql.ClusterKey.generate(
-            {"nodes": [{}] * num_parties}, {"sum": True}
-        )
-        xor_key = nilql.ClusterKey.generate(
-            {"nodes": [{}] * num_parties}, {"store": True}
-        )
-
-        # Step 2: Secret share query
-        logger.debug("Secret sharing query and sending to NilDB...")
-        # 2.1 Extract the user query
+        # Get user query
+        logger.debug("Extracting user query")
         query = None
         for message in req.messages:
             if message.role == "user":
@@ -90,74 +78,20 @@ async def handle_nilrag(req: ChatRequest):
 
         if query is None:
             raise HTTPException(status_code=400, detail="No user query found")
+        
+        # Get number of chunks to include
+        num_chunks = req.nilrag.get("num_chunks", 2)
 
-        # 2.2 Generate query embeddings: one string query is assumed.
-        query_embedding = generate_embeddings_huggingface([query])[0]
-        nilql_query_embedding = encrypt_float_list(additive_key, query_embedding)
+        # Step 2: Execute nilRAG
+        top_results = await nilDB.top_num_chunks_execute(query, num_chunks)
 
-        # Step 3: Ask NilDB to compute the differences
-        logger.debug("Requesting computation from NilDB...")
-        difference_shares: List[List[Dict[str, Any]]] = await nilDB.diff_query_execute(
-            nilql_query_embedding
-        )
-
-        # Step 4: Compute distances and sort
-        logger.debug("Compute distances and sort...")
-        # 4.1 Group difference shares by ID
-        difference_shares_by_id = group_shares_by_id(
-            difference_shares,  # type: ignore
-            lambda share: share["difference"],
-        )
-        # 4.2 Transpose the lists for each _id
-        difference_shares_by_id = {
-            id: list(map(list, zip(*differences)))
-            for id, differences in difference_shares_by_id.items()
-        }
-        # 4.3 Decrypt and compute distances
-        reconstructed = [
-            {
-                "_id": id,
-                "distances": np.linalg.norm(
-                    decrypt_float_list(additive_key, difference_shares)
-                ),
-            }
-            for id, difference_shares in difference_shares_by_id.items()
-        ]
-        # 4.4 Sort id list based on the corresponding distances
-        sorted_ids = sorted(reconstructed, key=lambda x: x["distances"])
-
-        # Step 5: Query the top k
-        logger.debug("Query top k chunks...")
-        top_k = req.nilrag.get("num_chunks", 2)
-        if not isinstance(top_k, int):
-            raise HTTPException(
-                status_code=400,
-                detail="num_chunks must be an integer as it represents the number of chunks to be retrieved.",
-            )
-        top_k_ids = [item["_id"] for item in sorted_ids[:top_k]]
-
-        # 5.1 Query top k
-        chunk_shares = await nilDB.chunk_query_execute(top_k_ids)
-
-        # 5.2 Group chunk shares by ID
-        chunk_shares_by_id = group_shares_by_id(
-            chunk_shares,  # type: ignore
-            lambda share: share["chunk"],
-        )
-
-        # 5.3 Decrypt chunks
-        top_results = [
-            {"_id": id, "distances": nilql.decrypt(xor_key, chunk_shares)}
-            for id, chunk_shares in chunk_shares_by_id.items()
-        ]
-
-        # Step 6: Format top results
+        # Step 3: Format top results
         formatted_results = "\n".join(
             f"- {str(result['distances'])}" for result in top_results
         )
         relevant_context = f"\n\nRelevant Context:\n{formatted_results}"
 
-        # Step 7: Update system message
+        # Step 4: Update system message
         for message in req.messages:
             if message.role == "system":
                 if message.content is None:
