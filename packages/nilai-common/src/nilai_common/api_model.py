@@ -42,6 +42,7 @@ class ChatRequest(BaseModel):
 
 class SignedChatCompletion(ChatCompletion):
     signature: str
+    metrics: Optional[dict] = {}
 
 
 class AttestationResponse(BaseModel):
