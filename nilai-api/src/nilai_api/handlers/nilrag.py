@@ -97,7 +97,7 @@ async def handle_nilrag(req: ChatRequest):
 
         # Step 3: Ask NilDB to compute the differences
         logger.debug("Requesting computation from NilDB...")
-        difference_shares = await nilDB.diff_query_execute(nilql_query_embedding)
+        difference_shares: list[list[dict[str, any]]] = await nilDB.diff_query_execute(nilql_query_embedding)
 
         # Step 4: Compute distances and sort
         logger.debug("Compute distances and sort...")
