@@ -12,7 +12,7 @@ from nilrag.util import (
     group_shares_by_id,
 )
 from sentence_transformers import SentenceTransformer
-from typing import Union
+from typing import Union, Any, Dict, List
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +97,7 @@ async def handle_nilrag(req: ChatRequest):
 
         # Step 3: Ask NilDB to compute the differences
         logger.debug("Requesting computation from NilDB...")
-        difference_shares: list[list[dict[str, any]]] = await nilDB.diff_query_execute(
+        difference_shares: List[List[Dict[str, Any]]] = await nilDB.diff_query_execute(
             nilql_query_embedding
         )
 
