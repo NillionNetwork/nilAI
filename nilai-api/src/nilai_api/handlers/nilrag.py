@@ -46,7 +46,7 @@ async def handle_nilrag(req: ChatRequest):
     """
     try:
         logger.debug("Rag is starting.")
-        
+
         # Step 1: Get inputs
         # Get nilDB instances
         if not req.nilrag or "nodes" not in req.nilrag:
@@ -78,7 +78,7 @@ async def handle_nilrag(req: ChatRequest):
 
         if query is None:
             raise HTTPException(status_code=400, detail="No user query found")
-        
+
         # Get number of chunks to include
         num_chunks = req.nilrag.get("num_chunks", 2)
 

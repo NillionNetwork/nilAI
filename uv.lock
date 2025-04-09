@@ -1313,7 +1313,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.27.2" },
     { name = "nilai-common", editable = "packages/nilai-common" },
     { name = "nilql", specifier = ">=0.0.0a12" },
-    { name = "nilrag", specifier = ">=0.1.10" },
+    { name = "nilrag", specifier = ">=0.1.11" },
     { name = "numpy", specifier = "<2.0.0" },
     { name = "openai", specifier = ">=1.59.9" },
     { name = "pg8000", specifier = ">=1.31.2" },
@@ -1375,7 +1375,7 @@ wheels = [
 
 [[package]]
 name = "nilrag"
-version = "0.1.10"
+version = "0.1.11"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -1386,9 +1386,9 @@ dependencies = [
     { name = "pyjwt", extra = ["crypto"] },
     { name = "sentence-transformers" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/17/49/38924ddfd6bed4ef6a46ce3937115d2623d02b7481d1db73e6ca0fe06d8b/nilrag-0.1.10.tar.gz", hash = "sha256:f2b48d658fd11adb7180fdd1060c72ff3768f9e5b1b3dc3ae4c39194c44de5fc", size = 15600 }
+sdist = { url = "https://files.pythonhosted.org/packages/38/7d/3aa1ec32fd3f4efcd889b2325c20bfbe5083e025c6cb886747796c23382f/nilrag-0.1.11.tar.gz", hash = "sha256:89e2134427977b10dba7cf0019e9836008e8eb38600a61eb271cee75bbd63eee", size = 16530 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2a/b4/b53665797da0b52d577822163e1d402a26359aa9cf003e468fcf1ee566a6/nilrag-0.1.10-py3-none-any.whl", hash = "sha256:596c68f16c22a4cb1f76709ba2227c20b3af1b708019568b6e77f4bb1fccec06", size = 13610 },
+    { url = "https://files.pythonhosted.org/packages/56/c3/b8c4e5cd4ad1579363980d8fe3b770a6776e24b04883e9d5c95d7fe22202/nilrag-0.1.11-py3-none-any.whl", hash = "sha256:2a4aeafb8aab857555dd545b910e72c58f89c690499a77b99898aacf67703c3a", size = 14627 },
 ]
 
 [[package]]
