@@ -1,18 +1,11 @@
 import logging
-import numpy as np
 
-import nilql
 import nilrag
 
 from nilai_common import ChatRequest, Message
 from fastapi import HTTPException, status
-from nilrag.util import (
-    decrypt_float_list,
-    encrypt_float_list,
-    group_shares_by_id,
-)
 from sentence_transformers import SentenceTransformer
-from typing import Union, Any, Dict, List
+from typing import Union
 
 logger = logging.getLogger(__name__)
 
