@@ -21,8 +21,8 @@ dependencies = [
     "sqlalchemy>=2.0.36",
     "uvicorn>=0.32.1",
     "httpx>=0.27.2",
-    "nilrag>=0.1.2",
-    "nilql>=0.0.0a3",
+    "nilrag>=0.1.10",
+    "nilql>=0.0.0a12",
     "openai>=1.59.9",
     "pg8000>=1.31.2",
     "prometheus_fastapi_instrumentator>=7.0.2",
@@ -32,6 +32,7 @@ dependencies = [
     "authlib>=1.4.1",
     "verifier",
     "web3>=7.8.0",
+    "click>=8.1.8",
 ]
 
 

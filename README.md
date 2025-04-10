@@ -13,8 +13,12 @@ nilAI is a platform designed to run on Confidential VMs with Trusted Execution E
 
 1. **Environment Setup**
    - Copy the `.env.sample` file to `.env`
-   - Replace `HUGGINGFACE_API_TOKEN` with your Hugging Face API token
-   - Obtain token by requesting access on the specific model's [Hugging Face page](https://huggingface.co/meta-llama/Llama-3.2-1B)
+   ```shell
+   cp .env.sample .env
+   ```
+   - Update the environment variables in `.env`:
+     - `HUGGINGFACE_API_TOKEN`: Your Hugging Face API token
+   - Obtain token by requesting access on the specific model's Hugging Face page. For example, to request access for the Llama 1B model, you can ask [here](https://huggingface.co/meta-llama/Llama-3.2-1B). Note that for the Llama-8B model, you need to make a separate request.
 
 ## Deployment Options
 
@@ -30,13 +34,18 @@ docker build -t nillion/nilai-api:latest -f docker/api.Dockerfile --target nilai
 Then, to deploy:
 
 ```shell
+
+# Deploy with CPU-only configuration
 docker compose -f docker-compose.yml \
   -f docker-compose.dev.yml \
-  -f docker/compose/docker-compose.llama-3b-gpu.yml \
-  -f docker/compose/docker-compose.llama-8b-gpu.yml \
-  -f docker/compose/docker-compose.dolphin-8b-gpu.yml \
-  -f docker/compose/docker-compose.deepseek-14b-gpu.yml \
-  up --build
+  -f docker/compose/docker-compose.llama-1b-gpu.yml \
+  up -d
+
+# Monitor logs
+docker compose -f docker-compose.yml \
+  -f docker-compose.dev.yml \
+  -f docker/compose/docker-compose.llama-1b-gpu.yml \
+  logs -f
 ```
 
 #### Production Environment
@@ -56,7 +65,7 @@ up -d
 ```
 **Note**: Remove lines for models you do not wish to deploy.
 
-For testing environment:
+#### Testing Without GPU
 
 ```shell
 # Build vLLM docker container
@@ -72,7 +81,7 @@ docker compose -f docker-compose.yml \
 up -d
 ```
 
-### 2. Manual Deployment
+### 2. Manual Component Deployment
 
 #### Components
 
@@ -94,13 +103,16 @@ up -d
      -p 6379:6379 \
      redis:latest
 
-   docker run -d --name postgres \
-     -e POSTGRES_USER=user \
-     -e POSTGRES_PASSWORD=<ASECUREPASSWORD> \
-     -e POSTGRES_DB=yourdb \
-     -p 5432:5432 \
-     postgres:latest
-   ```
+# Start PostgreSQL
+docker run -d --name postgres \
+  -e POSTGRES_USER=${POSTGRES_USER} \
+  -e POSTGRES_PASSWORD=${POSTGRES_PASSWORD} \
+  -e POSTGRES_DB=${POSTGRES_DB} \
+  -p 5432:5432 \
+  --network frontend_net \
+  --volume postgres_data:/var/lib/postgresql/data \
+  postgres:16
+```
 
 2. **Run API Server**
    ```shell
@@ -133,21 +145,40 @@ uv run pre-commit install
 
 ## Model Lifecycle Management
 
-- Models register themselves in the etcd3 database
+- Models register themselves in the etcd database
 - Registration includes address information with an auto-expiring lifetime
 - If a model disconnects, it is automatically removed from the available models
 
 ## Security
 
 - Hugging Face API token controls model access
-- SQLite database manages user permissions
+- PostgreSQL database manages user permissions
 - Distributed architecture allows for flexible security configurations
 
 ## Troubleshooting
 
-- Ensure Hugging Face API token is valid
-- Check etcd3 and Docker container logs for connection issues
-- Verify network ports are not blocked or in use
+Common issues and solutions:
+
+1. **Container Logs**
+   ```shell
+   # View logs for all services
+   docker compose logs -f
+
+   # View logs for specific service
+   docker compose logs -f api
+   ```
+
+2. **Database Connection**
+   ```shell
+   # Check PostgreSQL connection
+   docker exec -it postgres psql -U ${POSTGRES_USER} -d ${POSTGRES_DB}
+   ```
+
+3. **Service Health**
+   ```shell
+   # Check service health status
+   docker compose ps
+   ```
 
 ### vLLM for Local Execution on macOS
 To configure vLLM for **local execution on macOS**, execute the following steps:

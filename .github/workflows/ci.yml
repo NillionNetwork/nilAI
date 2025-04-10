@@ -9,7 +9,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v4
 
@@ -29,15 +29,129 @@ jobs:
       - name: Install dependencies
         run: |
           uv sync
-          
+
       - name: Run Ruff format check
         run: uv run ruff format --check
 
       - name: Run Ruff linting
         run: uv run ruff check --exclude packages/verifier/
-      
+
       - name: Run tests
-        run: uv run pytest -v
-        
-      # - name: pyright
-      #   run: uv run pyright nilai-api
+        run: uv run pytest -v tests/unit
+
+      - name: pyright
+        run: uv run pyright
+
+  start-runner:
+    name: Start self-hosted EC2 runner
+    runs-on: ubuntu-24.04
+    outputs:
+      label: ${{ steps.start-ec2-runner.outputs.label }}
+      ec2-instances-ids: ${{ steps.start-ec2-runner.outputs.ec2-instances-ids }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4.0.2
+        with:
+          aws-access-key-id: ${{ secrets.GH_AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.GH_AWS_SECRET_KEY }}
+          aws-region: "eu-west-1"
+      - name: Start EC2 runner
+        id: start-ec2-runner
+        uses: NillionNetwork/ec2-github-runner@v2.2
+        with:
+          mode: start
+          github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+          runners-per-machine: 1
+          number-of-machines: 1
+          ec2-image-id: ami-0ac221d824dd88706
+          ec2-instance-type: g4dn.xlarge
+          subnet-id: subnet-0ec4c353621eabae2
+          security-group-id: sg-03ee5c56e1f467aa0
+          key-name: production-github-runner-key
+          iam-role-name: github-runners-production-github-runner-ec2
+          aws-resource-tags: >
+            [
+              {"Key": "Name", "Value": "github-runner-${{ github.run_id }}-${{ github.run_number }}"},
+              {"Key": "GitHubRepository", "Value": "${{ github.repository }}"},
+              {"Key": "KeyName", "Value": "github-runners-key"},
+              {"Key": "Deployment", "Value": "github-runners"},
+              {"Key": "Type", "Value": "GithubRunner"},
+              {"Key": "User", "Value": "ec2-user"},
+              {"Key": "Environment", "Value": "production"}
+            ]
+
+  e2e-tests:
+    name: E2E Tests
+    needs: start-runner
+    runs-on: ${{ needs.start-runner.outputs.label }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: "**/pyproject.toml"
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Build vllm
+        run: docker build -t nillion/nilai-vllm:latest -f docker/vllm.Dockerfile .
+
+      - name: Build nilal API
+        run: docker build -t nillion/nilai-api:latest -f docker/api.Dockerfile --target nilai .
+
+      - name: Create .env
+        run: |
+         cp .env.ci .env
+         # Copy secret into .env replacing the existing HF_TOKEN
+         sed -i 's/HF_TOKEN=.*/HF_TOKEN=${{ secrets.HF_TOKEN }}/' .env
+
+      - name: Start Services
+        run: |
+          docker-compose -f docker-compose.yml \
+          -f docker-compose.dev.yml \
+          -f docker-compose.prod.yml \
+          -f docker/compose/docker-compose.llama-1b-gpu.ci.yml \
+          up -d
+          docker ps -a
+
+      - name: Wait for services to be healthy
+        run: bash scripts/wait_for_ci_services.sh
+
+      - name: Run E2E tests
+        run: |
+          set -e
+          export AUTH_TOKEN=$(docker exec nilai-api uv run src/nilai_api/commands/add_user.py --name test1 --email test1@test.com --ratelimit-minute 1000 --ratelimit-hour 1000 --ratelimit-day 1000 | jq ".apikey" -r)
+          export ENVIRONMENT=ci
+          uv run pytest -v tests/e2e
+
+      - name: Stop Services
+        run: |
+          docker-compose -f docker-compose.yml \
+          -f docker-compose.dev.yml \
+          -f docker-compose.prod.yml \
+          -f docker/compose/docker-compose.llama-1b-gpu.ci.yml \
+          down -v
+
+  stop-runner:
+    name: Stop self-hosted EC2 runner
+    needs: [ start-runner, e2e-tests ]
+    runs-on: ubuntu-24.04
+    if: ${{ always() }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.GH_AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.GH_AWS_SECRET_KEY }}
+          aws-region: "eu-west-1"
+
+      - name: Stop EC2 runner
+        uses: NillionNetwork/ec2-github-runner@v2.2
+        with:
+          mode: stop
+          github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+          label: ${{ needs.start-runner.outputs.label }}
+          ec2-instances-ids: ${{ needs.start-runner.outputs.ec2-instances-ids }}

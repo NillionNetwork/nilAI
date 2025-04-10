@@ -1,10 +1,11 @@
 # gunicorn.config.py
+from nilai_common.config import SETTINGS
 
 # Bind to address and port
 bind = ["0.0.0.0:8080", "0.0.0.0:8443"]
 
 # Set the number of workers (2)
-workers = 50
+workers = SETTINGS["gunicorn_workers"]
 
 # Set the number of threads per worker (16)
 threads = 1

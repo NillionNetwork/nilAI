@@ -1,37 +1,27 @@
 services:
-  deepseek_14b_gpu:
+  llama_1b_cpu:
     image: nillion/nilai-vllm:latest
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-    ipc: host
-    ulimits:
-      memlock: -1
-      stack: 67108864
+    container_name: nilai-llama_1b_cpu
     env_file:
       - .env
     restart: unless-stopped
     depends_on:
       etcd:
         condition: service_healthy
-      llama_8b_gpu:
-        condition: service_healthy
     command: >
-      --model deepseek-ai/DeepSeek-R1-Distill-Qwen-14B
-      --gpu-memory-utilization 0.39
-      --max-model-len 10000
+      --model meta-llama/Llama-3.2-1B-Instruct
+      --gpu-memory-utilization 0.5
+      --max-model-len 30000
       --tensor-parallel-size 1
+      --enable-auto-tool-choice
+      --tool-call-parser llama3_json
       --uvicorn-log-level warning
     environment:
-      - SVC_HOST=deepseek_14b_gpu
+      - SVC_HOST=llama_1b_cpu
       - SVC_PORT=8000
       - ETCD_HOST=etcd
       - ETCD_PORT=2379
-      - TOOL_SUPPORT=false
+      - TOOL_SUPPORT=true
     volumes:
       - hugging_face_models:/root/.cache/huggingface  # cache models
     networks:

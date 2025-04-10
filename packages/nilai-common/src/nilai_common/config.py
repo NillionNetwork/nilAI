@@ -10,6 +10,7 @@ SETTINGS = {
     "etcd_host": os.getenv("ETCD_HOST", "localhost"),
     "etcd_port": os.getenv("ETCD_PORT", 2379),
     "tool_support": os.getenv("TOOL_SUPPORT", False),
+    "gunicorn_workers": os.getenv("NILAI_GUNICORN_WORKERS", 10),
 }
 # if environment == "docker":
 #     config = "docker_settings.py"
