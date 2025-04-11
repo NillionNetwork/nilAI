@@ -107,7 +107,7 @@ class CcAdminUtils:
         Returns:
             [bool]: True if the verification is successful, otherwise False.
         """
-        # Skipping the comparision of FWID in the attestation certificate if the Attestation report does not contains the FWID.
+        # Skipping the comparison of FWID in the attestation certificate if the Attestation report does not contain the FWID.
         if attestation_report_fwid != "":
             if attestation_report_fwid != CcAdminUtils.extract_fwid(cert_chain[0]):
                 info_log.error(

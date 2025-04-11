@@ -118,7 +118,7 @@ class AttestationReport:
 
         if not len(response_data) > signature_length:
             raise ParsingError(
-                "The the length of the SPDM GET_MEASUREMENT response message is less than \
+                "The length of the SPDM GET_MEASUREMENT response message is less than \
                                or equal to the length of the signature field, which is not correct."
             )
 
@@ -145,7 +145,7 @@ class AttestationReport:
             public_key = extract_public_key(certificate)
             verifying_key = VerifyingKey.from_pem(public_key)
             event_log.debug(
-                "Extracted the public key from the certificate for the the attestation report."
+                "Extracted the public key from the certificate for the attestation report."
             )
 
             data_whose_signature_is_to_be_verified = AttestationReport.concatenate(
