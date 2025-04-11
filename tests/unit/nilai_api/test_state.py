@@ -29,18 +29,6 @@ def test_uptime(app_state):
     )
 
 
-@patch("nilai_api.state.sev.init")
-@patch("nilai_api.state.sev.get_quote", return_value="mocked_quote")
-def test_cpu_attestation(mock_get_quote, mock_init, app_state):
-    assert app_state.cpu_attestation == "mocked_quote"
-    mock_init.assert_called_once()
-    mock_get_quote.assert_called_once()
-
-
-def test_gpu_attestation():
-    assert AppState().gpu_attestation != "<No GPU>"
-
-
 @pytest.mark.asyncio
 async def test_models(app_state):
     with patch.object(

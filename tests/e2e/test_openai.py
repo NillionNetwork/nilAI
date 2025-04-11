@@ -377,6 +377,7 @@ def test_attestation_endpoint(client):
                 "Authorization": f"Bearer {AUTH_TOKEN}",
                 "Content-Type": "application/json",
             },
+            params={"nonce": "0" * 64},
         )
 
         assert response.status_code == 200, "Attestation endpoint should return 200 OK"

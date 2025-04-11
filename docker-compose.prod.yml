@@ -1,5 +1,5 @@
 services:
-  api:
+  attestation:
     deploy:
       resources:
         reservations:

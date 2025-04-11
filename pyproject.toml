@@ -13,7 +13,6 @@ dependencies = [
     "nilai-api",
     "nilai-common",
     "nilai-models",
-    "verifier",
 ]
 
 [dependency-groups]
@@ -22,11 +21,11 @@ dev = [
     "isort>=5.13.2",
     "pytest-mock>=3.14.0",
     "pytest>=8.3.3",
-    "ruff>=0.8.0",
+    "ruff>=0.11.4",
     "uvicorn>=0.32.1",
     "pytest-asyncio>=0.25.0",
     "testcontainers>=4.9.1",
-    "pyright>=1.1",
+    "pyright>=1.1.399",
     "pre-commit>=4.1.0",
     "httpx>=0.28.1",
 ]
@@ -45,9 +44,6 @@ members = ["nilai-models", "nilai-api", "packages/nilai-common", "packages/verif
 nilai-common = { workspace = true }
 nilai-api = { workspace = true }
 nilai-models = { workspace = true }
-verifier = { workspace = true }
-
-
 [tool.pyright]
 exclude = [".venv", "packages/verifier/"]
 

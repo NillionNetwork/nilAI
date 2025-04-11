@@ -1,24 +1,10 @@
 import uuid
-from typing import List, Optional, Literal, Iterable
+from typing import Annotated, List, Optional, Literal, Iterable
 
 from openai.types.chat import ChatCompletion, ChatCompletionMessage
 from openai.types.chat.chat_completion import Choice as OpenaAIChoice
-from openai.types.completion_usage import CompletionUsage
 from openai.types.chat import ChatCompletionToolParam
 from pydantic import BaseModel, Field
-
-
-__all__ = [
-    "Message",
-    "Choice",
-    "ChatRequest",
-    "CompletionUsage",
-    "SignedChatCompletion",
-    "AttestationResponse",
-    "ModelMetadata",
-    "ModelEndpoint",
-    "HealthCheckResponse",
-]
 
 
 class Message(ChatCompletionMessage):
@@ -44,12 +30,6 @@ class SignedChatCompletion(ChatCompletion):
     signature: str
 
 
-class AttestationResponse(BaseModel):
-    verifying_key: str  # PEM encoded public key
-    cpu_attestation: str  # Base64 encoded CPU attestation
-    gpu_attestation: str  # Base64 encoded GPU attestation
-
-
 class ModelMetadata(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
@@ -70,3 +50,28 @@ class ModelEndpoint(BaseModel):
 class HealthCheckResponse(BaseModel):
     status: str
     uptime: str
+
+
+Nonce = Annotated[
+    str,
+    Field(
+        max_length=64,
+        min_length=64,
+        description="The nonce to be used for the attestation",
+    ),
+]
+
+AMDAttestationToken = Annotated[
+    str, Field(description="The attestation token from AMD's attestation service")
+]
+
+NVAttestationToken = Annotated[
+    str, Field(description="The attestation token from NVIDIA's attestation service")
+]
+
+
+class AttestationReport(BaseModel):
+    nonce: Nonce
+    verifying_key: Annotated[str, Field(description="PEM encoded public key")]
+    cpu_attestation: AMDAttestationToken
+    gpu_attestation: NVAttestationToken

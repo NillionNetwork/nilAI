@@ -5,13 +5,8 @@ from typing import Dict, Optional
 
 from nilai_api import config
 from nilai_api.crypto import generate_key_pair
-from nilai_api.sev.sev import sev
 from nilai_common import ModelServiceDiscovery
 from nilai_common.api_model import ModelEndpoint
-from verifier.cc_admin import collect_gpu_evidence, attest
-import secrets
-import json
-import base64
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -25,49 +20,6 @@ class AppState:
             host=config.ETCD_HOST, port=config.ETCD_PORT
         )
         self._uptime = time.time()
-        self._cpu_quote = None
-        self._gpu_quote = "<No GPU>"
-
-    @property
-    def cpu_attestation(self) -> str:
-        if self._cpu_quote is None:
-            try:
-                sev.init()
-                self._cpu_quote = sev.get_quote()
-            except RuntimeError:
-                self._cpu_quote = "<Non TEE CPU>"
-        return self._cpu_quote
-
-    @property
-    def gpu_attestation(self) -> str:
-        # Check if GPU is available
-        try:
-            nonce = secrets.token_bytes(32).hex()
-            arguments_as_dictionary = {
-                "nonce": nonce,
-                "verbose": False,
-                "test_no_gpu": False,
-                "rim_root_cert": None,
-                "rim_service_url": None,
-                "ocsp_service_url": None,
-                "ocsp_attestation_settings": "default",
-                "allow_hold_cert": None,
-                "ocsp_validity_extension": None,
-                "ocsp_cert_revocation_extension_device": None,
-                "ocsp_cert_revocation_extension_driver_rim": None,
-                "ocsp_cert_revocation_extension_vbios_rim": None,
-            }
-            evidence_list = collect_gpu_evidence(
-                nonce,
-            )
-            result, jwt_token = attest(arguments_as_dictionary, nonce, evidence_list)
-            self._gpu_quote = base64.b64encode(
-                json.dumps({"result": result, "jwt_token": jwt_token}).encode()
-            ).decode()
-            return self._gpu_quote
-        except Exception as e:
-            logging.error("Could not attest GPU: %s", e)
-            return self._gpu_quote
 
     @property
     def uptime(self):

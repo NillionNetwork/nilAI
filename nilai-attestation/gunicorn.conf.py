@@ -2,7 +2,7 @@
 from nilai_common.config import SETTINGS
 
 # Bind to address and port
-bind = ["0.0.0.0:8080"]
+bind = [f"0.0.0.0:{SETTINGS['attestation_port']}"]
 
 # Set the number of workers (2)
 workers = SETTINGS["gunicorn_workers"]

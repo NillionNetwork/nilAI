@@ -99,6 +99,9 @@ jobs:
       - name: Build vllm
         run: docker build -t nillion/nilai-vllm:latest -f docker/vllm.Dockerfile .
 
+      - name: Build attestation
+        run: docker build -t nillion/nilai-attestation:latest -f docker/attestation.Dockerfile .
+
       - name: Build nilal API
         run: docker build -t nillion/nilai-api:latest -f docker/api.Dockerfile --target nilai .
 

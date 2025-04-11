@@ -1,5 +1,5 @@
 from nilai_common.api_model import (
-    AttestationResponse,
+    AttestationReport,
     ChatRequest,
     SignedChatCompletion,
     Choice,
@@ -7,6 +7,9 @@ from nilai_common.api_model import (
     Message,
     ModelEndpoint,
     ModelMetadata,
+    Nonce,
+    AMDAttestationToken,
+    NVAttestationToken,
 )
 from openai.types.completion_usage import CompletionUsage as Usage
 from nilai_common.config import SETTINGS
@@ -19,9 +22,12 @@ __all__ = [
     "Choice",
     "ModelMetadata",
     "Usage",
-    "AttestationResponse",
+    "AttestationReport",
     "HealthCheckResponse",
     "ModelEndpoint",
     "ModelServiceDiscovery",
+    "Nonce",
+    "AMDAttestationToken",
+    "NVAttestationToken",
     "SETTINGS",
 ]

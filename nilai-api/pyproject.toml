@@ -42,4 +42,3 @@ build-backend = "hatchling.build"
 
 [tool.uv.sources]
 nilai-common = { workspace = true }
-verifier = { workspace = true }
