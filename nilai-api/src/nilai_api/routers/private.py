@@ -3,7 +3,7 @@ import asyncio
 import logging
 import os
 from base64 import b64encode
-from typing import AsyncGenerator, Union, List, Tuple
+from typing import AsyncGenerator, Optional, Union, List, Tuple
 from nilai_api.attestation import get_attestation_report
 from nilai_api.handlers.nilrag import handle_nilrag
 
@@ -58,7 +58,7 @@ async def get_usage(user: UserModel = Depends(get_user)) -> Usage:
 
 @router.get("/v1/attestation/report", tags=["Attestation"])
 async def get_attestation(
-    nonce: Nonce | None, user: UserModel = Depends(get_user)
+    nonce: Optional[Nonce] = None, user: UserModel = Depends(get_user)
 ) -> AttestationReport:
     """
     Generate a cryptographic attestation report.
