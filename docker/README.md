@@ -7,7 +7,6 @@ docker build -t nillion/nilai-api:latest -f docker/api.Dockerfile .
 
  docker run -it --rm \
  -p 8080:8080 \
- -p 8443:8443 \
  -v hugging_face_models:/root/.cache/huggingface \
  -v $(pwd)/db/users.sqlite:/app/db/users.sqlite \
  nillion/nilai-api:latest

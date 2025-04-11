@@ -26,6 +26,8 @@ nilAI is a platform designed to run on Confidential VMs with Trusted Execution E
 
 #### Development Environment
 ```shell
+# Build nilai_attestation endpoint
+docker build -t nillion/nilai-attestation:latest -f docker/attestation.Dockerfile .
 # Build vLLM docker container
 docker build -t nillion/nilai-vllm:latest -f docker/vllm.Dockerfile .
 # Build nilai_api container
@@ -49,6 +51,8 @@ docker compose -f docker-compose.yml \
 
 #### Production Environment
 ```shell
+# Build nilai_attestation endpoint
+docker build -t nillion/nilai-attestation:latest -f docker/attestation.Dockerfile .
 # Build vLLM docker container
 docker build -t nillion/nilai-vllm:latest -f docker/vllm.Dockerfile .
 # Build nilai_api container
@@ -66,6 +70,8 @@ up -d
 
 #### Testing Without GPU
 ```shell
+# Build nilai_attestation endpoint
+docker build -t nillion/nilai-attestation:latest -f docker/attestation.Dockerfile .
 # Build vLLM docker container
 docker build -t nillion/nilai-vllm:latest -f docker/vllm.Dockerfile .
 # Build nilai_api container
@@ -75,7 +81,7 @@ To deploy:
 ```shell
 docker compose -f docker-compose.yml \
 -f docker-compose.dev.yml \
--f docker/compose/docker-compose.llama-1b-gpu.yml \
+-f docker/compose/docker-compose.llama-1b-cpu.yml \
 up -d
 ```
 

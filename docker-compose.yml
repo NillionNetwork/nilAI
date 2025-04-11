@@ -4,6 +4,7 @@ services:
     environment:
       - ALLOW_NONE_AUTHENTICATION=yes
       - ETCD_ADVERTISE_CLIENT_URLS=http://etcd:2379
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "etcdctl", "endpoint", "health"]
       interval: 10s
@@ -16,6 +17,7 @@ services:
     image: 'redis:latest'
     networks:
       - frontend_net
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 30s
@@ -126,6 +128,20 @@ services:
       retries: 3
       start_period: 15s
       timeout: 10s
+  attestation:
+    image: nillion/nilai-attestation:latest
+    restart: unless-stopped
+    networks:
+      - backend_net
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      retries: 3
+      start_period: 15s
+      timeout: 10s
+
   caddy:
     image: caddy:latest
     container_name: caddy
