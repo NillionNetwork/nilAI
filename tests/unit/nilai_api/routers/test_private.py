@@ -5,6 +5,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from nilai_api.db.users import UserModel
+from nilai_common import AttestationReport
+
 from nilai_api.state import state
 from ... import model_endpoint, model_metadata, response as RESPONSE
 
@@ -94,11 +96,22 @@ def mock_state(mocker, event_loop):
 
     # Patch other attributes
     mocker.patch.object(state, "verifying_key", "test-verifying-key")
-    mocker.patch.object(state, "_cpu_quote", "test-cpu-attestation")
-    mocker.patch.object(state, "_gpu_quote", "test-gpu-attestation")
 
     # Patch get_model method
     mocker.patch.object(state, "get_model", return_value=model_endpoint)
+
+    # Patch get_attestation method
+    attestation_response = AttestationReport(
+        verifying_key="test-verifying-key",
+        nonce="0" * 64,
+        cpu_attestation="test-cpu-attestation",
+        gpu_attestation="test-gpu-attestation",
+    )
+    # Patch the get_attestation_report function
+    mocker.patch(
+        "nilai_api.attestation.get_attestation_report",
+        return_value=attestation_response,
+    )
 
     return state
 
@@ -136,12 +149,14 @@ def test_get_usage(mock_user, mock_user_manager, mock_state, client):
 
 def test_get_attestation(mock_user, mock_user_manager, mock_state, client):
     response = client.get(
-        "/v1/attestation/report", headers={"Authorization": "Bearer test-api-key"}
+        "/v1/attestation/report",
+        headers={"Authorization": "Bearer test-api-key"},
+        params={"nonce": "0" * 64},
     )
     assert response.status_code == 200
     assert response.json()["verifying_key"] == "test-verifying-key"
     assert response.json()["cpu_attestation"] == "test-cpu-attestation"
-    assert response.json()["gpu_attestation"] != "test-gpu-attestation"
+    assert response.json()["gpu_attestation"] == "test-gpu-attestation"
 
 
 def test_get_models(mock_user, mock_user_manager, mock_state, client):

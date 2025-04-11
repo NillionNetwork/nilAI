@@ -3,6 +3,7 @@ import ctypes
 import logging
 import os
 from typing import Optional
+from nilai_common import Nonce, AMDAttestationToken
 
 logger = logging.getLogger(__name__)
 
@@ -48,20 +49,25 @@ class SEVGuest:
             return False
         return self.lib.Init() == 0
 
-    def get_quote(self, report_data: Optional[bytes] = None) -> str:
+    def get_quote(self, nonce: Optional[Nonce] = None) -> AMDAttestationToken:
         """Get a quote using the report data."""
         if not self.lib:
             logger.warning("SEV library not loaded, returning mock quote")
             return base64.b64encode(b"mock_quote").decode("ascii")
 
-        if report_data is None:
-            report_data = bytes(64)
+        if nonce is None:
+            nonce = "0" * 64
 
-        if len(report_data) != 64:
-            raise ValueError("Report data must be exactly 64 bytes")
+        if not isinstance(nonce, str):
+            raise ValueError("Nonce must be a string")
 
-        report_buffer = ctypes.create_string_buffer(report_data)
-        quote_ptr = self.lib.GetQuote(report_buffer)
+        if len(nonce) != 64:
+            raise ValueError("Nonce must be exactly 64 bytes")
+
+        # Convert string nonce to bytes
+        nonce_bytes = nonce.encode("utf-8")
+        nonce_buffer = ctypes.create_string_buffer(nonce_bytes)
+        quote_ptr = self.lib.GetQuote(nonce_buffer)
 
         if quote_ptr is None:
             raise RuntimeError("Failed to get quote")
@@ -89,7 +95,7 @@ if __name__ == "__main__":
     try:
         if sev.init():
             print("SEV guest device initialized successfully.")
-            report_data = bytes([0] * 64)
+            report_data: Nonce = "0" * 64
             quote = sev.get_quote(report_data)
             print("Quote:", quote)
 

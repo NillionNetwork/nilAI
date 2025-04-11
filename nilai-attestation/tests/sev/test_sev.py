@@ -2,7 +2,7 @@ import base64
 import ctypes
 
 import pytest
-from nilai_api.sev.sev import SEVGuest
+from nilai_attestation.attestation.sev.sev import SEVGuest  # type: ignore
 
 
 @pytest.fixture
