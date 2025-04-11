@@ -5,6 +5,7 @@ services:
       - "8443:8443"
     volumes:
       - ./nilai-api/:/app/nilai-api/
+      - ./packages/:/app/packages/
   redis:
     ports:
       - "6379:6379"
