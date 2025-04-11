@@ -3,6 +3,7 @@ from nilai_common import AttestationReport, Nonce
 
 from nilai_attestation.attestation.sev.sev import sev
 from nilai_attestation.attestation.nvtrust.nv_attester import nv_attest
+from nilai_attestation.attestation.nvtrust.nv_verifier import verify_attestation
 from nilai_common.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -29,6 +30,11 @@ def get_attestation_report(nonce: Nonce | None = None) -> AttestationReport:
         cpu_attestation=sev.get_quote(),
         gpu_attestation=nv_attest(attestation_nonce),
     )
+
+
+def verify_attestation_report(report: AttestationReport) -> bool:
+    """Verify the attestation report"""
+    return verify_attestation(report)
 
 
 if __name__ == "__main__":

@@ -13,14 +13,22 @@ async def get_attestation_report(
 
     try:
         attestation_url = f"http://{SETTINGS['attestation_host']}:{SETTINGS['attestation_port']}/attestation/report"
-
-        logger.info(f"Getting attestation report for nonce: {nonce}")
-        logger.info(f"Attestation URL: {attestation_url}")
-
         async with httpx.AsyncClient() as client:
             response: httpx.Response = await client.get(attestation_url, params=nonce)
             report = AttestationReport(**response.json())
-            logger.info(f"Attestation report: {report}")
             return report
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+async def verify_attestation_report(attestation_report: AttestationReport) -> bool:
+    """Verify the attestation report"""
+    try:
+        attestation_url = f"http://{SETTINGS['attestation_host']}:{SETTINGS['attestation_port']}/attestation/verify"
+        async with httpx.AsyncClient() as client:
+            response: httpx.Response = await client.post(
+                attestation_url, json=attestation_report.model_dump()
+            )
+            return response.json()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
