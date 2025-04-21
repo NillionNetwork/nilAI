@@ -36,6 +36,7 @@ docker build -t nillion/nilai-api:latest -f docker/api.Dockerfile --target nilai
 Then, to deploy:
 
 ```shell
+
 # Deploy with CPU-only configuration
 docker compose -f docker-compose.yml \
   -f docker-compose.dev.yml \
@@ -69,6 +70,7 @@ up -d
 **Note**: Remove lines for models you do not wish to deploy.
 
 #### Testing Without GPU
+
 ```shell
 # Build nilai_attestation endpoint
 docker build -t nillion/nilai-attestation:latest -f docker/attestation.Dockerfile .
@@ -121,7 +123,7 @@ docker run -d --name postgres \
 2. **Run API Server**
    ```shell
    # Development Environment
-   uv run fastapi dev nilai-api/src/nilai_api/__main__.py --port 8080
+    fastapi dev nilai-api/src/nilai_api/__main__.py --port 8080
 
    # Production Environment
    uv run fastapi run nilai-api/src/nilai_api/__main__.py --port 8080
@@ -183,6 +185,21 @@ Common issues and solutions:
    # Check service health status
    docker compose ps
    ```
+
+### vLLM for Local Execution on macOS
+To configure vLLM for **local execution on macOS**, execute the following steps:
+```shell
+# Clone vLLM repository (root folder)
+git clone https://github.com/vllm-project/vllm.git
+git checkout v0.7.3 # We use v0.7.3
+# Build vLLM OpenAI (vllm folder)
+cd vllm
+docker build -f Dockerfile.arm -t vllm/vllm-openai . --shm-size=4g
+# Build vLLM docker container (root folder)
+docker build -t nillion/nilai-vllm:latest -f docker/vllm.Dockerfile .
+# Build nilai_api container
+docker build -t nillion/nilai-api:latest -f docker/api.Dockerfile --target nilai --platform linux/amd64 .
+````
 
 ## Contributing
 
