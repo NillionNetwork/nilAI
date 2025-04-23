@@ -9,6 +9,14 @@ from nilai_api.attestation import verify_attestation_report
 router = APIRouter()
 
 
+@router.get("/v1/public_key", tags=["Public"])
+async def get_public_key() -> str:
+    """
+    Get the public key of the API.
+    """
+    return state.b64_public_key
+
+
 # Health Check Endpoint
 @router.get("/v1/health", tags=["Health"])
 async def health_check() -> HealthCheckResponse:

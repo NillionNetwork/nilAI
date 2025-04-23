@@ -77,7 +77,7 @@ async def get_attestation(
     """
 
     attestation_report = await get_attestation_report(nonce)
-    attestation_report.verifying_key = state.verifying_key
+    attestation_report.verifying_key = state.b64_public_key
     return attestation_report
 
 
