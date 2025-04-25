@@ -1,0 +1,47 @@
+services:
+  whisperx_gpu:
+    image: ghcr.io/jim60105/whisperx:latest
+    container_name: nilai-whisperx_gpu
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ipc: host
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    env_file:
+      - .env
+    restart: unless-stopped
+    depends_on:
+      etcd:
+        condition: service_healthy
+    environment:
+      - HF_TOKEN=${HF_TOKEN}
+      - PYTHONUNBUFFERED=1
+      - SVC_HOST=llama_1b_gpu
+      - SVC_PORT=8000
+      - ETCD_HOST=etcd
+      - ETCD_PORT=2379
+      - TOOL_SUPPORT=true
+    volumes:
+      - whisperx_cache:/.cache
+      - whisperx_jobs:/jobs
+    networks:
+      - backend_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      retries: 3
+      start_period: 60s
+      timeout: 10s
+
+volumes:
+  whisperx_cache:
+  whisperx_jobs:
+
+networks:
+  backend_net:
