@@ -48,8 +48,14 @@ class UserRateLimits(BaseModel):
 
 
 def get_user_limits(user: Annotated[UserModel, Depends(get_user)]) -> UserRateLimits:
+    # TODO: When the only allowed strategy is NUC, we can change the apikey name to subscription_holder
+    # In apikey mode, the apikey is unique as the userid.
+    # In nuc mode, the apikey is associated with a subscription holder and the userid is the user
+    # For NUCs we want the rate limit to be per subscription holder, not per user
+    # In JWT mode, the apikey is the userid too
+    # So we use the apikey as the id
     return UserRateLimits(
-        id=user.userid,
+        id=user.apikey,
         day_limit=user.ratelimit_day,
         hour_limit=user.ratelimit_hour,
         minute_limit=user.ratelimit_minute,

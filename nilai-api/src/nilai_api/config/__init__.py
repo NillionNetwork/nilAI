@@ -21,7 +21,9 @@ DB_PORT = int(os.getenv("POSTGRES_PORT", 5432))
 DB_NAME = os.getenv("POSTGRES_DB", "nilai_users")
 
 
-AUTH_STRATEGY = "api_key"
+NILAUTH_TRUSTED_ROOT_ISSUERS = os.getenv("NILAUTH_TRUSTED_ROOT_ISSUERS", "").split(",")
+
+AUTH_STRATEGY = os.getenv("AUTH_STRATEGY", "api_key")
 
 
 if ENVIRONMENT == "mainnet":

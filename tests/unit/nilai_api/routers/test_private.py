@@ -21,6 +21,7 @@ def mock_user():
     mock = MagicMock(spec=UserModel)
     mock.userid = "test-user-id"
     mock.name = "Test User"
+    mock.apikey = "test-api-key"
     mock.prompt_tokens = 100
     mock.completion_tokens = 50
     mock.total_tokens = 150

@@ -1,5 +1,3 @@
-AUTH_STRATEGY = "api_key"
-
 # It defines the number of concurrent requests allowed for each model.
 # At a same point of time, if all models are available,
 # there can be 45 + 30 + 15 + 5 = 85 concurrent requests in the system

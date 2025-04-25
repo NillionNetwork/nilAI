@@ -1,5 +1,3 @@
-AUTH_STRATEGY = "jwt"
-
 # It defines the number of concurrent requests allowed for each model.
 # At a same point of time, if all models are available,
 # there can be 10 + 10 + 5 + 5 = 30 concurrent requests in the system

@@ -2,10 +2,10 @@
 from nilai_common.config import SETTINGS
 
 # Bind to address and port
-bind = [f"0.0.0.0:{SETTINGS['attestation_port']}"]
+bind = [f"0.0.0.0:{SETTINGS.attestation_port}"]
 
 # Set the number of workers (2)
-workers = SETTINGS["gunicorn_workers"]
+workers = 1
 
 # Set the number of threads per worker (16)
 threads = 1
