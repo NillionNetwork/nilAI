@@ -92,9 +92,10 @@ jobs:
         with:
           enable-cache: true
           cache-dependency-glob: "**/pyproject.toml"
-
       - name: Install dependencies
-        run: uv sync
+        run: |
+          apt-get update && apt-get install curl git pkg-config automake file -y
+          uv sync
 
       - name: Build vllm
         run: docker build -t nillion/nilai-vllm:latest -f docker/vllm.Dockerfile .
@@ -126,7 +127,7 @@ jobs:
       - name: Run E2E tests
         run: |
           set -e
-          export AUTH_TOKEN=$(docker exec nilai-api uv run src/nilai_api/commands/add_user.py --name test1 --email test1@test.com --ratelimit-minute 1000 --ratelimit-hour 1000 --ratelimit-day 1000 | jq ".apikey" -r)
+          export AUTH_TOKEN=$(docker exec nilai-api uv run src/nilai_api/commands/add_user.py --name test1 --ratelimit-minute 1000 --ratelimit-hour 1000 --ratelimit-day 1000 | jq ".apikey" -r)
           export ENVIRONMENT=ci
           uv run pytest -v tests/e2e
 
