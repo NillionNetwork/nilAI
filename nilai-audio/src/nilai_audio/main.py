@@ -403,9 +403,3 @@ async def generate_from_transcript_endpoint(
     except Exception as e:
         logger.error(f"{log_prefix} Unexpected error during generation: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"An unexpected server error occurred during generation.")
-
-
-if __name__ == "__main__":
-    import uvicorn
-    logger.info(f"HF_TOKEN available: {'Yes' if HF_TOKEN else 'No'}")
-    uvicorn.run("main:app", host="0.0.0.0", port=8080, reload=False)
