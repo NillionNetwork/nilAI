@@ -17,7 +17,7 @@ import tempfile
 import uvicorn
 
 from nilai_audio.transcription import transcribe_audio_logic
-from nilai_audio.summarization import summarize_transcript, read_transcript, MODEL_NAME as SUMMARIZATION_MODEL_NAME
+from nilai_audio.summarization import read_transcript
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -311,95 +311,3 @@ async def transcribe_media_endpoint(
              logger.debug(f"[Request {request_id}] No base temporary directory to clean up or it was already removed.")
 
         logger.info(f"[Request {request_id}] Final cleanup complete.")
-
-
-@app.post("/generate-from-transcript/")
-async def generate_from_transcript_endpoint(
-    transcript_content: Annotated[str, Form()],
-    customPromptTemplate: Annotated[Optional[str], Form()] = None,
-    original_filename: Annotated[Optional[str], Form()] = None,
-    job_id: Annotated[Optional[str], Form()] = None
-):
-    request_id = uuid.uuid4()
-    log_prefix = f"[Request {request_id}, Job {job_id or 'Unknown'}]"
-    logger.info(f"{log_prefix} Received request to generate from transcript (length: {len(transcript_content)}). Original file: {original_filename or 'Unknown'}")
-
-    if not transcript_content:
-         logger.error(f"{log_prefix} Error: Received empty transcript content.")
-         raise HTTPException(status_code=400, detail="Transcript content cannot be empty.")
-
-    try:
-        check_model_availability(["device"])
-
-        logger.info(f"{log_prefix} Starting generation step using model '{SUMMARIZATION_MODEL_NAME}'...")
-        system_base = "You are a helpful assistant that summarizes meeting transcripts. You must only write in english for the summary (no chinese)."
-        instructions_base = "Base your response *only* on the provided transcript. Structure the output clearly. Do not add any information not present in the transcript."
-        structure_instruction = "Provide a concise summary covering key decisions, main topics, action items, and critical follow-up points based *only* on the provided transcript. Structure the output clearly with headings for each section (e.g., ### Key Decisions)."
-
-        system_message = system_base
-        if customPromptTemplate:
-            logger.info(f"{log_prefix} Using custom prompt instruction.")
-            system_message += f"\n\nFollow these specific instructions: {customPromptTemplate}"
-        else:
-            logger.info(f"{log_prefix} Using default structure instruction.")
-            system_message += f"\n\n{structure_instruction}"
-        system_message += f"\n\n{instructions_base}"
-
-        generated_text = await summarize_transcript(
-            system_prompt=system_message,
-            transcript_content=transcript_content
-        )
-
-        logger.info(f"{log_prefix} Received result from summarize_transcript function.")
-        if isinstance(generated_text, str):
-              logger.info(f"{log_prefix} Generation result type: str, Length: {len(generated_text)}, Starts with: '{generated_text[:100]}...'")
-        elif generated_text is None:
-             logger.error(f"{log_prefix} Generation failed: summarize_transcript returned None.")
-             raise HTTPException(status_code=500, detail="Summary generation failed (None returned).")
-        else:
-              logger.warning(f"{log_prefix} Unexpected result type from summarize_transcript: {type(generated_text)}, Value: {generated_text}")
-              raise HTTPException(status_code=500, detail=f"Summary generation returned unexpected type: {type(generated_text)}.")
-
-
-        if generated_text.startswith("Error:"):
-            error_detail = generated_text
-            logger.error(f"{log_prefix} Generation failed: {error_detail}")
-            raise HTTPException(status_code=500, detail=f"Generation failed: {error_detail}")
-
-        logger.info(f"{log_prefix} Generation successful.")
-
-        summary_filename_metadata = None
-        if original_filename:
-              base_name, _ = os.path.splitext(os.path.basename(original_filename))
-              if job_id and job_id.startswith(base_name) and len(job_id) > len(base_name) + 1:
-                  unique_suffix = job_id[len(base_name)+1:]
-                  base_name_with_suffix = f"{base_name}_{unique_suffix}"
-              else:
-                  base_name_with_suffix = job_id or base_name
-              safe_model_name = "".join(c if c.isalnum() else '_' for c in SUMMARIZATION_MODEL_NAME)
-              summary_filename_metadata = f"{base_name_with_suffix}_summary_{safe_model_name}.txt"
-              logger.info(f"{log_prefix} Constructed summary filename for response metadata: {summary_filename_metadata}")
-        else:
-             safe_model_name = "".join(c if c.isalnum() else '_' for c in SUMMARIZATION_MODEL_NAME)
-             fallback_id = job_id or request_id.hex[:8]
-             summary_filename_metadata = f"summary_{fallback_id}_{safe_model_name}.txt"
-             logger.info(f"{log_prefix} Constructed fallback summary filename for response metadata: {summary_filename_metadata}")
-
-
-        logger.info(f"{log_prefix} Preparing final JSON response...")
-        response_content = {
-            "summary": {
-                 "summary": generated_text,
-                 "summary_filename": summary_filename_metadata
-             }
-        }
-
-        logger.info(f"{log_prefix} Successfully generated from transcript. Returning response.")
-        return JSONResponse(content=response_content)
-
-    except HTTPException as http_exc:
-        logger.error(f"{log_prefix} HTTP Exception during generation: {http_exc.status_code} - {http_exc.detail}", exc_info=False)
-        raise http_exc
-    except Exception as e:
-        logger.error(f"{log_prefix} Unexpected error during generation: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"An unexpected server error occurred during generation.")
