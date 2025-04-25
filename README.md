@@ -103,18 +103,20 @@ up -d
      -p 6379:6379 \
      redis:latest
 
-# Start PostgreSQL
-docker run -d --name postgres \
-  -e POSTGRES_USER=${POSTGRES_USER} \
-  -e POSTGRES_PASSWORD=${POSTGRES_PASSWORD} \
-  -e POSTGRES_DB=${POSTGRES_DB} \
-  -p 5432:5432 \
-  --network frontend_net \
-  --volume postgres_data:/var/lib/postgresql/data \
-  postgres:16
-```
+2. **Start PostgreSQL**
+    ```shell
+    docker run -d --name postgres \
+      -e POSTGRES_USER=${POSTGRES_USER} \
+      -e POSTGRES_PASSWORD=${POSTGRES_PASSWORD} \
+      -e POSTGRES_DB=${POSTGRES_DB} \
+      -p 5432:5432 \
+      --network frontend_net \
+      --volume postgres_data:/var/lib/postgresql/data \
+      postgres:16
+    ```
 
-2. **Run API Server**
+
+3. **Run API Server**
    ```shell
    # Development Environment
     fastapi dev nilai-api/src/nilai_api/__main__.py --port 8080
@@ -123,7 +125,7 @@ docker run -d --name postgres \
    uv run fastapi run nilai-api/src/nilai_api/__main__.py --port 8080
    ```
 
-3. **Run Model Instances**
+4. **Run Model Instances**
    ```shell
    # Example: Llama 3.2 1B Model
    # Development Environment

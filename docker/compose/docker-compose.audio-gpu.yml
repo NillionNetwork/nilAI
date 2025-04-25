@@ -1,0 +1,39 @@
+# File: docker/compose/docker-compose.audio-gpu.yml
+services:
+  audio_gpu:
+    image: nillion/nilai-audio:latest
+    container_name: nilai-audio_gpu
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ipc: host
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    env_file:
+      - .env
+    restart: unless-stopped
+    volumes:
+      - hugging_face_models:/root/.cache/huggingface
+      - torch_models:/root/.cache/torch
+    networks:
+      - backend_net
+    ports:
+      - "8002:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
+      interval: 30s
+      retries: 3
+      start_period: 90s
+      timeout: 15s
+
+volumes:
+  hugging_face_models:
+  torch_models:
+
+networks:
+  backend_net:
