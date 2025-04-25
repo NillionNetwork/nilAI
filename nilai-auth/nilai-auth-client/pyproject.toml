@@ -1,0 +1,23 @@
+[project]
+name = "nilai-auth-client"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "José Cabrero-Holgueras", email = "jose.cabrero@nillion.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "httpx>=0.28.1",
+    "nuc",
+    "openai>=1.70.0",
+    "pydantic>=2.11.2",
+    "secp256k1>=0.14.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv.sources]
+nuc = { git = "https://github.com/NillionNetwork/nuc-py.git" }
