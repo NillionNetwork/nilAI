@@ -5,7 +5,7 @@ COPY --link . /app/
 WORKDIR /app/nilai-api/
 
 RUN apt-get update && \
-apt-get install build-essential curl -y && \
+apt-get install build-essential curl git pkg-config automake file -y && \
 apt-get clean && \
 apt-get autoremove && \
 rm -rf /var/lib/apt/lists/* && \
