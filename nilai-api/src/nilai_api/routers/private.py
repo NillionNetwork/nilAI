@@ -238,16 +238,28 @@ async def chat_completion(
             chat_completion_stream_generator(),
             media_type="text/event-stream",  # Ensure client interprets as Server-Sent Events
         )
+
     client = OpenAI(base_url=model_url, api_key="<not-needed>")
-    response = client.chat.completions.create(
-        model=req.model,
-        messages=req.messages,  # type: ignore
-        stream=req.stream,
-        top_p=req.top_p,
-        temperature=req.temperature,
-        max_tokens=req.max_tokens,
-        tools=req.tools,  # type: ignore
-    )  # type: ignore
+    if req.response_format:
+        response = client.beta.chat.completions.parse(
+            model=req.model,
+            messages=req.messages,
+            top_p=req.top_p,
+            temperature=req.temperature,
+            max_tokens=req.max_tokens,
+            tools=req.tools,
+            response_format=req.response_format,
+        )
+    else:
+        response = client.chat.completions.create(
+            model=req.model,
+            messages=req.messages,  # type: ignore
+            stream=req.stream,
+            top_p=req.top_p,
+            temperature=req.temperature,
+            max_tokens=req.max_tokens,
+            tools=req.tools,  # type: ignore
+        )  # type: ignore
 
     model_response = SignedChatCompletion(
         **response.model_dump(),
