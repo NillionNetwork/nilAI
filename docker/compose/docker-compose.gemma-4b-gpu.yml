@@ -1,0 +1,52 @@
+services:
+  gemma_4b_it_gpu:
+    image: nillion/nilai-vllm:latest
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ipc: host
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    env_file:
+      - .env    # must include HUGGINGFACE_HUB_TOKEN
+    restart: unless-stopped
+    depends_on:
+      etcd:
+        condition: service_healthy
+    command: >
+      --model "google/gemma-3-4b-it"
+      --trust-remote-code
+      --gpu-memory-utilization 0.85
+      --max-model-len 60000
+      --tensor-parallel-size 1
+      --uvicorn-log-level warning
+      --chat-template-content-format "openai"
+      --dtype "bfloat16"
+    environment:
+      - SVC_HOST=gemma_4b_it_gpu
+      - SVC_PORT=8000
+      - ETCD_HOST=etcd
+      - ETCD_PORT=2379
+      - TOOL_SUPPORT=true
+      - ENABLE_MULTIMODAL=true
+    volumes:
+      - hugging_face_models:/root/.cache/huggingface
+    networks:
+      - backend_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      retries: 3
+      start_period: 90s
+      timeout: 10s
+
+volumes:
+  hugging_face_models:
+
+networks:
+  backend_net:
