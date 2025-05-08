@@ -25,6 +25,7 @@ def client():
             "Content-Type": "application/json",
             "Authorization": f"Bearer {AUTH_TOKEN}",
         },
+        timeout=None,
     )
 
 
