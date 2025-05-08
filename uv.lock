@@ -10,6 +10,7 @@ members = [
     "nilai-auth-server",
     "nilai-common",
     "nilai-models",
+    "nuc-helpers",
 ]
 
 [[package]]
@@ -1301,6 +1302,7 @@ dependencies = [
     { name = "nilai-api" },
     { name = "nilai-common" },
     { name = "nilai-models" },
+    { name = "nuc-helpers" },
 ]
 
 [package.dev-dependencies]
@@ -1323,6 +1325,7 @@ requires-dist = [
     { name = "nilai-api", editable = "nilai-api" },
     { name = "nilai-common", editable = "packages/nilai-common" },
     { name = "nilai-models", editable = "nilai-models" },
+    { name = "nuc-helpers", editable = "nilai-auth/nuc-helpers" },
 ]
 
 [package.metadata.requires-dev]
@@ -1400,20 +1403,14 @@ name = "nilai-auth-client"
 version = "0.1.0"
 source = { editable = "nilai-auth/nilai-auth-client" }
 dependencies = [
-    { name = "httpx" },
-    { name = "nuc" },
+    { name = "nuc-helpers" },
     { name = "openai" },
-    { name = "pydantic" },
-    { name = "secp256k1" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "httpx", specifier = ">=0.28.1" },
-    { name = "nuc", git = "https://github.com/NillionNetwork/nuc-py.git" },
+    { name = "nuc-helpers", editable = "nilai-auth/nuc-helpers" },
     { name = "openai", specifier = ">=1.70.0" },
-    { name = "pydantic", specifier = ">=2.11.2" },
-    { name = "secp256k1", specifier = ">=0.14.0" },
 ]
 
 [[package]]
@@ -1421,19 +1418,17 @@ name = "nilai-auth-server"
 version = "0.1.0"
 source = { editable = "nilai-auth/nilai-auth-server" }
 dependencies = [
-    { name = "cosmpy" },
     { name = "fastapi", extra = ["standard"] },
     { name = "gunicorn" },
-    { name = "nuc" },
+    { name = "nuc-helpers" },
     { name = "uvicorn" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "cosmpy", specifier = "==0.9.2" },
     { name = "fastapi", extras = ["standard"], specifier = ">=0.115.5" },
     { name = "gunicorn", specifier = ">=23.0.0" },
-    { name = "nuc", git = "https://github.com/NillionNetwork/nuc-py.git" },
+    { name = "nuc-helpers", editable = "nilai-auth/nuc-helpers" },
     { name = "uvicorn", specifier = ">=0.34.0" },
 ]
 
@@ -1519,6 +1514,27 @@ dependencies = [
     { name = "cosmpy" },
     { name = "requests" },
     { name = "secp256k1" },
+]
+
+[[package]]
+name = "nuc-helpers"
+version = "0.1.0"
+source = { editable = "nilai-auth/nuc-helpers" }
+dependencies = [
+    { name = "cosmpy" },
+    { name = "httpx" },
+    { name = "nuc" },
+    { name = "pydantic" },
+    { name = "secp256k1" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "cosmpy", specifier = "==0.9.2" },
+    { name = "httpx", specifier = ">=0.28.1" },
+    { name = "nuc", git = "https://github.com/NillionNetwork/nuc-py.git" },
+    { name = "pydantic", specifier = ">=2.11.2" },
+    { name = "secp256k1", specifier = ">=0.14.0" },
 ]
 
 [[package]]

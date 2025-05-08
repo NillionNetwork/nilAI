@@ -29,8 +29,7 @@ Use a ASGI server like Uvicorn:
 
 ```bash
 cd nilai-auth/nilai-auth-server
-# Make sure dependencies are installed (e.g., using uv or pip)
-uvicorn src.nilai_auth_server.app:app --host 0.0.0.0 --port 8100 --reload
+uv run python3 src/nilai_auth_server/app.py
 ```
 
 ## Configuration

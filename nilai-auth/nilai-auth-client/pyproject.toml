@@ -8,11 +8,8 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
-    "httpx>=0.28.1",
-    "nuc",
+    "nuc-helpers",
     "openai>=1.70.0",
-    "pydantic>=2.11.2",
-    "secp256k1>=0.14.0",
 ]
 
 [build-system]
@@ -20,4 +17,4 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.uv.sources]
-nuc = { git = "https://github.com/NillionNetwork/nuc-py.git" }
+nuc-helpers = { workspace = true }

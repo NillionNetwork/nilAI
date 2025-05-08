@@ -1,5 +1,5 @@
 [project]
-name = "nilai-auth-server"
+name = "nuc-helpers"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -8,10 +8,11 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
-    "fastapi[standard]>=0.115.5",
-    "gunicorn>=23.0.0",
-    "nuc-helpers",
-    "uvicorn>=0.34.0",
+    "cosmpy==0.9.2",
+    "nuc",
+    "pydantic>=2.11.2",
+    "secp256k1>=0.14.0",
+    "httpx>=0.28.1",
 ]
 
 [build-system]
@@ -19,4 +20,4 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.uv.sources]
-nuc-helpers = { workspace = true }
+nuc = { git = "https://github.com/NillionNetwork/nuc-py.git" }
