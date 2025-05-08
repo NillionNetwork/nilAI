@@ -1,5 +1,6 @@
-from base64 import b64encode
 import os
+import fcntl
+from base64 import b64encode
 
 from secp256k1 import PrivateKey, PublicKey
 
@@ -8,26 +9,42 @@ PRIVATE_KEY_PATH = "private_key.key"
 
 def generate_key_pair() -> tuple[PrivateKey, PublicKey, str]:
     """
-    Generate a new key pair and return the private key, public key, and base64 encoded public key.
+    Generate or load a key pair safely, preventing concurrent access using fcntl.
 
     Returns:
-        tuple[PrivateKey, PublicKey, str]: A tuple containing the private key, public key, and base64 encoded public key.
+        tuple[PrivateKey, PublicKey, str]: Private key, public key, and base64-encoded public key.
     """
     private_key: PrivateKey
-    if os.path.exists(PRIVATE_KEY_PATH):
-        with open(PRIVATE_KEY_PATH, "rb") as f:
-            private_key = PrivateKey(f.read())
-    else:
-        private_key = PrivateKey()
-        with open(PRIVATE_KEY_PATH, "wb") as f:
-            private_key_bytes: bytes = private_key.private_key  # type: ignore
-            f.write(private_key_bytes)
+
+    # Use a separate lock file to avoid corrupting the key file itself
+    lock_path = PRIVATE_KEY_PATH + ".lock"
+
+    # Ensure the lock file exists
+    open(lock_path, "a").close()
+
+    with open(lock_path, "r+") as lock_file:
+        fcntl.flock(lock_file, fcntl.LOCK_EX)
+
+        if os.path.exists(PRIVATE_KEY_PATH):
+            with open(PRIVATE_KEY_PATH, "rb") as f:
+                private_key_bytes: bytes = f.read()
+                if not private_key_bytes:
+                    raise ValueError("Private key file is empty or corrupted.")
+                private_key = PrivateKey(private_key_bytes)
+        else:
+            private_key = PrivateKey()
+            with open(PRIVATE_KEY_PATH, "wb") as f:
+                private_key_bytes: bytes = private_key.private_key  # type: ignore
+                f.write(private_key_bytes)
+
+        # Release the lock
+        fcntl.flock(lock_file, fcntl.LOCK_UN)
 
     public_key = private_key.pubkey
     if public_key is None:
-        raise ValueError("Keypair generation failed:Public key is None")
-    b64_public_key: str = b64encode(public_key.serialize()).decode()
+        raise ValueError("Keypair generation failed: Public key is None")
 
+    b64_public_key: str = b64encode(public_key.serialize()).decode()
     return private_key, public_key, b64_public_key
 
 

@@ -104,7 +104,7 @@ jobs:
         run: docker build -t nillion/nilai-attestation:latest -f docker/attestation.Dockerfile .
 
       - name: Build nilal API
-        run: docker build -t nillion/nilai-api:latest -f docker/api.Dockerfile --target nilai .
+        run: docker build -t nillion/nilai-api:latest -f docker/api.Dockerfile --target nilai --platform linux/amd64 .
 
       - name: Create .env
         run: |
