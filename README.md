@@ -77,7 +77,7 @@ docker build -t nillion/nilai-attestation:latest -f docker/attestation.Dockerfil
 # Build vLLM docker container
 docker build -t nillion/nilai-vllm:latest -f docker/vllm.Dockerfile .
 # Build nilai_api container
-docker build -t nillion/nilai-api:latest -f docker/api.Dockerfile --target nilai .
+docker build -t nillion/nilai-api:latest -f docker/api.Dockerfile --target nilai --platform linux/amd64 .
 ```
 To deploy:
 ```shell
