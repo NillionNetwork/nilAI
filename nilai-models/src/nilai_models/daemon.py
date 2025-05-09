@@ -21,7 +21,7 @@ async def get_metadata(num_retries=30):
     while True:
         url = None
         try:
-            url = f"http://{SETTINGS['host']}:{SETTINGS['port']}/v1/models"
+            url = f"http://{SETTINGS.host}:{SETTINGS.port}/v1/models"
             # Request model metadata from localhost:8000/v1/models
             async with httpx.AsyncClient() as client:
                 response = await client.get(url)
@@ -37,7 +37,7 @@ async def get_metadata(num_retries=30):
                     license="Apache 2.0",  # Usage license
                     source=f"https://huggingface.co/{model_name}",  # Model source
                     supported_features=["chat_completion"],  # Capabilities
-                    tool_support=SETTINGS["tool_support"],  # Tool support
+                    tool_support=SETTINGS.tool_support,  # Tool support
                 )
 
         except Exception as e:
@@ -81,12 +81,12 @@ async def main():
     try:
         # Initialize discovery service
         discovery_service = ModelServiceDiscovery(
-            host=SETTINGS["etcd_host"], port=SETTINGS["etcd_port"]
+            host=SETTINGS.etcd_host, port=SETTINGS.etcd_port
         )
 
         metadata = await get_metadata()
         model_endpoint = ModelEndpoint(
-            url=f"http://{SETTINGS['host']}:{SETTINGS['port']}", metadata=metadata
+            url=f"http://{SETTINGS.host}:{SETTINGS.port}", metadata=metadata
         )
 
         # Setup signal handlers

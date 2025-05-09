@@ -18,6 +18,6 @@
 	}
 
 	handle {
-		reverse_proxy api:8443
+		reverse_proxy api:8080
 	}
  }

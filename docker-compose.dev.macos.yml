@@ -3,9 +3,15 @@ services:
     platform: linux/amd64
     ports:
       - "8080:8080"
-      - "8443:8443"
     volumes:
       - ./nilai-api/:/app/nilai-api/
+      - ./packages/:/app/packages/
+  attestation:
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./nilai-attestation/:/app/nilai-attestation/
+      - ./packages/:/app/packages/
   redis:
     ports:
       - "6379:6379"

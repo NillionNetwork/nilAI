@@ -3,7 +3,8 @@ import asyncio
 import logging
 import os
 from base64 import b64encode
-from typing import AsyncGenerator, Union, List, Tuple
+from typing import AsyncGenerator, Optional, Union, List, Tuple
+from nilai_api.attestation import get_attestation_report
 from nilai_api.handlers.nilrag import handle_nilrag
 
 from fastapi import APIRouter, Body, Depends, HTTPException, status, Request
@@ -18,12 +19,13 @@ from nilai_api.state import state
 
 # Internal libraries
 from nilai_common import (
-    AttestationResponse,
+    AttestationReport,
     ChatRequest,
     Message,
     ModelMetadata,
     SignedChatCompletion,
     Usage,
+    Nonce,
 )
 from openai import AsyncOpenAI, OpenAI
 
@@ -55,10 +57,13 @@ async def get_usage(user: UserModel = Depends(get_user)) -> Usage:
 
 
 @router.get("/v1/attestation/report", tags=["Attestation"])
-async def get_attestation(user: UserModel = Depends(get_user)) -> AttestationResponse:
+async def get_attestation(
+    nonce: Optional[Nonce] = None, user: UserModel = Depends(get_user)
+) -> AttestationReport:
     """
     Generate a cryptographic attestation report.
 
+    - **attestation_request**: Attestation request containing a nonce
     - **user**: Authenticated user information (through HTTP Bearer header)
     - **Returns**: Attestation details for service verification
 
@@ -70,11 +75,10 @@ async def get_attestation(user: UserModel = Depends(get_user)) -> AttestationRes
     ### Security Note
     Provides cryptographic proof of the service's integrity and environment.
     """
-    return AttestationResponse(
-        verifying_key=state.verifying_key,
-        cpu_attestation=state.cpu_attestation,
-        gpu_attestation=state.gpu_attestation,
-    )
+
+    attestation_report = await get_attestation_report(nonce)
+    attestation_report.verifying_key = state.verifying_key
+    return attestation_report
 
 
 @router.get("/v1/models", tags=["Model"])

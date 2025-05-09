@@ -1,16 +1,14 @@
 # Fast API and serving
 from fastapi import APIRouter
-from nilai_api.state import state
 
 # Internal libraries
-from nilai_common import HealthCheckResponse, AttestationReport
-from nilai_api.attestation import verify_attestation_report
+from nilai_common import HealthCheckResponse
 
 router = APIRouter()
 
 
 # Health Check Endpoint
-@router.get("/v1/health", tags=["Health"])
+@router.get("/health", tags=["Health"])
 async def health_check() -> HealthCheckResponse:
     """
     Perform a system health check.
@@ -33,15 +31,4 @@ async def health_check() -> HealthCheckResponse:
     # Expect: HealthCheckResponse(status='ok', uptime=3600)
     ```
     """
-    return HealthCheckResponse(status="ok", uptime=state.uptime)
-
-
-@router.post("/attestation/verify", tags=["Attestation"])
-async def post_attestation(attestation_report: AttestationReport) -> bool:
-    """
-    Verify a cryptographic attestation report.
-
-    - **attestation_report**: Attestation report to verify
-    - **Returns**: True if the attestation report is valid, False otherwise
-    """
-    return await verify_attestation_report(attestation_report)
+    return HealthCheckResponse(status="ok", uptime="")
