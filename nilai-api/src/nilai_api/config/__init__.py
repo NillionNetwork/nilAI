@@ -21,7 +21,9 @@ DB_PORT = int(os.getenv("POSTGRES_PORT", 5432))
 DB_NAME = os.getenv("POSTGRES_DB", "nilai_users")
 
 
-AUTH_STRATEGY = "api_key"
+NILAUTH_TRUSTED_ROOT_ISSUERS = os.getenv("NILAUTH_TRUSTED_ROOT_ISSUERS", "").split(",")
+
+AUTH_STRATEGY = os.getenv("AUTH_STRATEGY", "api_key")
 
 
 if ENVIRONMENT == "mainnet":
@@ -29,5 +31,5 @@ if ENVIRONMENT == "mainnet":
 elif ENVIRONMENT == "testnet":
     from .testnet import *  # noqa
 else:
-    # default to testnet
-    from .testnet import *  # noqa
+    # default to mainnet with no limits
+    from .mainnet import *  # noqa

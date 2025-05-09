@@ -17,7 +17,7 @@ class QueryLog(Base):
 
     id: int = Column(Integer, primary_key=True, autoincrement=True)  # type: ignore
     userid: str = Column(
-        String(36), ForeignKey(UserModel.userid), nullable=False, index=True
+        String(75), ForeignKey(UserModel.userid), nullable=False, index=True
     )  # type: ignore
     query_timestamp: datetime = Column(
         DateTime, server_default=sqlalchemy.func.now(), nullable=False

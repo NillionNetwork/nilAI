@@ -77,7 +77,7 @@ async def get_attestation(
     """
 
     attestation_report = await get_attestation_report(nonce)
-    attestation_report.verifying_key = state.verifying_key
+    attestation_report.verifying_key = state.b64_public_key
     return attestation_report
 
 
@@ -215,23 +215,35 @@ async def chat_completion(
                     },
                 )  # type: ignore
 
+                prompt_token_usage: int = 0
+                completion_token_usage: int = 0
                 async for chunk in response:
-                    if chunk.usage is not None:
-                        await UserManager.update_token_usage(
-                            user.userid,
-                            prompt_tokens=chunk.usage.prompt_tokens,
-                            completion_tokens=chunk.usage.completion_tokens,
-                        )
-                        await QueryLogManager.log_query(
-                            user.userid,
-                            model=req.model,
-                            prompt_tokens=chunk.usage.prompt_tokens,
-                            completion_tokens=chunk.usage.completion_tokens,
-                        )
+                    if (
+                        chunk.usage is not None
+                        and chunk.usage.prompt_tokens is not None
+                        and chunk.usage.completion_tokens is not None
+                    ):
+                        prompt_token_usage = chunk.usage.prompt_tokens
+                        completion_token_usage += chunk.usage.completion_tokens
 
+                    logger.info(
+                        f"Prompt token usage: {chunk.usage.prompt_tokens}/{prompt_token_usage}, Completion token usage: {chunk.usage.completion_tokens}/{completion_token_usage}"
+                    )
                     data = chunk.model_dump_json(exclude_unset=True)
                     yield f"data: {data}\n\n"
                     await asyncio.sleep(0)
+
+                await UserManager.update_token_usage(
+                    user.userid,
+                    prompt_tokens=prompt_token_usage,
+                    completion_tokens=completion_token_usage,
+                )
+                await QueryLogManager.log_query(
+                    user.userid,
+                    model=req.model,
+                    prompt_tokens=prompt_token_usage,
+                    completion_tokens=completion_token_usage,
+                )
 
             except Exception as e:
                 logger.error(f"Error streaming response: {e}")

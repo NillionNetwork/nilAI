@@ -13,6 +13,7 @@ dependencies = [
     "nilai-api",
     "nilai-common",
     "nilai-models",
+    "nuc-helpers",
 ]
 
 [dependency-groups]
@@ -21,11 +22,11 @@ dev = [
     "isort>=5.13.2",
     "pytest-mock>=3.14.0",
     "pytest>=8.3.3",
-    "ruff>=0.11.4",
+    "ruff>=0.11.7",
     "uvicorn>=0.32.1",
     "pytest-asyncio>=0.25.0",
     "testcontainers>=4.9.1",
-    "pyright>=1.1.399",
+    "pyright>=1.1.400",
     "pre-commit>=4.1.0",
     "httpx>=0.28.1",
 ]
@@ -38,14 +39,15 @@ build-backend = "setuptools.build_meta"
 find = { include = ["nilai"] }
 
 [tool.uv.workspace]
-members = ["nilai-models", "nilai-api", "packages/nilai-common", "packages/verifier"]
+members = ["nilai-models", "nilai-api", "packages/nilai-common", "nilai-auth/nilai-auth-server", "nilai-auth/nilai-auth-client", "nilai-auth/nuc-helpers"]
 
 [tool.uv.sources]
 nilai-common = { workspace = true }
 nilai-api = { workspace = true }
 nilai-models = { workspace = true }
+nuc-helpers = { workspace = true }
 [tool.pyright]
-exclude = [".venv", "packages/verifier/"]
+exclude = [".venv"]
 
 [tool.ruff]
-exclude = [".venv", "packages/verifier"]
+exclude = [".venv"]

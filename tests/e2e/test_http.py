@@ -10,7 +10,8 @@ pytest tests/e2e/test_http.py
 
 import json
 
-from .config import BASE_URL, AUTH_TOKEN, test_models
+from .config import BASE_URL, test_models
+from .nuc import get_nuc_token
 import httpx
 import pytest
 
@@ -18,12 +19,13 @@ import pytest
 @pytest.fixture
 def client():
     """Create an HTTPX client with default headers"""
+    invocation_token = get_nuc_token()
     return httpx.Client(
         base_url=BASE_URL,
         headers={
             "accept": "application/json",
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {AUTH_TOKEN}",
+            "Authorization": f"Bearer {invocation_token.token}",
         },
         timeout=None,
     )

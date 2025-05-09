@@ -13,7 +13,7 @@ logger = logging.getLogger("uvicorn.error")
 
 class AppState:
     def __init__(self):
-        self.private_key, self.public_key, self.verifying_key = generate_key_pair()
+        self.private_key, self.public_key, self.b64_public_key = generate_key_pair()
         self.sem = Semaphore(2)
 
         self.discovery_service = ModelServiceDiscovery(

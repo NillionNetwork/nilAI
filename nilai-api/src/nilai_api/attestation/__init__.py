@@ -1,6 +1,6 @@
 from fastapi import HTTPException
 import httpx
-from nilai_common import SETTINGS, Nonce, AttestationReport
+from nilai_common import Nonce, AttestationReport, SETTINGS
 from nilai_common.logger import setup_logger
 
 logger = setup_logger(__name__)

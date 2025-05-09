@@ -170,3 +170,6 @@ grafana/runtime-data/*
 
 prometheus/data/*
 !prometheus/data/.gitkeep
+
+private_key.key
+private_key.key.lock

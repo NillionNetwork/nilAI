@@ -12,7 +12,7 @@ def app_state(mocker):
 def test_generate_key_pair(app_state):
     assert app_state.private_key is not None
     assert app_state.public_key is not None
-    assert app_state.verifying_key is not None
+    assert app_state.b64_public_key is not None
 
 
 def test_semaphore_initialization(app_state):

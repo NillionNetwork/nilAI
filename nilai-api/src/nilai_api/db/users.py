@@ -23,10 +23,9 @@ logger = logging.getLogger(__name__)
 class UserModel(Base):
     __tablename__ = "users"
 
-    userid: str = Column(String(50), primary_key=True, index=True)  # type: ignore
+    userid: str = Column(String(75), primary_key=True, index=True)  # type: ignore
     name: str = Column(String(100), nullable=False)  # type: ignore
-    email: str = Column(String(255), unique=True, nullable=False, index=True)  # type: ignore
-    apikey: str = Column(String(50), unique=True, nullable=False, index=True)  # type: ignore
+    apikey: str = Column(String(75), unique=False, nullable=False, index=True)  # type: ignore
     prompt_tokens: int = Column(Integer, default=0, nullable=False)  # type: ignore
     completion_tokens: int = Column(Integer, default=0, nullable=False)  # type: ignore
     queries: int = Column(Integer, default=0, nullable=False)  # type: ignore
@@ -34,12 +33,14 @@ class UserModel(Base):
         DateTime, server_default=sqlalchemy.func.now(), nullable=False
     )  # type: ignore
     last_activity: datetime = Column(DateTime, nullable=True)  # type: ignore
-    ratelimit_day: int = Column(Integer, default=1000, nullable=True)  # type: ignore
-    ratelimit_hour: int = Column(Integer, default=100, nullable=True)  # type: ignore
-    ratelimit_minute: int = Column(Integer, default=10, nullable=True)  # type: ignore
+    ratelimit_day: int = Column(Integer, default=USER_RATE_LIMIT_DAY, nullable=True)  # type: ignore
+    ratelimit_hour: int = Column(Integer, default=USER_RATE_LIMIT_HOUR, nullable=True)  # type: ignore
+    ratelimit_minute: int = Column(
+        Integer, default=USER_RATE_LIMIT_MINUTE, nullable=True
+    )  # type: ignore
 
     def __repr__(self):
-        return f"<User(userid={self.userid}, name={self.name}, email={self.email})>"
+        return f"<User(userid={self.userid}, name={self.name})>"
 
 
 @dataclass
@@ -86,7 +87,6 @@ class UserManager:
     @staticmethod
     async def insert_user(
         name: str,
-        email: str,
         apikey: str | None = None,
         userid: str | None = None,
         ratelimit_day: int | None = USER_RATE_LIMIT_DAY,
@@ -98,7 +98,6 @@ class UserManager:
 
         Args:
             name (str): Name of the user
-            email (str): Email of the user
             apikey (str): API key for the user
             userid (str): Unique ID for the user
             ratelimit_day (int): Daily rate limit
@@ -118,7 +117,6 @@ class UserManager:
         user = UserModel(
             userid=userid,
             name=name,
-            email=email,
             apikey=apikey,
             ratelimit_day=ratelimit_day,
             ratelimit_hour=ratelimit_hour,
@@ -143,6 +141,27 @@ class UserManager:
         except SQLAlchemyError as e:
             logger.error(f"Error inserting user: {e}")
             raise
+
+    @staticmethod
+    async def check_user(userid: str) -> Optional[UserModel]:
+        """
+        Validate a user.
+
+        Args:
+            userid (str): User ID to validate
+
+        Returns:
+            User's name if user is valid, None otherwise
+        """
+        try:
+            async with get_db_session() as session:
+                query = sqlalchemy.select(UserModel).filter(UserModel.userid == userid)  # type: ignore
+                user = await session.execute(query)
+                user = user.scalar_one_or_none()
+                return user
+        except SQLAlchemyError as e:
+            logger.error(f"Error checking API key: {e}")
+            return None
 
     @staticmethod
     async def check_api_key(api_key: str) -> Optional[UserModel]:
