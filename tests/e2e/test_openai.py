@@ -14,12 +14,14 @@ import pytest
 from openai import OpenAI
 from openai.types.chat import ChatCompletion
 from .config import BASE_URL, AUTH_TOKEN, test_models
+from .nuc import get_nuc_token
 
 
 @pytest.fixture
 def client():
     """Create an OpenAI client configured to use the Nilai API"""
-    return OpenAI(base_url=BASE_URL, api_key=AUTH_TOKEN)
+    invocation_token = get_nuc_token()
+    return OpenAI(base_url=BASE_URL, api_key=invocation_token.token)
 
 
 @pytest.mark.parametrize(

@@ -139,10 +139,12 @@ def pay_for_subscription(
     logger.info(f"IS SUBSCRIBED: {subscription_details.subscribed}")
     if (
         not subscription_details
-        or not subscription_details.subscribed
-        or not subscription_details.details
+        or subscription_details.subscribed is None
+        or subscription_details.details is None
     ):
-        raise RuntimeError("User subscription details could not be retrieved")
+        raise RuntimeError(
+            f"User subscription details could not be retrieved: {subscription_details}, {subscription_details.subscribed}, {subscription_details.details}"
+        )
 
     if not subscription_details.subscribed:
         logger.info("[>] Paying for subscription")

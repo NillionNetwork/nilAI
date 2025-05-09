@@ -19,7 +19,7 @@ from nuc.validate import ValidationParameters, InvocationRequirement
 
 def b2b2c_test():
     # Services must be running for this to work
-    PRIVATE_KEY = "l/SYifzu2Iqc3dsWoWHRP2oSMHwrORY/PDw5fDwtJDQ="
+    PRIVATE_KEY = "l/SYifzu2Iqc3dsWoWHRP2oSMHwrORY/PDw5fDwtJDQ="  # This is an example private key with funds for testing devnet, and should not be used in production
     NILAI_ENDPOINT = "localhost:8080"
     NILAUTH_ENDPOINT = "localhost:30921"
     NILCHAIN_GRPC = "localhost:26649"
@@ -81,7 +81,7 @@ def b2b2c_test():
 
 def b2c_test():
     # Services must be running for this to work
-    PRIVATE_KEY = "l/SYifzu2Iqc3dsWoWHRP2oSMHwrORY/PDw5fDwtJDQ="
+    PRIVATE_KEY = "l/SYifzu2Iqc3dsWoWHRP2oSMHwrORY/PDw5fDwtJDQ="  # This is an example private key with funds for testing devnet, and should not be used in production
     NILAI_ENDPOINT = "localhost:8080"
     NILAUTH_ENDPOINT = "localhost:30921"
     NILCHAIN_GRPC = "localhost:26649"
