@@ -1,8 +1,5 @@
 import os
 from pydantic import BaseModel
-# from dotenv import load_dotenv
-
-# load_dotenv()  # Only needed locally if using a .env file
 
 
 class HostSettings(BaseModel):

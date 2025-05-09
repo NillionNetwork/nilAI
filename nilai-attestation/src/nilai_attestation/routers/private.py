@@ -1,6 +1,6 @@
 # Fast API and serving
 import logging
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 # Internal libraries
 from nilai_attestation.attestation import (
@@ -35,12 +35,14 @@ async def get_attestation(nonce: Nonce | None = None) -> AttestationReport:
     return get_attestation_report(nonce)
 
 
-@router.post("/attestation/verify", tags=["Attestation"])
-async def post_attestation(attestation_report: AttestationReport) -> bool:
+@router.get("/attestation/verify", tags=["Attestation"])
+async def get_attestation_verification(
+    attestation_report: AttestationReport = Depends(),
+) -> bool:
     """
-    Verify a cryptographic attestation report.
+    Verify a cryptographic attestation report passed as query parameters.
 
-    - **attestation_report**: Attestation report to verify
+    - **attestation_report**: Attestation report to verify (fields passed as query parameters)
     - **Returns**: True if the attestation report is valid, False otherwise
     """
     return verify_attestation_report(attestation_report)
