@@ -46,7 +46,7 @@ def is_nvidia_gpu_available() -> bool:
         return False
 
 
-def nv_attest(nonce: Nonce) -> NVAttestationToken:
+def nv_attest(nonce: Nonce, name: str = "thisNode1") -> NVAttestationToken:
     """Generate an attestation token from local evidence.
 
     Args:
@@ -57,7 +57,7 @@ def nv_attest(nonce: Nonce) -> NVAttestationToken:
     """
     # Create and configure the attestation client.
     client = attestation.Attestation()
-    client.set_name("thisNode1")
+    client.set_name(name)
     client.set_nonce(nonce)
 
     logger.info("Checking if NVIDIA GPU is available")

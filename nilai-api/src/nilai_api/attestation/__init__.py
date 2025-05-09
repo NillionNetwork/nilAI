@@ -12,7 +12,7 @@ async def get_attestation_report(
     """Get the attestation report for the given nonce"""
 
     try:
-        attestation_url = f"http://{SETTINGS['attestation_host']}:{SETTINGS['attestation_port']}/attestation/report"
+        attestation_url = f"http://{SETTINGS.attestation_host}:{SETTINGS.attestation_port}/attestation/report"
         async with httpx.AsyncClient() as client:
             response: httpx.Response = await client.get(attestation_url, params=nonce)
             report = AttestationReport(**response.json())
@@ -24,10 +24,10 @@ async def get_attestation_report(
 async def verify_attestation_report(attestation_report: AttestationReport) -> bool:
     """Verify the attestation report"""
     try:
-        attestation_url = f"http://{SETTINGS['attestation_host']}:{SETTINGS['attestation_port']}/attestation/verify"
+        attestation_url = f"http://{SETTINGS.attestation_host}:{SETTINGS.attestation_port}/attestation/verify"
         async with httpx.AsyncClient() as client:
-            response: httpx.Response = await client.post(
-                attestation_url, json=attestation_report.model_dump()
+            response: httpx.Response = await client.get(
+                attestation_url, params=attestation_report.model_dump()
             )
             return response.json()
     except Exception as e:

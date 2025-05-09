@@ -5,7 +5,7 @@ from nilai_common.config import SETTINGS
 bind = ["0.0.0.0:8080"]
 
 # Set the number of workers (2)
-workers = SETTINGS["gunicorn_workers"]
+workers = SETTINGS.gunicorn_workers
 
 # Set the number of threads per worker (16)
 threads = 1

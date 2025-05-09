@@ -43,7 +43,9 @@ POLICY = {
 }
 
 
-def verify_attestation(attestation_report: AttestationReport) -> bool:
+def verify_attestation(
+    attestation_report: AttestationReport, name: str = "thisNode1"
+) -> bool:
     """Verify an NVIDIA attestation token against a policy.
 
     Args:
@@ -57,7 +59,7 @@ def verify_attestation(attestation_report: AttestationReport) -> bool:
     # Create an attestation client instance for token verification.
     logger.info(f"Attestation report: {attestation_report}")
     client = attestation.Attestation()
-    client.set_name("thisNode1")
+    client.set_name(name)
     client.set_nonce(attestation_report.nonce)
     client.add_verifier(
         attestation.Devices.GPU, attestation.Environment.REMOTE, NRAS_URL, ""

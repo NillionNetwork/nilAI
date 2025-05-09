@@ -24,6 +24,7 @@ def get_attestation_report(nonce: Nonce | None = None) -> AttestationReport:
     logger.info(f"Nonce: {attestation_nonce}")
 
     load_sev_library()
+
     return AttestationReport(
         nonce=attestation_nonce,
         verifying_key="",
