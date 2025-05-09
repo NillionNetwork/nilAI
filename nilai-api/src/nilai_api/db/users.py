@@ -33,9 +33,11 @@ class UserModel(Base):
         DateTime, server_default=sqlalchemy.func.now(), nullable=False
     )  # type: ignore
     last_activity: datetime = Column(DateTime, nullable=True)  # type: ignore
-    ratelimit_day: int = Column(Integer, default=1000, nullable=True)  # type: ignore
-    ratelimit_hour: int = Column(Integer, default=100, nullable=True)  # type: ignore
-    ratelimit_minute: int = Column(Integer, default=10, nullable=True)  # type: ignore
+    ratelimit_day: int = Column(Integer, default=USER_RATE_LIMIT_DAY, nullable=True)  # type: ignore
+    ratelimit_hour: int = Column(Integer, default=USER_RATE_LIMIT_HOUR, nullable=True)  # type: ignore
+    ratelimit_minute: int = Column(
+        Integer, default=USER_RATE_LIMIT_MINUTE, nullable=True
+    )  # type: ignore
 
     def __repr__(self):
         return f"<User(userid={self.userid}, name={self.name})>"

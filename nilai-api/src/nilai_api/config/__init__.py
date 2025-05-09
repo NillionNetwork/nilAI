@@ -31,5 +31,5 @@ if ENVIRONMENT == "mainnet":
 elif ENVIRONMENT == "testnet":
     from .testnet import *  # noqa
 else:
-    # default to testnet
-    from .testnet import *  # noqa
+    # default to mainnet with no limits
+    from .mainnet import *  # noqa

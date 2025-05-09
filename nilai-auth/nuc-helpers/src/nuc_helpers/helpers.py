@@ -137,11 +137,7 @@ def pay_for_subscription(
     # Pretty print the subscription details
     subscription_details = nilauth_client.subscription_status(private_key)
     logger.info(f"IS SUBSCRIBED: {subscription_details.subscribed}")
-    if (
-        not subscription_details
-        or subscription_details.subscribed is None
-        or subscription_details.details is None
-    ):
+    if not subscription_details or subscription_details.subscribed is None:
         raise RuntimeError(
             f"User subscription details could not be retrieved: {subscription_details}, {subscription_details.subscribed}, {subscription_details.details}"
         )
@@ -154,6 +150,11 @@ def pay_for_subscription(
         )
     else:
         logger.info("[>] Subscription is already paid for")
+
+        if subscription_details.details is None:
+            raise RuntimeError(
+                f"Subscription details could not be retrieved: {subscription_details}"
+            )
 
         logger.info(
             f"EXPIRES IN: {subscription_details.details.expires_at - datetime.datetime.now(datetime.timezone.utc)}"
