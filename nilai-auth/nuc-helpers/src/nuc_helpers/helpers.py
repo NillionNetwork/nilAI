@@ -169,6 +169,7 @@ def get_delegation_token(
     private_key: NilAuthPrivateKey,
     user_public_key: NilAuthPublicKey,
     usage_limit: int | None = None,
+    expires_at: datetime.datetime | None = None,
 ) -> DelegationToken:
     """
     Delegate the root token to the delegated key
@@ -184,6 +185,12 @@ def get_delegation_token(
     root_token_envelope = NucTokenEnvelope.parse(root_token.token)
     delegated_token = (
         NucTokenBuilder.extending(root_token_envelope)
+        .expires_at(
+            expires_at
+            if expires_at
+            else datetime.datetime.now(datetime.timezone.utc)
+            + datetime.timedelta(minutes=5)
+        )
         .audience(Did(user_public_key.serialize()))
         .command(Command(["nil", "ai", "generate"]))
         .meta({"usage_limit": usage_limit})

@@ -1,49 +1,52 @@
-from fastapi import HTTPException, Security, status
+from fastapi import Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from logging import getLogger
 
 from nilai_api import config
-from nilai_api.auth.jwt import validate_jwt
-from nilai_api.db.users import UserManager, UserModel
-from nilai_api.auth.strategies import STRATEGIES
+from nilai_api.db.users import UserManager
+from nilai_api.auth.strategies import AuthenticationStrategy
 
 from nuc.validate import ValidationException
+from nuc_helpers.usage import UsageLimitError
+
+from nilai_api.auth.common import (
+    AuthenticationInfo,
+    AuthenticationError,
+    TokenRateLimit,
+)
 
 logger = getLogger(__name__)
 bearer_scheme = HTTPBearer()
 
 
-class AuthenticationError(HTTPException):
-    def __init__(self, detail: str):
-        super().__init__(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=detail,
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-
-async def get_user(
+async def get_auth_info(
     credentials: HTTPAuthorizationCredentials = Security(bearer_scheme),
-) -> UserModel:
+) -> AuthenticationInfo:
     try:
-        if config.AUTH_STRATEGY not in STRATEGIES:
-            logger.error(f"Invalid auth strategy: {config.AUTH_STRATEGY}")
-            raise AuthenticationError("Server misconfiguration: invalid auth strategy")
+        strategy_name: str = config.AUTH_STRATEGY.upper()
 
-        user = await STRATEGIES[config.AUTH_STRATEGY](credentials.credentials)
-        if not user:
-            raise AuthenticationError("Missing or invalid API key")
-        await UserManager.update_last_activity(userid=user.userid)
-        return user
+        try:
+            strategy = AuthenticationStrategy[strategy_name]
+        except KeyError:  # If the strategy is not found, we raise an error
+            logger.error(f"Invalid auth strategy: {strategy_name}")
+            raise AuthenticationError(
+                f"Server misconfiguration: invalid auth strategy: {strategy_name}"
+            )
+
+        auth_info = await strategy(credentials.credentials)
+        await UserManager.update_last_activity(userid=auth_info.user.userid)
+        return auth_info
     except AuthenticationError as e:
         raise e
     except ValueError as e:
         raise AuthenticationError(detail="Authentication failed: " + str(e))
     except ValidationException as e:
         raise AuthenticationError(detail="NUC validation failed: " + str(e))
+    except UsageLimitError as e:
+        raise AuthenticationError(detail="Usage limit error: " + str(e))
     except Exception as e:
         raise AuthenticationError(detail="Unexpected authentication error: " + str(e))
 
 
-__all__ = ["get_user", "validate_jwt"]
+__all__ = ["get_auth_info", "AuthenticationInfo", "TokenRateLimit"]

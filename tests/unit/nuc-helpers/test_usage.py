@@ -2,12 +2,14 @@ import unittest
 from unittest.mock import patch
 from nuc_helpers.usage import get_usage_limit, UsageLimitError, UsageLimitKind
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 
 # Dummy token envelope structure to simulate nuc.envelope
 class DummyNucToken:
-    def __init__(self, meta=None, expires_at=datetime.now() + timedelta(days=1)):
+    def __init__(
+        self, meta=None, expires_at=datetime.now(timezone.utc) + timedelta(days=1)
+    ):
         self.meta = meta or {}
         self.expires_at = expires_at
 
@@ -108,6 +110,26 @@ class GetUsageLimitTests(unittest.TestCase):
         self.assertEqual(limit, 25)
 
     @patch("nuc.envelope.NucTokenEnvelope.parse")
+    def test_multiple_consistent_limits_long(self, mock_parse):
+        env = DummyNucTokenEnvelope(
+            proofs=[
+                DummyDecodedNucToken({"usage_limit": 25}),
+                DummyDecodedNucToken({"usage_limit": 32}),
+                DummyDecodedNucToken({"usage_limit": None}),
+                DummyDecodedNucToken({"usage_limit": 50}),
+                DummyDecodedNucToken({"usage_limit": None}),
+                DummyDecodedNucToken({"usage_limit": None}),
+                DummyDecodedNucToken({"usage_limit": 75}),
+                DummyDecodedNucToken({"usage_limit": 100}),
+                DummyDecodedNucToken({"usage_limit": None}),
+            ]
+        )
+        mock_parse.return_value = env
+
+        sig, limit, expires_at = get_usage_limit("dummy_token")
+        self.assertEqual(limit, 25)
+
+    @patch("nuc.envelope.NucTokenEnvelope.parse")
     def test_inconsistent_usage_limits_raises_error(self, mock_parse):
         env = DummyNucTokenEnvelope(
             proofs=[
@@ -127,6 +149,42 @@ class GetUsageLimitTests(unittest.TestCase):
         env = DummyNucTokenEnvelope(
             proofs=[
                 DummyDecodedNucToken({"usage_limit": 110}),
+                DummyDecodedNucToken({"usage_limit": None}),
+                DummyDecodedNucToken({"usage_limit": 100}),
+            ]
+        )
+        mock_parse.return_value = env
+
+        with self.assertRaises(UsageLimitError) as cm:
+            get_usage_limit("dummy_token")
+        self.assertEqual(cm.exception.kind, UsageLimitKind.INCONSISTENT)
+
+    @patch("nuc.envelope.NucTokenEnvelope.parse")
+    def test_inconsistent_usage_limits_with_negative_raises_error(self, mock_parse):
+        env = DummyNucTokenEnvelope(
+            proofs=[
+                DummyDecodedNucToken({"usage_limit": 80}),
+                DummyDecodedNucToken({"usage_limit": -90}),
+                DummyDecodedNucToken({"usage_limit": 100}),
+            ]
+        )
+        mock_parse.return_value = env
+
+        with self.assertRaises(UsageLimitError) as cm:
+            get_usage_limit("dummy_token")
+        self.assertEqual(cm.exception.kind, UsageLimitKind.INCONSISTENT)
+
+    @patch("nuc.envelope.NucTokenEnvelope.parse")
+    def test_inconsistent_usage_limits_with_long_chain(self, mock_parse):
+        env = DummyNucTokenEnvelope(
+            proofs=[
+                DummyDecodedNucToken({"usage_limit": 50}),
+                DummyDecodedNucToken({"usage_limit": 74}),
+                DummyDecodedNucToken({"usage_limit": 85}),
+                DummyDecodedNucToken({"usage_limit": 88}),
+                DummyDecodedNucToken({"usage_limit": None}),
+                DummyDecodedNucToken({"usage_limit": -89}),
+                DummyDecodedNucToken({"usage_limit": 99}),
                 DummyDecodedNucToken({"usage_limit": None}),
                 DummyDecodedNucToken({"usage_limit": 100}),
             ]
@@ -194,7 +252,7 @@ class GetUsageLimitTests(unittest.TestCase):
         sig, limit, expires_at = get_usage_limit("dummy_token")
 
         # Check expires_at is less than 1 day from now
-        self.assertLess(expires_at, datetime.now() + timedelta(days=1))  # type: ignore
+        self.assertLess(expires_at, datetime.now(timezone.utc) + timedelta(days=1))  # type: ignore
 
 
 if __name__ == "__main__":

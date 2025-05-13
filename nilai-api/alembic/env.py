@@ -9,8 +9,13 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 from nilai_api.db import Base
+from nilai_api.db.users import UserModel
+from nilai_api.db.logs import QueryLog
 import nilai_api.config as nilai_config
 
+# If we don't use the models, they remain unused, and the migration fails
+# This is a workaround to ensure the models are loaded
+print("Using models: ", UserModel, QueryLog)
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config

@@ -4,14 +4,7 @@ ENVIRONMENT = os.getenv("ENVIRONMENT", "dev")
 # Left for API key for backwards compatibility
 AUTH_TOKEN = os.getenv("AUTH_TOKEN", "")
 
-if ENVIRONMENT == "dev":
-    BASE_URL = "http://localhost:8080/v1"
-elif ENVIRONMENT == "ci":
-    BASE_URL = "http://127.0.0.1:8080/v1"
-elif ENVIRONMENT == "mainnet":
-    BASE_URL = "https://nilai-e176.nillion.network/v1"
-else:
-    raise ValueError(f"Invalid environment: {ENVIRONMENT}")
+BASE_URL = "http://127.0.0.1:8080/v1"
 
 
 models = {
@@ -29,4 +22,4 @@ models = {
     ],
 }
 
-test_models = models[ENVIRONMENT]
+test_models = models["ci"]

@@ -3,7 +3,7 @@
 
 from prometheus_fastapi_instrumentator import Instrumentator
 from fastapi import Depends, FastAPI
-from nilai_api.auth import get_user
+from nilai_api.auth import get_auth_info
 from nilai_api.rate_limiting import setup_redis_conn
 from nilai_api.routers import private, public
 from nilai_api import config
@@ -86,7 +86,7 @@ app = FastAPI(
 
 
 app.include_router(public.router)
-app.include_router(private.router, dependencies=[Depends(get_user)])
+app.include_router(private.router, dependencies=[Depends(get_auth_info)])
 
 origins = [
     "https://docs.nillion.com",  # TODO: When users want to connect from browser
