@@ -6,6 +6,7 @@ services:
     volumes:
       - ./nilai-api/:/app/nilai-api/
       - ./packages/:/app/packages/
+      - ./nilai-auth/nuc-helpers/:/app/nilai-auth/nuc-helpers/
     networks:
       - nilauth
   attestation:

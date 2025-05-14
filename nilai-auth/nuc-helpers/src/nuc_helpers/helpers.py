@@ -168,6 +168,8 @@ def get_delegation_token(
     root_token: RootToken,
     private_key: NilAuthPrivateKey,
     user_public_key: NilAuthPublicKey,
+    usage_limit: int | None = None,
+    expires_at: datetime.datetime | None = None,
 ) -> DelegationToken:
     """
     Delegate the root token to the delegated key
@@ -183,8 +185,15 @@ def get_delegation_token(
     root_token_envelope = NucTokenEnvelope.parse(root_token.token)
     delegated_token = (
         NucTokenBuilder.extending(root_token_envelope)
+        .expires_at(
+            expires_at
+            if expires_at
+            else datetime.datetime.now(datetime.timezone.utc)
+            + datetime.timedelta(minutes=5)
+        )
         .audience(Did(user_public_key.serialize()))
         .command(Command(["nil", "ai", "generate"]))
+        .meta({"usage_limit": usage_limit})
         .build(private_key)
     )
     return DelegationToken(token=delegated_token)
@@ -256,8 +265,12 @@ def validate_token(
         token: The token to validate
         validation_parameters: The validation parameters
     """
+    token_envelope = NucTokenEnvelope.parse(token)
     validator = NucTokenValidator([get_nilauth_public_key(nilauth_url)])
 
-    validator.validate(NucTokenEnvelope.parse(token), validation_parameters)
+    validator.validate(token_envelope, validation_parameters)
 
     print("[>] Token validated")
+
+    print("type of token_envelope.token", type(token_envelope.token))
+    print("type of token_envelope.token.token", type(token_envelope.token.token))

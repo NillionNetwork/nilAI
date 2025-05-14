@@ -3,7 +3,7 @@ import logging
 from typing import Dict, Optional
 
 from asyncio import CancelledError
-from datetime import datetime
+from datetime import datetime, timezone
 from tenacity import retry, wait_exponential, stop_after_attempt
 
 
@@ -130,7 +130,7 @@ class ModelServiceDiscovery:
     )
     async def _refresh_lease(self, lease):
         lease.refresh()
-        self.last_refresh = datetime.now()
+        self.last_refresh = datetime.now(timezone.utc)
         self.is_healthy = True
 
     async def keep_alive(self, lease):

@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from typing import Tuple
 from nuc.validate import NucTokenValidator, ValidationParameters, InvocationRequirement
 from nuc.envelope import NucTokenEnvelope
@@ -6,8 +7,11 @@ from nuc.token import Did, NucToken
 from functools import lru_cache
 from nilai_api.config import NILAUTH_TRUSTED_ROOT_ISSUERS
 from nilai_api.state import state
+from nilai_api.auth.common import AuthenticationError, TokenRateLimit
 
 from nilai_common.logger import setup_logger
+
+from nuc_helpers.usage import get_usage_limit
 
 logger = setup_logger(__name__)
 
@@ -72,3 +76,25 @@ def validate_nuc(nuc_token: str) -> Tuple[str, str]:
     logger.info(f"Subscription holder: {subscription_holder}")
     logger.info(f"User: {user}")
     return subscription_holder, user
+
+
+def get_token_rate_limit(nuc_token: str) -> TokenRateLimit:
+    """
+    Get the rate limit for the NUC token
+
+    Args:
+        nuc_token: The NUC token to get the rate limit for
+
+    Returns:
+        The rate limit for the NUC token
+
+    Raises:
+        UsageLimitError: If the usage limit is not found or is invalid
+    """
+    sig, limit, expires_at = get_usage_limit(nuc_token)
+    if expires_at is None:
+        raise AuthenticationError("Token has no expiration date")
+    if expires_at < datetime.now(timezone.utc):
+        raise AuthenticationError("Token has expired")
+
+    return TokenRateLimit(signature=sig, usage_limit=limit, expires_at=expires_at)

@@ -14,13 +14,20 @@ import pytest
 from openai import OpenAI
 from openai.types.chat import ChatCompletion
 from .config import BASE_URL, test_models
-from .nuc import get_nuc_token
+from .nuc import get_nuc_token, get_rate_limited_nuc_token
 
 
 @pytest.fixture
 def client():
     """Create an OpenAI client configured to use the Nilai API"""
     invocation_token = get_nuc_token()
+    return OpenAI(base_url=BASE_URL, api_key=invocation_token.token)
+
+
+@pytest.fixture
+def rate_limited_client():
+    """Create an OpenAI client configured to use the Nilai API with rate limiting"""
+    invocation_token = get_rate_limited_nuc_token(rate_limit=1)
     return OpenAI(base_url=BASE_URL, api_key=invocation_token.token)
 
 
@@ -78,6 +85,36 @@ def test_chat_completion(client, model):
 
     except Exception as e:
         pytest.fail(f"Error testing chat completion with {model}: {str(e)}")
+
+
+@pytest.mark.parametrize(
+    "model",
+    test_models,
+)
+def test_rate_limiting_nucs(rate_limited_client, model):
+    """Test rate limiting by sending multiple rapid requests"""
+    import openai
+
+    # Send multiple rapid requests
+    rate_limited = False
+    for _ in range(4):  # Adjust number based on expected rate limits
+        try:
+            _ = rate_limited_client.chat.completions.create(
+                model=model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a helpful assistant that provides accurate and concise information.",
+                    },
+                    {"role": "user", "content": "What is the capital of France?"},
+                ],
+                temperature=0.2,
+                max_tokens=100,
+            )
+        except openai.RateLimitError:
+            rate_limited = True
+
+    assert rate_limited, "No NUC rate limiting detected, when expected"
 
 
 @pytest.mark.parametrize(
