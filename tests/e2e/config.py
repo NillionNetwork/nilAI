@@ -4,7 +4,7 @@ ENVIRONMENT = os.getenv("ENVIRONMENT", "ci")
 # Left for API key for backwards compatibility
 AUTH_TOKEN = os.getenv("AUTH_TOKEN", "")
 
-BASE_URL = "http://127.0.0.1:8080/v1"
+BASE_URL = "https://localhost/nuc/v1"
 
 
 models = {

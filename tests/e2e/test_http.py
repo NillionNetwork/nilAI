@@ -31,6 +31,7 @@ def client():
             "Content-Type": "application/json",
             "Authorization": f"Bearer {invocation_token.token}",
         },
+        verify=False,
         timeout=None,
     )
 
@@ -47,6 +48,7 @@ def rate_limited_client():
             "Authorization": f"Bearer {invocation_token.token}",
         },
         timeout=None,
+        verify=False,
     )
 
 
@@ -62,6 +64,7 @@ def invalid_rate_limited_client():
             "Authorization": f"Bearer {invocation_token.token}",
         },
         timeout=None,
+        verify=False,
     )
 
 
@@ -91,7 +94,9 @@ def test_models_endpoint(client):
 def test_usage_endpoint(client):
     """Test the usage endpoint"""
     response = client.get("/usage")
-    assert response.status_code == 200, "Usage endpoint should return 200 OK"
+    assert response.status_code == 200, (
+        f"Usage endpoint should return 200 OK: {response.json()}"
+    )
 
     # Basic usage response validation
     usage_data = response.json()

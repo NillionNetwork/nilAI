@@ -9,7 +9,7 @@ pytest tests/e2e/test_openai.py
 """
 
 import json
-
+import httpx
 import pytest
 from openai import OpenAI
 from openai.types.chat import ChatCompletion
@@ -25,21 +25,45 @@ from .nuc import (
 def client():
     """Create an OpenAI client configured to use the Nilai API"""
     invocation_token = get_nuc_token()
-    return OpenAI(base_url=BASE_URL, api_key=invocation_token.token)
+    # Create a custom HTTP transport with SSL verification disabled
+    transport = httpx.HTTPTransport(verify=False)
+
+    # Use the transport in a client
+    return OpenAI(
+        base_url=BASE_URL,
+        api_key=invocation_token.token,
+        http_client=httpx.Client(transport=transport),
+    )
 
 
 @pytest.fixture
 def rate_limited_client():
     """Create an OpenAI client configured to use the Nilai API with rate limiting"""
     invocation_token = get_rate_limited_nuc_token(rate_limit=1)
-    return OpenAI(base_url=BASE_URL, api_key=invocation_token.token)
+    # Create a custom HTTP transport with SSL verification disabled
+    transport = httpx.HTTPTransport(verify=False)
+
+    # Use the transport in a client
+    return OpenAI(
+        base_url=BASE_URL,
+        api_key=invocation_token.token,
+        http_client=httpx.Client(transport=transport),
+    )
 
 
 @pytest.fixture
 def invalid_rate_limited_client():
     """Create an OpenAI client configured to use the Nilai API with rate limiting"""
     invocation_token = get_invalid_rate_limited_nuc_token()
-    return OpenAI(base_url=BASE_URL, api_key=invocation_token.token)
+    # Create a custom HTTP transport with SSL verification disabled
+    transport = httpx.HTTPTransport(verify=False)
+
+    # Use the transport in a client
+    return OpenAI(
+        base_url=BASE_URL,
+        api_key=invocation_token.token,
+        http_client=httpx.Client(transport=transport),
+    )
 
 
 @pytest.mark.parametrize(
@@ -424,6 +448,7 @@ def test_usage_endpoint(client):
                 "Authorization": f"Bearer {invocation_token.token}",
                 "Content-Type": "application/json",
             },
+            verify=False,
         )
         assert response.status_code == 200, "Usage endpoint should return 200 OK"
 
@@ -461,6 +486,7 @@ def test_attestation_endpoint(client):
                 "Content-Type": "application/json",
             },
             params={"nonce": "0" * 64},
+            verify=False,
         )
 
         assert response.status_code == 200, "Attestation endpoint should return 200 OK"
@@ -492,6 +518,7 @@ def test_health_endpoint(client):
                 "Accept": "application/json",
                 "Content-Type": "application/json",
             },
+            verify=False,
         )
 
         print(f"Health response: {response.status_code} {response.text}")
