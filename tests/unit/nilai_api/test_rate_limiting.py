@@ -4,7 +4,7 @@ import random
 from unittest.mock import MagicMock
 from datetime import datetime, timedelta, timezone
 
-from nilai_api.auth import TokenRateLimit
+from nilai_api.auth import TokenRateLimit, TokenRateLimits
 import pytest
 import pytest_asyncio
 from fastapi import HTTPException, Request
@@ -94,10 +94,14 @@ async def test_concurrent_rate_limit(req):
             day_limit=None,
             hour_limit=None,
             minute_limit=None,
-            token_rate_limit=TokenRateLimit(
-                signature=random_id(),
-                usage_limit=11,
-                expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
+            token_rate_limit=TokenRateLimits(
+                limits=[
+                    TokenRateLimit(
+                        signature=random_id(),
+                        usage_limit=11,
+                        expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
+                    )
+                ]
             ),
         ),
     ],

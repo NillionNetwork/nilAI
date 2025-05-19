@@ -14,6 +14,7 @@ from nilai_api.auth.common import (
     AuthenticationInfo,
     AuthenticationError,
     TokenRateLimit,
+    TokenRateLimits,
 )
 
 logger = getLogger(__name__)
@@ -49,4 +50,4 @@ async def get_auth_info(
         raise AuthenticationError(detail="Unexpected authentication error: " + str(e))
 
 
-__all__ = ["get_auth_info", "AuthenticationInfo", "TokenRateLimit"]
+__all__ = ["get_auth_info", "AuthenticationInfo", "TokenRateLimits", "TokenRateLimit"]

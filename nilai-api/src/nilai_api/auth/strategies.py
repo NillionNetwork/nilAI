@@ -2,7 +2,7 @@ from nilai_api.db.users import UserManager, UserModel, UserData
 from nilai_api.auth.jwt import validate_jwt
 from nilai_api.auth.nuc import validate_nuc, get_token_rate_limit
 from nilai_api.auth.common import (
-    TokenRateLimit,
+    TokenRateLimits,
     AuthenticationInfo,
     AuthenticationError,
 )
@@ -46,11 +46,12 @@ async def nuc_strategy(nuc_token) -> AuthenticationInfo:
     Validate a NUC token and return the user model
     """
     subscription_holder, user = validate_nuc(nuc_token)
-    token_rate_limit: TokenRateLimit = get_token_rate_limit(nuc_token)
+    token_rate_limits: TokenRateLimits | None = get_token_rate_limit(nuc_token)
     user_model: UserModel | None = await UserManager.check_user(user)
     if user_model:
         return AuthenticationInfo(
-            user=UserData.from_sqlalchemy(user_model), token_rate_limit=token_rate_limit
+            user=UserData.from_sqlalchemy(user_model),
+            token_rate_limit=token_rate_limits,
         )
 
     user_model = UserModel(
@@ -60,7 +61,7 @@ async def nuc_strategy(nuc_token) -> AuthenticationInfo:
     )
     await UserManager.insert_user_model(user_model)
     return AuthenticationInfo(
-        user=UserData.from_sqlalchemy(user_model), token_rate_limit=token_rate_limit
+        user=UserData.from_sqlalchemy(user_model), token_rate_limit=token_rate_limits
     )
 
 

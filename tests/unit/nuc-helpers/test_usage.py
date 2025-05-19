@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import patch
-from nuc_helpers.usage import get_usage_limit, UsageLimitError, UsageLimitKind
+from nuc_helpers.usage import TokenRateLimits, UsageLimitError, UsageLimitKind
 
 from datetime import datetime, timedelta, timezone
 
@@ -29,7 +29,7 @@ class DummyNucTokenEnvelope:
 class GetUsageLimitTests(unittest.TestCase):
     def setUp(self):
         """Clear the cache before each test, because the cache is global and we use the same dummy token for all tests."""
-        get_usage_limit.cache_clear()
+        TokenRateLimits.from_token.cache_clear()
 
     @patch("nuc.envelope.NucTokenEnvelope.parse")
     def test_no_usage_limit_returns_none(self, mock_parse):
@@ -38,16 +38,18 @@ class GetUsageLimitTests(unittest.TestCase):
         )
         mock_parse.return_value = env
 
-        sig, limit, expires_at = get_usage_limit("dummy_token")
-        self.assertEqual(limit, None)
+        limits = TokenRateLimits.from_token("dummy_token")
+        self.assertIsNone(limits)
 
     @patch("nuc.envelope.NucTokenEnvelope.parse")
     def test_single_usage_limit_returns_value(self, mock_parse):
         env = DummyNucTokenEnvelope(proofs=[DummyDecodedNucToken({"usage_limit": 10})])
         mock_parse.return_value = env
 
-        sig, limit, expires_at = get_usage_limit("dummy_token")
-        self.assertEqual(limit, 10)
+        limits = TokenRateLimits.from_token("dummy_token")
+        if limits is None:
+            self.fail("Limits should not be None")
+        self.assertEqual(limits.last.usage_limit, 10)
 
     @patch("nuc.envelope.NucTokenEnvelope.parse")
     def test_multiple_consistent_limits(self, mock_parse):
@@ -66,11 +68,14 @@ class GetUsageLimitTests(unittest.TestCase):
         )
         mock_parse.return_value = env
 
-        sig, limit, expires_at = get_usage_limit("dummy_token")
-        self.assertEqual(limit, 25)
+        limits = TokenRateLimits.from_token("dummy_token")
+        if limits is None:
+            self.fail("Limits should not be None")
+        self.assertEqual(limits.last.usage_limit, 25)
 
     @patch("nuc.envelope.NucTokenEnvelope.parse")
     def test_multiple_consistent_limits_with_none(self, mock_parse):
+        limits = [25, None, 100]
         env = DummyNucTokenEnvelope(
             proofs=[
                 DummyDecodedNucToken(
@@ -86,48 +91,48 @@ class GetUsageLimitTests(unittest.TestCase):
         )
         mock_parse.return_value = env
 
-        sig, limit, expires_at = get_usage_limit("dummy_token")
-        self.assertEqual(limit, 25)
+        limits = TokenRateLimits.from_token("dummy_token")
+        if limits is None:
+            self.fail("Limits should not be None")
+        self.assertEqual(limits.last.usage_limit, 25)
 
     @patch("nuc.envelope.NucTokenEnvelope.parse")
     def test_multiple_consistent_limits_with_none_2(self, mock_parse):
+        limits = [25, 100, None]
         env = DummyNucTokenEnvelope(
-            proofs=[
-                DummyDecodedNucToken(
-                    {"usage_limit": 25}
-                ),  # This is a second reduction of the base usage limit
-                DummyDecodedNucToken(
-                    {"usage_limit": 100}
-                ),  # This is a first reduction of the base usage limit
-                DummyDecodedNucToken(
-                    {"usage_limit": None}
-                ),  # This is the base usage limit
-            ]
+            proofs=[DummyDecodedNucToken({"usage_limit": limit}) for limit in limits]
         )
         mock_parse.return_value = env
 
-        sig, limit, expires_at = get_usage_limit("dummy_token")
-        self.assertEqual(limit, 25)
+        token_rate_limits = TokenRateLimits.from_token("dummy_token")
+        if token_rate_limits is None:
+            self.fail("Limits should not be None")
+        limits_reversed_without_none = [
+            limit for limit in limits[::-1] if limit is not None
+        ]
+        for effective_limit, expected_limit in zip(
+            token_rate_limits.limits, limits_reversed_without_none
+        ):
+            self.assertEqual(effective_limit.usage_limit, expected_limit)
 
     @patch("nuc.envelope.NucTokenEnvelope.parse")
     def test_multiple_consistent_limits_long(self, mock_parse):
+        limits = [25, 32, None, 50, None, None, 75, 100, None]
         env = DummyNucTokenEnvelope(
-            proofs=[
-                DummyDecodedNucToken({"usage_limit": 25}),
-                DummyDecodedNucToken({"usage_limit": 32}),
-                DummyDecodedNucToken({"usage_limit": None}),
-                DummyDecodedNucToken({"usage_limit": 50}),
-                DummyDecodedNucToken({"usage_limit": None}),
-                DummyDecodedNucToken({"usage_limit": None}),
-                DummyDecodedNucToken({"usage_limit": 75}),
-                DummyDecodedNucToken({"usage_limit": 100}),
-                DummyDecodedNucToken({"usage_limit": None}),
-            ]
+            proofs=[DummyDecodedNucToken({"usage_limit": limit}) for limit in limits]
         )
         mock_parse.return_value = env
 
-        sig, limit, expires_at = get_usage_limit("dummy_token")
-        self.assertEqual(limit, 25)
+        token_rate_limits = TokenRateLimits.from_token("dummy_token")
+        if token_rate_limits is None:
+            self.fail("Limits should not be None")
+        limits_reversed_without_none = [
+            limit for limit in limits[::-1] if limit is not None
+        ]
+        for effective_limit, expected_limit in zip(
+            token_rate_limits.limits, limits_reversed_without_none
+        ):
+            self.assertEqual(effective_limit.usage_limit, expected_limit)
 
     @patch("nuc.envelope.NucTokenEnvelope.parse")
     def test_inconsistent_usage_limits_raises_error(self, mock_parse):
@@ -141,7 +146,7 @@ class GetUsageLimitTests(unittest.TestCase):
         mock_parse.return_value = env
 
         with self.assertRaises(UsageLimitError) as cm:
-            get_usage_limit("dummy_token")
+            TokenRateLimits.from_token("dummy_token")
         self.assertEqual(cm.exception.kind, UsageLimitKind.INCONSISTENT)
 
     @patch("nuc.envelope.NucTokenEnvelope.parse")
@@ -156,7 +161,7 @@ class GetUsageLimitTests(unittest.TestCase):
         mock_parse.return_value = env
 
         with self.assertRaises(UsageLimitError) as cm:
-            get_usage_limit("dummy_token")
+            TokenRateLimits.from_token("dummy_token")
         self.assertEqual(cm.exception.kind, UsageLimitKind.INCONSISTENT)
 
     @patch("nuc.envelope.NucTokenEnvelope.parse")
@@ -171,7 +176,7 @@ class GetUsageLimitTests(unittest.TestCase):
         mock_parse.return_value = env
 
         with self.assertRaises(UsageLimitError) as cm:
-            get_usage_limit("dummy_token")
+            TokenRateLimits.from_token("dummy_token")
         self.assertEqual(cm.exception.kind, UsageLimitKind.INCONSISTENT)
 
     @patch("nuc.envelope.NucTokenEnvelope.parse")
@@ -192,7 +197,7 @@ class GetUsageLimitTests(unittest.TestCase):
         mock_parse.return_value = env
 
         with self.assertRaises(UsageLimitError) as cm:
-            get_usage_limit("dummy_token")
+            TokenRateLimits.from_token("dummy_token")
         self.assertEqual(cm.exception.kind, UsageLimitKind.INCONSISTENT)
 
     @patch("nuc.envelope.NucTokenEnvelope.parse")
@@ -205,7 +210,7 @@ class GetUsageLimitTests(unittest.TestCase):
         mock_parse.return_value = env
 
         with self.assertRaises(UsageLimitError) as cm:
-            get_usage_limit("dummy_token")
+            TokenRateLimits.from_token("dummy_token")
         self.assertEqual(cm.exception.kind, UsageLimitKind.INVALID_TYPE)
 
     @patch("nuc.envelope.NucTokenEnvelope.parse")
@@ -217,8 +222,8 @@ class GetUsageLimitTests(unittest.TestCase):
         )
         mock_parse.return_value = env
 
-        sig, limit, expires_at = get_usage_limit("dummy_token")
-        self.assertEqual(limit, None)
+        limits = TokenRateLimits.from_token("dummy_token")
+        self.assertIsNone(limits)
 
     @patch("nuc.envelope.NucTokenEnvelope.parse")
     def test_invocation_usage_limit_ignored(self, mock_parse):
@@ -228,16 +233,18 @@ class GetUsageLimitTests(unittest.TestCase):
         )
         mock_parse.return_value = env
 
-        sig, limit, expires_at = get_usage_limit("dummy_token")
-        self.assertEqual(limit, 5)
+        limits = TokenRateLimits.from_token("dummy_token")
+        if limits is None:
+            self.fail("Limits should not be None")
+        self.assertEqual(limits.last.usage_limit, 5)
 
     @patch("nuc.envelope.NucTokenEnvelope.parse")
     def test_caching_behavior(self, mock_parse):
         env = DummyNucTokenEnvelope(proofs=[DummyDecodedNucToken({"usage_limit": 10})])
         mock_parse.return_value = env
 
-        get_usage_limit("dummy_token")
-        get_usage_limit("dummy_token")
+        TokenRateLimits.from_token("dummy_token")
+        TokenRateLimits.from_token("dummy_token")
 
         # NucTokenEnvelope.parse should only be called once due to caching
         mock_parse.assert_called_once()
@@ -249,7 +256,10 @@ class GetUsageLimitTests(unittest.TestCase):
         )
         mock_parse.return_value = env
 
-        sig, limit, expires_at = get_usage_limit("dummy_token")
+        limits = TokenRateLimits.from_token("dummy_token")
+        if limits is None:
+            self.fail("Limits should not be None")
+        expires_at = limits.last.expires_at
 
         # Check expires_at is less than 1 day from now
         self.assertLess(expires_at, datetime.now(timezone.utc) + timedelta(days=1))  # type: ignore

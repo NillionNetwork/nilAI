@@ -14,7 +14,11 @@ import pytest
 from openai import OpenAI
 from openai.types.chat import ChatCompletion
 from .config import BASE_URL, test_models
-from .nuc import get_nuc_token, get_rate_limited_nuc_token
+from .nuc import (
+    get_nuc_token,
+    get_rate_limited_nuc_token,
+    get_invalid_rate_limited_nuc_token,
+)
 
 
 @pytest.fixture
@@ -28,6 +32,13 @@ def client():
 def rate_limited_client():
     """Create an OpenAI client configured to use the Nilai API with rate limiting"""
     invocation_token = get_rate_limited_nuc_token(rate_limit=1)
+    return OpenAI(base_url=BASE_URL, api_key=invocation_token.token)
+
+
+@pytest.fixture
+def invalid_rate_limited_client():
+    """Create an OpenAI client configured to use the Nilai API with rate limiting"""
+    invocation_token = get_invalid_rate_limited_nuc_token()
     return OpenAI(base_url=BASE_URL, api_key=invocation_token.token)
 
 
@@ -115,6 +126,36 @@ def test_rate_limiting_nucs(rate_limited_client, model):
             rate_limited = True
 
     assert rate_limited, "No NUC rate limiting detected, when expected"
+
+
+@pytest.mark.parametrize(
+    "model",
+    test_models,
+)
+def test_invalid_rate_limiting_nucs(invalid_rate_limited_client, model):
+    """Test rate limiting by sending multiple rapid requests"""
+    import openai
+
+    # Send multiple rapid requests
+    forbidden = False
+    for _ in range(4):  # Adjust number based on expected rate limits
+        try:
+            _ = invalid_rate_limited_client.chat.completions.create(
+                model=model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a helpful assistant that provides accurate and concise information.",
+                    },
+                    {"role": "user", "content": "What is the capital of France?"},
+                ],
+                temperature=0.2,
+                max_tokens=100,
+            )
+        except openai.AuthenticationError:
+            forbidden = True
+
+    assert forbidden, "No NUC rate limiting detected, when expected"
 
 
 @pytest.mark.parametrize(

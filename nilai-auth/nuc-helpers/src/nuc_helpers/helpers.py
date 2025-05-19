@@ -93,8 +93,6 @@ def get_unil_balance(address: Address, grpc_endpoint: str) -> int:
     Returns:
         The balance of the user in UNIL
     """
-    print("grpc_endpoint", grpc_endpoint)
-
     cfg = NetworkConfig(
         chain_id="nillion-chain-devnet",
         url="grpc+" + grpc_endpoint,
@@ -165,7 +163,7 @@ def pay_for_subscription(
 
 
 def get_delegation_token(
-    root_token: RootToken,
+    root_token: RootToken | DelegationToken,
     private_key: NilAuthPrivateKey,
     user_public_key: NilAuthPublicKey,
     usage_limit: int | None = None,
@@ -228,7 +226,6 @@ def get_invocation_token(
         nilai_public_key: The nilai public key
         delegated_key: The private key
     """
-    print("Delegation token: ", delegation_token)
     delegated_token_envelope = NucTokenEnvelope.parse(delegation_token.token)
 
     invocation = (
@@ -269,8 +266,3 @@ def validate_token(
     validator = NucTokenValidator([get_nilauth_public_key(nilauth_url)])
 
     validator.validate(token_envelope, validation_parameters)
-
-    print("[>] Token validated")
-
-    print("type of token_envelope.token", type(token_envelope.token))
-    print("type of token_envelope.token.token", type(token_envelope.token.token))

@@ -7,7 +7,7 @@ from fastapi.params import Depends
 from fastapi import status, HTTPException, Request
 from redis.asyncio import from_url, Redis
 
-from nilai_api.auth import get_auth_info, AuthenticationInfo, TokenRateLimit
+from nilai_api.auth import get_auth_info, AuthenticationInfo, TokenRateLimits
 
 LUA_RATE_LIMIT_SCRIPT = """
 local key = KEYS[1]
@@ -44,7 +44,7 @@ class UserRateLimits(BaseModel):
     day_limit: int | None
     hour_limit: int | None
     minute_limit: int | None
-    token_rate_limit: TokenRateLimit | None
+    token_rate_limit: TokenRateLimits | None
 
 
 def get_user_limits(
@@ -112,19 +112,23 @@ class RateLimit:
             DAY_MS,
         )
 
-        if user_limits.token_rate_limit and user_limits.token_rate_limit.usage_limit:
+        if (
+            user_limits.token_rate_limit
+        ):  # If the token rate limit is not None, we need to check it
             # We create a record in redis for the signature
             # The key is the signature
             # The value is the usage limit
             # The expiration is the time remaining in validity of the token
             # We use the time remaining to check if the token rate limit is exceeded
-            await self.check_bucket(
-                redis,
-                redis_rate_limit_command,
-                f"token:{user_limits.token_rate_limit.signature}",
-                user_limits.token_rate_limit.usage_limit,
-                user_limits.token_rate_limit.ms_remaining,
-            )
+
+            for limit in user_limits.token_rate_limit.limits:
+                await self.check_bucket(
+                    redis,
+                    redis_rate_limit_command,
+                    f"token:{limit.signature}",
+                    limit.usage_limit,
+                    limit.ms_remaining,
+                )
 
         key = await self.check_concurrent_and_increment(redis, request)
         try:

@@ -11,7 +11,11 @@ pytest tests/e2e/test_http.py
 import json
 
 from .config import BASE_URL, test_models
-from .nuc import get_nuc_token, get_rate_limited_nuc_token
+from .nuc import (
+    get_nuc_token,
+    get_rate_limited_nuc_token,
+    get_invalid_rate_limited_nuc_token,
+)
 import httpx
 import pytest
 
@@ -35,6 +39,21 @@ def client():
 def rate_limited_client():
     """Create an HTTPX client with default headers"""
     invocation_token = get_rate_limited_nuc_token(rate_limit=1)
+    return httpx.Client(
+        base_url=BASE_URL,
+        headers={
+            "accept": "application/json",
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {invocation_token.token}",
+        },
+        timeout=None,
+    )
+
+
+@pytest.fixture
+def invalid_rate_limited_client():
+    """Create an HTTPX client with default headers"""
+    invocation_token = get_invalid_rate_limited_nuc_token()
     return httpx.Client(
         base_url=BASE_URL,
         headers={
@@ -434,6 +453,31 @@ def test_rate_limiting_nucs(rate_limited_client):
 
     # Check for potential rate limit responses
     rate_limit_statuses = [429, 403, 503]
+    rate_limited_responses = [
+        r for r in responses if r.status_code in rate_limit_statuses
+    ]
+
+    assert len(rate_limited_responses) > 0, (
+        "No NUC rate limiting detected, when expected"
+    )
+
+
+def test_invalid_rate_limiting_nucs(invalid_rate_limited_client):
+    """Test rate limiting by sending multiple rapid requests"""
+    # Payload for repeated requests
+    payload = {
+        "model": test_models[0],
+        "messages": [{"role": "user", "content": "What is your name?"}],
+    }
+
+    # Send multiple rapid requests
+    responses = []
+    for _ in range(4):  # Adjust number based on expected rate limits
+        response = invalid_rate_limited_client.post("/chat/completions", json=payload)
+        responses.append(response)
+
+    # Check for potential rate limit responses
+    rate_limit_statuses = [401]
     rate_limited_responses = [
         r for r in responses if r.status_code in rate_limit_statuses
     ]

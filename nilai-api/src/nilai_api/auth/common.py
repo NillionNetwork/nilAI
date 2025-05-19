@@ -1,8 +1,8 @@
 from pydantic import BaseModel
 from typing import Optional
-from datetime import datetime, timezone
 from fastapi import HTTPException, status
 from nilai_api.db.users import UserData
+from nuc_helpers.usage import TokenRateLimits, TokenRateLimit
 
 
 class AuthenticationError(HTTPException):
@@ -14,18 +14,14 @@ class AuthenticationError(HTTPException):
         )
 
 
-class TokenRateLimit(BaseModel):
-    signature: str
-    expires_at: datetime
-    usage_limit: Optional[int]
-
-    @property
-    def ms_remaining(self) -> int:
-        return int(
-            (self.expires_at - datetime.now(timezone.utc)).total_seconds() * 1000
-        )
-
-
 class AuthenticationInfo(BaseModel):
     user: UserData
-    token_rate_limit: Optional[TokenRateLimit]
+    token_rate_limit: Optional[TokenRateLimits]
+
+
+__all__ = [
+    "AuthenticationError",
+    "AuthenticationInfo",
+    "TokenRateLimits",
+    "TokenRateLimit",
+]
