@@ -13,9 +13,8 @@ import httpx
 import pytest
 from openai import OpenAI
 from openai.types.chat import ChatCompletion
-from .config import BASE_URL, test_models
+from .config import BASE_URL, test_models, AUTH_STRATEGY, api_key_getter
 from .nuc import (
-    get_nuc_token,
     get_rate_limited_nuc_token,
     get_invalid_rate_limited_nuc_token,
 )
@@ -24,14 +23,14 @@ from .nuc import (
 @pytest.fixture
 def client():
     """Create an OpenAI client configured to use the Nilai API"""
-    invocation_token = get_nuc_token()
+    invocation_token: str = api_key_getter()
     # Create a custom HTTP transport with SSL verification disabled
     transport = httpx.HTTPTransport(verify=False)
 
     # Use the transport in a client
     return OpenAI(
         base_url=BASE_URL,
-        api_key=invocation_token.token,
+        api_key=invocation_token,
         http_client=httpx.Client(transport=transport),
     )
 
@@ -126,6 +125,9 @@ def test_chat_completion(client, model):
     "model",
     test_models,
 )
+@pytest.mark.skipif(
+    AUTH_STRATEGY == "nuc", reason="NUC rate limiting not used with API key"
+)
 def test_rate_limiting_nucs(rate_limited_client, model):
     """Test rate limiting by sending multiple rapid requests"""
     import openai
@@ -155,6 +157,9 @@ def test_rate_limiting_nucs(rate_limited_client, model):
 @pytest.mark.parametrize(
     "model",
     test_models,
+)
+@pytest.mark.skipif(
+    AUTH_STRATEGY == "nuc", reason="NUC rate limiting not used with API key"
 )
 def test_invalid_rate_limiting_nucs(invalid_rate_limited_client, model):
     """Test rate limiting by sending multiple rapid requests"""
@@ -439,13 +444,13 @@ def test_usage_endpoint(client):
         # The OpenAI client doesn't have a built-in method for this
         import requests
 
-        invocation_token = get_nuc_token()
+        invocation_token = api_key_getter()
 
         url = BASE_URL + "/usage"
         response = requests.get(
             url,
             headers={
-                "Authorization": f"Bearer {invocation_token.token}",
+                "Authorization": f"Bearer {invocation_token}",
                 "Content-Type": "application/json",
             },
             verify=False,
@@ -478,11 +483,11 @@ def test_attestation_endpoint(client):
         import requests
 
         url = BASE_URL + "/attestation/report"
-        invocation_token = get_nuc_token()
+        invocation_token = api_key_getter()
         response = requests.get(
             url,
             headers={
-                "Authorization": f"Bearer {invocation_token.token}",
+                "Authorization": f"Bearer {invocation_token}",
                 "Content-Type": "application/json",
             },
             params={"nonce": "0" * 64},

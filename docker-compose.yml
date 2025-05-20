@@ -43,7 +43,7 @@ services:
 
   nuc-postgres:
     image: postgres:16
-    container_name: postgres
+    container_name: nuc-postgres
     restart: always
     env_file:
       - .env
@@ -52,7 +52,7 @@ services:
     networks:
       - frontend_net
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - nuc_postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD", "sh", "-c", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB} -h localhost"]
       interval: 30s
@@ -156,7 +156,7 @@ services:
     depends_on:
       etcd:
         condition: service_healthy
-      postgres:
+      nuc-postgres:
         condition: service_healthy
       api:
         condition: service_healthy
@@ -219,3 +219,4 @@ networks:
 
 volumes:
   postgres_data:
+  nuc_postgres_data:
