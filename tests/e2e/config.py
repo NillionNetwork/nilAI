@@ -1,7 +1,8 @@
 import os
 
 ENVIRONMENT = os.getenv("ENVIRONMENT", "dev")
-AUTH_TOKEN = os.environ["AUTH_TOKEN"]
+# Left for API key for backwards compatibility
+AUTH_TOKEN = os.getenv("AUTH_TOKEN", "")
 
 if ENVIRONMENT == "dev":
     BASE_URL = "http://localhost:8080/v1"

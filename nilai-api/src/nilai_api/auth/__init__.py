@@ -8,6 +8,8 @@ from nilai_api.auth.jwt import validate_jwt
 from nilai_api.db.users import UserManager, UserModel
 from nilai_api.auth.strategies import STRATEGIES
 
+from nuc.validate import ValidationException
+
 logger = getLogger(__name__)
 bearer_scheme = HTTPBearer()
 
@@ -38,6 +40,8 @@ async def get_user(
         raise e
     except ValueError as e:
         raise AuthenticationError(detail="Authentication failed: " + str(e))
+    except ValidationException as e:
+        raise AuthenticationError(detail="NUC validation failed: " + str(e))
     except Exception as e:
         raise AuthenticationError(detail="Unexpected authentication error: " + str(e))
 

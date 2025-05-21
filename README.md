@@ -77,7 +77,7 @@ docker build -t nillion/nilai-attestation:latest -f docker/attestation.Dockerfil
 # Build vLLM docker container
 docker build -t nillion/nilai-vllm:latest -f docker/vllm.Dockerfile .
 # Build nilai_api container
-docker build -t nillion/nilai-api:latest -f docker/api.Dockerfile --target nilai .
+docker build -t nillion/nilai-api:latest -f docker/api.Dockerfile --target nilai --platform linux/amd64 .
 ```
 To deploy:
 ```shell
@@ -195,6 +195,8 @@ git checkout v0.7.3 # We use v0.7.3
 # Build vLLM OpenAI (vllm folder)
 cd vllm
 docker build -f Dockerfile.arm -t vllm/vllm-openai . --shm-size=4g
+# Build nilai attestation container
+docker build -t nillion/nilai-attestation:latest -f docker/attestation.Dockerfile .
 # Build vLLM docker container (root folder)
 docker build -t nillion/nilai-vllm:latest -f docker/vllm.Dockerfile .
 # Build nilai_api container

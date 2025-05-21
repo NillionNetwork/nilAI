@@ -13,13 +13,15 @@ import json
 import pytest
 from openai import OpenAI
 from openai.types.chat import ChatCompletion
-from .config import BASE_URL, AUTH_TOKEN, test_models
+from .config import BASE_URL, test_models
+from .nuc import get_nuc_token
 
 
 @pytest.fixture
 def client():
     """Create an OpenAI client configured to use the Nilai API"""
-    return OpenAI(base_url=BASE_URL, api_key=AUTH_TOKEN)
+    invocation_token = get_nuc_token()
+    return OpenAI(base_url=BASE_URL, api_key=invocation_token.token)
 
 
 @pytest.mark.parametrize(
@@ -335,11 +337,13 @@ def test_usage_endpoint(client):
         # The OpenAI client doesn't have a built-in method for this
         import requests
 
+        invocation_token = get_nuc_token()
+
         url = BASE_URL + "/usage"
         response = requests.get(
             url,
             headers={
-                "Authorization": f"Bearer {AUTH_TOKEN}",
+                "Authorization": f"Bearer {invocation_token.token}",
                 "Content-Type": "application/json",
             },
         )
@@ -371,10 +375,11 @@ def test_attestation_endpoint(client):
         import requests
 
         url = BASE_URL + "/attestation/report"
+        invocation_token = get_nuc_token()
         response = requests.get(
             url,
             headers={
-                "Authorization": f"Bearer {AUTH_TOKEN}",
+                "Authorization": f"Bearer {invocation_token.token}",
                 "Content-Type": "application/json",
             },
             params={"nonce": "0" * 64},

@@ -21,6 +21,7 @@ def mock_user():
     mock = MagicMock(spec=UserModel)
     mock.userid = "test-user-id"
     mock.name = "Test User"
+    mock.apikey = "test-api-key"
     mock.prompt_tokens = 100
     mock.completion_tokens = 50
     mock.total_tokens = 150
@@ -95,7 +96,7 @@ def mock_state(mocker, event_loop):
     mocker.patch.object(state, "discovery_service", mock_discovery_service)
 
     # Patch other attributes
-    mocker.patch.object(state, "verifying_key", "test-verifying-key")
+    mocker.patch.object(state, "b64_public_key", "test-verifying-key")
 
     # Patch get_model method
     mocker.patch.object(state, "get_model", return_value=model_endpoint)

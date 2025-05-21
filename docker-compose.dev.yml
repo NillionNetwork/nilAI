@@ -1,10 +1,13 @@
 services:
   api:
+    platform: linux/amd64 # for macOS to force running on Rosetta 2
     ports:
       - "8080:8080"
     volumes:
       - ./nilai-api/:/app/nilai-api/
       - ./packages/:/app/packages/
+    networks:
+      - nilauth
   attestation:
     ports:
       - "8081:8080"
@@ -20,3 +23,49 @@ services:
   grafana:
     ports:
       - "3000:3000"
+
+  nilauth-postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "30432:5432"
+    networks:
+      - nilauth
+
+  nilchain:
+    image: ghcr.io/nillionnetwork/nilchain-devnet:v0.1.0
+    restart: unless-stopped
+    shm_size: 128mb
+    ports:
+      - "26648:26648" # JSON RPC
+      - "26649:26649" # gRPC
+      - "26650:26650" # REST
+    networks:
+      - nilauth
+
+  nilauth:
+    image: public.ecr.aws/k5d9x2g2/nilauth:latest
+    depends_on:
+      - nilauth-postgres
+      - nilchain
+    volumes:
+      - ./docker/nilauth/config.yaml:/opt/config.yaml
+    command: ["--config-file", "/opt/config.yaml"]
+    ports:
+      - "30921:30921" # main server
+      - "30922:30022" # metrics server
+    networks:
+      - nilauth
+
+  token-price-api:
+    image: caddy:2
+    ports:
+      - "30923:80"
+    command: |
+      caddy respond --listen :80 --body '{"nillion":{"usd":1}}' --header "Content-Type: application/json"
+    networks:
+      - nilauth
+
+networks:
+  nilauth:
