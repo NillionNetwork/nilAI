@@ -93,7 +93,7 @@ def get_unil_balance(address: Address, grpc_endpoint: str) -> int:
     Returns:
         The balance of the user in UNIL
     """
-    print("grpc_endpoint", grpc_endpoint)
+    logger.info("grpc_endpoint", grpc_endpoint)
 
     cfg = NetworkConfig(
         chain_id="nillion-chain-devnet",
@@ -124,7 +124,10 @@ def pay_for_subscription(
         grpc_endpoint: The endpoint of the grpc server
     """
 
-    if get_unil_balance(wallet.address(), grpc_endpoint=grpc_endpoint) < 0:
+    if (
+        get_unil_balance(wallet.address(), grpc_endpoint=grpc_endpoint)
+        < nilauth_client.subscription_cost()
+    ):
         raise RuntimeError("User does not have enough UNIL to pay for the subscription")
 
     payer = Payer(
@@ -219,7 +222,7 @@ def get_invocation_token(
         nilai_public_key: The nilai public key
         delegated_key: The private key
     """
-    print("Delegation token: ", delegation_token)
+    logger.info(f"Delegation token: {delegation_token}")
     delegated_token_envelope = NucTokenEnvelope.parse(delegation_token.token)
 
     invocation = (
@@ -260,4 +263,4 @@ def validate_token(
 
     validator.validate(NucTokenEnvelope.parse(token), validation_parameters)
 
-    print("[>] Token validated")
+    logger.info("[>] Token validated")

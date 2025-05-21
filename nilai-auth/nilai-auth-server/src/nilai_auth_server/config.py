@@ -1,7 +1,4 @@
 from dotenv import load_dotenv
 
 load_dotenv()
-NILAUTH_TRUSTED_ROOT_ISSUERS = "localhost:30921"
-# NILAUTH_TRUSTED_ROOT_ISSUERS = os.getenv("NILAUTH_TRUSTED_ROOT_ISSUERS", "").split(",")
-
-print("With trusted root issuers: ", NILAUTH_TRUSTED_ROOT_ISSUERS)
+NILAUTH_TRUSTED_ROOT_ISSUER = "localhost:30921"
