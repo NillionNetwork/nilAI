@@ -127,7 +127,6 @@ jobs:
       - name: Run E2E tests
         run: |
           set -e
-          # export AUTH_TOKEN=$(docker exec nilai-api uv run src/nilai_api/commands/add_user.py --name test1 --ratelimit-minute 1000 --ratelimit-hour 1000 --ratelimit-day 1000 | jq ".apikey" -r)
           export ENVIRONMENT=ci
           uv run pytest -v tests/e2e
 
