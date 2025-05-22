@@ -122,7 +122,10 @@ def pay_for_subscription(
         grpc_endpoint: The endpoint of the grpc server
     """
 
-    if get_unil_balance(wallet.address(), grpc_endpoint=grpc_endpoint) < 0:
+    if (
+        get_unil_balance(wallet.address(), grpc_endpoint=grpc_endpoint)
+        < nilauth_client.subscription_cost()
+    ):
         raise RuntimeError("User does not have enough UNIL to pay for the subscription")
 
     payer = Payer(
@@ -266,3 +269,4 @@ def validate_token(
     validator = NucTokenValidator([get_nilauth_public_key(nilauth_url)])
 
     validator.validate(token_envelope, validation_parameters)
+

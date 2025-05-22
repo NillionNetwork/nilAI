@@ -3,7 +3,7 @@ from nuc.nilauth import NilauthClient
 from pydantic import BaseModel
 from secp256k1 import PublicKey as NilAuthPublicKey
 import base64
-from nilai_auth_server.config import NILAUTH_TRUSTED_ROOT_ISSUERS
+from nilai_auth_server.config import NILAUTH_TRUSTED_ROOT_ISSUER
 
 from nuc_helpers import (
     RootToken,
@@ -36,7 +36,7 @@ def delegate(request: DelegateRequest) -> DelegationToken:
     server_wallet, server_keypair, server_private_key = get_wallet_and_private_key(
         PRIVATE_KEY
     )
-    nilauth_client = NilauthClient(f"http://{NILAUTH_TRUSTED_ROOT_ISSUERS}")
+    nilauth_client = NilauthClient(f"http://{NILAUTH_TRUSTED_ROOT_ISSUER}")
 
     # Pay for the subscription
     pay_for_subscription(
