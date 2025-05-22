@@ -63,7 +63,7 @@ jobs:
           github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
           runners-per-machine: 1
           number-of-machines: 1
-          ec2-image-id: ami-0ac221d824dd88706
+          ec2-image-id: ami-0174a246556e8750b
           ec2-instance-type: g4dn.xlarge
           subnet-id: subnet-0ec4c353621eabae2
           security-group-id: sg-03ee5c56e1f467aa0
@@ -118,7 +118,7 @@ jobs:
           -f docker-compose.dev.yml \
           -f docker-compose.prod.yml \
           -f docker/compose/docker-compose.llama-1b-gpu.ci.yml \
-          up -d || (while true; do sleep 30; done)
+          up -d
           docker ps -a
 
       - name: Wait for services to be healthy
