@@ -1,6 +1,6 @@
 import os
 
-ENVIRONMENT = os.getenv("ENVIRONMENT", "dev")
+ENVIRONMENT = os.getenv("ENVIRONMENT", "ci")
 # Left for API key for backwards compatibility
 AUTH_TOKEN = os.getenv("AUTH_TOKEN", "")
 
@@ -22,4 +22,9 @@ models = {
     ],
 }
 
-test_models = models["ci"]
+if ENVIRONMENT not in models:
+    ENVIRONMENT = "ci"
+    print(
+        f"Environment {ENVIRONMENT} not found in models, using {ENVIRONMENT} as default"
+    )
+test_models = models[ENVIRONMENT]
