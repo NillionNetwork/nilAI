@@ -93,8 +93,6 @@ def get_unil_balance(address: Address, grpc_endpoint: str) -> int:
     Returns:
         The balance of the user in UNIL
     """
-    logger.info("grpc_endpoint", grpc_endpoint)
-
     cfg = NetworkConfig(
         chain_id="nillion-chain-devnet",
         url="grpc+" + grpc_endpoint,
@@ -168,9 +166,11 @@ def pay_for_subscription(
 
 
 def get_delegation_token(
-    root_token: RootToken,
+    root_token: RootToken | DelegationToken,
     private_key: NilAuthPrivateKey,
     user_public_key: NilAuthPublicKey,
+    usage_limit: int | None = None,
+    expires_at: datetime.datetime | None = None,
 ) -> DelegationToken:
     """
     Delegate the root token to the delegated key
@@ -186,8 +186,15 @@ def get_delegation_token(
     root_token_envelope = NucTokenEnvelope.parse(root_token.token)
     delegated_token = (
         NucTokenBuilder.extending(root_token_envelope)
+        .expires_at(
+            expires_at
+            if expires_at
+            else datetime.datetime.now(datetime.timezone.utc)
+            + datetime.timedelta(minutes=5)
+        )
         .audience(Did(user_public_key.serialize()))
         .command(Command(["nil", "ai", "generate"]))
+        .meta({"usage_limit": usage_limit})
         .build(private_key)
     )
     return DelegationToken(token=delegated_token)
@@ -222,7 +229,6 @@ def get_invocation_token(
         nilai_public_key: The nilai public key
         delegated_key: The private key
     """
-    logger.info(f"Delegation token: {delegation_token}")
     delegated_token_envelope = NucTokenEnvelope.parse(delegation_token.token)
 
     invocation = (
@@ -259,8 +265,7 @@ def validate_token(
         token: The token to validate
         validation_parameters: The validation parameters
     """
+    token_envelope = NucTokenEnvelope.parse(token)
     validator = NucTokenValidator([get_nilauth_public_key(nilauth_url)])
 
-    validator.validate(NucTokenEnvelope.parse(token), validation_parameters)
-
-    logger.info("[>] Token validated")
+    validator.validate(token_envelope, validation_parameters)
