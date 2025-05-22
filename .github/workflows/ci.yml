@@ -118,7 +118,7 @@ jobs:
           -f docker-compose.dev.yml \
           -f docker-compose.prod.yml \
           -f docker/compose/docker-compose.llama-1b-gpu.ci.yml \
-          up -d
+          up -d || (while true; do sleep 30; done)
           docker ps -a
 
       - name: Wait for services to be healthy
