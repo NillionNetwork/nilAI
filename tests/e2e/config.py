@@ -19,7 +19,7 @@ match AUTH_STRATEGY:
 
         def api_key_getter():
             return get_nuc_token().token
-    case "api":
+    case "api_key":
         BASE_URL = "https://localhost/v1"
 
         def api_key_getter():
@@ -28,6 +28,7 @@ match AUTH_STRATEGY:
         raise ValueError(f"Invalid AUTH_STRATEGY: {AUTH_STRATEGY}")
 
 
+print(f"USING {AUTH_STRATEGY}")
 models = {
     "mainnet": [
         "meta-llama/Llama-3.2-3B-Instruct",

@@ -126,7 +126,7 @@ def test_chat_completion(client, model):
     test_models,
 )
 @pytest.mark.skipif(
-    AUTH_STRATEGY == "nuc", reason="NUC rate limiting not used with API key"
+    AUTH_STRATEGY != "nuc", reason="NUC rate limiting not used with API key"
 )
 def test_rate_limiting_nucs(rate_limited_client, model):
     """Test rate limiting by sending multiple rapid requests"""
@@ -159,7 +159,7 @@ def test_rate_limiting_nucs(rate_limited_client, model):
     test_models,
 )
 @pytest.mark.skipif(
-    AUTH_STRATEGY == "nuc", reason="NUC rate limiting not used with API key"
+    AUTH_STRATEGY != "nuc", reason="NUC rate limiting not used with API key"
 )
 def test_invalid_rate_limiting_nucs(invalid_rate_limited_client, model):
     """Test rate limiting by sending multiple rapid requests"""

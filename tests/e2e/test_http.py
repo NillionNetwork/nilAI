@@ -94,9 +94,8 @@ def test_usage_endpoint(client):
     """Test the usage endpoint"""
     response = client.get("/usage")
     assert response.status_code == 200, (
-        f"Usage endpoint should return 200 OK: {response.json()}"
+        f"Usage endpoint should return 200 OK: {response.json()} {BASE_URL}"
     )
-
     # Basic usage response validation
     usage_data = response.json()
     assert isinstance(usage_data, dict), "Usage data should be a dictionary"
@@ -407,6 +406,7 @@ def test_invalid_auth_token(client):
             "Content-Type": "application/json",
             "Authorization": "Bearer invalid_token_123",
         },
+        verify=False,
     )
 
     response = invalid_client.get("/attestation/report")
@@ -442,7 +442,7 @@ def test_rate_limiting(client):
 
 
 @pytest.mark.skipif(
-    AUTH_STRATEGY == "nuc", reason="NUC rate limiting not used with API key"
+    AUTH_STRATEGY != "nuc", reason="NUC rate limiting not used with API key"
 )
 def test_rate_limiting_nucs(rate_limited_client):
     """Test rate limiting by sending multiple rapid requests"""
@@ -470,7 +470,7 @@ def test_rate_limiting_nucs(rate_limited_client):
 
 
 @pytest.mark.skipif(
-    AUTH_STRATEGY == "nuc", reason="NUC rate limiting not used with API key"
+    AUTH_STRATEGY != "nuc", reason="NUC rate limiting not used with API key"
 )
 def test_invalid_rate_limiting_nucs(invalid_rate_limited_client):
     """Test rate limiting by sending multiple rapid requests"""
