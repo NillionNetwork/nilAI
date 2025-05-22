@@ -269,4 +269,3 @@ def validate_token(
     validator = NucTokenValidator([get_nilauth_public_key(nilauth_url)])
 
     validator.validate(token_envelope, validation_parameters)
-

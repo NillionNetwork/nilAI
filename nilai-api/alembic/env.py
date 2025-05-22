@@ -15,7 +15,7 @@ import nilai_api.config as nilai_config
 
 # If we don't use the models, they remain unused, and the migration fails
 # This is a workaround to ensure the models are loaded
-logging.info("Using models: %s, %s", UserModel, QueryLog)
+_, _ = UserModel, QueryLog
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
