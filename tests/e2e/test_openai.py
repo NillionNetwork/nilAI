@@ -20,49 +20,35 @@ from .nuc import (
 )
 
 
+def _create_openai_client(api_key: str) -> OpenAI:
+    """Helper function to create an OpenAI client with SSL verification disabled"""
+    transport = httpx.HTTPTransport(verify=False)
+    return OpenAI(
+        base_url=BASE_URL,
+        api_key=api_key,
+        http_client=httpx.Client(transport=transport),
+    )
+
+
 @pytest.fixture
 def client():
     """Create an OpenAI client configured to use the Nilai API"""
     invocation_token: str = api_key_getter()
-    # Create a custom HTTP transport with SSL verification disabled
-    transport = httpx.HTTPTransport(verify=False)
-
-    # Use the transport in a client
-    return OpenAI(
-        base_url=BASE_URL,
-        api_key=invocation_token,
-        http_client=httpx.Client(transport=transport),
-    )
+    return _create_openai_client(invocation_token)
 
 
 @pytest.fixture
 def rate_limited_client():
     """Create an OpenAI client configured to use the Nilai API with rate limiting"""
     invocation_token = get_rate_limited_nuc_token(rate_limit=1)
-    # Create a custom HTTP transport with SSL verification disabled
-    transport = httpx.HTTPTransport(verify=False)
-
-    # Use the transport in a client
-    return OpenAI(
-        base_url=BASE_URL,
-        api_key=invocation_token.token,
-        http_client=httpx.Client(transport=transport),
-    )
+    return _create_openai_client(invocation_token.token)
 
 
 @pytest.fixture
 def invalid_rate_limited_client():
     """Create an OpenAI client configured to use the Nilai API with rate limiting"""
     invocation_token = get_invalid_rate_limited_nuc_token()
-    # Create a custom HTTP transport with SSL verification disabled
-    transport = httpx.HTTPTransport(verify=False)
-
-    # Use the transport in a client
-    return OpenAI(
-        base_url=BASE_URL,
-        api_key=invocation_token.token,
-        http_client=httpx.Client(transport=transport),
-    )
+    return _create_openai_client(invocation_token.token)
 
 
 @pytest.mark.parametrize(

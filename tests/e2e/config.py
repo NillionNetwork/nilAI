@@ -6,13 +6,6 @@ ENVIRONMENT = os.getenv("ENVIRONMENT", "ci")
 AUTH_TOKEN = os.getenv("AUTH_TOKEN", "")
 AUTH_STRATEGY = os.getenv("AUTH_STRATEGY", "nuc")
 
-BASE_URL = "https://localhost/nuc/v1"
-
-
-def api_key_getter():
-    return get_nuc_token().token
-
-
 match AUTH_STRATEGY:
     case "nuc":
         BASE_URL = "https://localhost/nuc/v1"
