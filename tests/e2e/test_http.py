@@ -10,9 +10,8 @@ pytest tests/e2e/test_http.py
 
 import json
 
-from .config import BASE_URL, test_models
+from .config import BASE_URL, test_models, AUTH_STRATEGY, api_key_getter
 from .nuc import (
-    get_nuc_token,
     get_rate_limited_nuc_token,
     get_invalid_rate_limited_nuc_token,
 )
@@ -23,14 +22,15 @@ import pytest
 @pytest.fixture
 def client():
     """Create an HTTPX client with default headers"""
-    invocation_token = get_nuc_token()
+    invocation_token: str = api_key_getter()
     return httpx.Client(
         base_url=BASE_URL,
         headers={
             "accept": "application/json",
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {invocation_token.token}",
+            "Authorization": f"Bearer {invocation_token}",
         },
+        verify=False,
         timeout=None,
     )
 
@@ -47,6 +47,7 @@ def rate_limited_client():
             "Authorization": f"Bearer {invocation_token.token}",
         },
         timeout=None,
+        verify=False,
     )
 
 
@@ -62,6 +63,7 @@ def invalid_rate_limited_client():
             "Authorization": f"Bearer {invocation_token.token}",
         },
         timeout=None,
+        verify=False,
     )
 
 
@@ -91,8 +93,9 @@ def test_models_endpoint(client):
 def test_usage_endpoint(client):
     """Test the usage endpoint"""
     response = client.get("/usage")
-    assert response.status_code == 200, "Usage endpoint should return 200 OK"
-
+    assert response.status_code == 200, (
+        f"Usage endpoint should return 200 OK: {response.json()} {BASE_URL}"
+    )
     # Basic usage response validation
     usage_data = response.json()
     assert isinstance(usage_data, dict), "Usage data should be a dictionary"
@@ -403,6 +406,7 @@ def test_invalid_auth_token(client):
             "Content-Type": "application/json",
             "Authorization": "Bearer invalid_token_123",
         },
+        verify=False,
     )
 
     response = invalid_client.get("/attestation/report")
@@ -437,6 +441,9 @@ def test_rate_limiting(client):
         pytest.skip("No rate limiting detected. Manual review may be needed.")
 
 
+@pytest.mark.skipif(
+    AUTH_STRATEGY != "nuc", reason="NUC rate limiting not used with API key"
+)
 def test_rate_limiting_nucs(rate_limited_client):
     """Test rate limiting by sending multiple rapid requests"""
     # Payload for repeated requests
@@ -462,6 +469,9 @@ def test_rate_limiting_nucs(rate_limited_client):
     )
 
 
+@pytest.mark.skipif(
+    AUTH_STRATEGY != "nuc", reason="NUC rate limiting not used with API key"
+)
 def test_invalid_rate_limiting_nucs(invalid_rate_limited_client):
     """Test rate limiting by sending multiple rapid requests"""
     # Payload for repeated requests
