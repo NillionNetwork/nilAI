@@ -1,6 +1,6 @@
 import pytest
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any
 
 
@@ -32,7 +32,7 @@ class MockUserDatabase:
             "prompt_tokens": 0,
             "completion_tokens": 0,
             "queries": 0,
-            "signup_date": datetime.now(),
+            "signup_date": datetime.now(timezone.utc),
             "last_activity": None,
         }
 
@@ -55,7 +55,7 @@ class MockUserDatabase:
             user["prompt_tokens"] += prompt_tokens
             user["completion_tokens"] += completion_tokens
             user["queries"] += 1
-            user["last_activity"] = datetime.now()
+            user["last_activity"] = datetime.now(timezone.utc)
 
     async def log_query(
         self, userid: str, model: str, prompt_tokens: int, completion_tokens: int
@@ -64,7 +64,7 @@ class MockUserDatabase:
         query_log = {
             "id": self._next_query_log_id,
             "userid": userid,
-            "query_timestamp": datetime.now(),
+            "query_timestamp": datetime.now(timezone.utc),
             "model": model,
             "prompt_tokens": prompt_tokens,
             "completion_tokens": completion_tokens,

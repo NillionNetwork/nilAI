@@ -1,8 +1,8 @@
 import logging
 import uuid
+from pydantic import BaseModel, ConfigDict
 
-from datetime import datetime
-from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import sqlalchemy
@@ -30,9 +30,9 @@ class UserModel(Base):
     completion_tokens: int = Column(Integer, default=0, nullable=False)  # type: ignore
     queries: int = Column(Integer, default=0, nullable=False)  # type: ignore
     signup_date: datetime = Column(
-        DateTime, server_default=sqlalchemy.func.now(), nullable=False
+        DateTime(timezone=True), server_default=sqlalchemy.func.now(), nullable=False
     )  # type: ignore
-    last_activity: datetime = Column(DateTime, nullable=True)  # type: ignore
+    last_activity: datetime = Column(DateTime(timezone=True), nullable=True)  # type: ignore
     ratelimit_day: int = Column(Integer, default=USER_RATE_LIMIT_DAY, nullable=True)  # type: ignore
     ratelimit_hour: int = Column(Integer, default=USER_RATE_LIMIT_HOUR, nullable=True)  # type: ignore
     ratelimit_minute: int = Column(
@@ -43,14 +43,36 @@ class UserModel(Base):
         return f"<User(userid={self.userid}, name={self.name})>"
 
 
-@dataclass
-class UserData:
+class UserData(BaseModel):
     userid: str
     name: str
     apikey: str
-    input_tokens: int
-    generated_tokens: int
-    queries: int
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    queries: int = 0
+    signup_date: datetime
+    last_activity: Optional[datetime] = None
+    ratelimit_day: Optional[int] = None
+    ratelimit_hour: Optional[int] = None
+    ratelimit_minute: Optional[int] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+    @classmethod
+    def from_sqlalchemy(cls, user: UserModel) -> "UserData":
+        return cls(
+            userid=user.userid,
+            name=user.name,
+            apikey=user.apikey,
+            prompt_tokens=user.prompt_tokens or 0,
+            completion_tokens=user.completion_tokens or 0,
+            queries=user.queries or 0,
+            signup_date=user.signup_date or datetime.now(timezone.utc),
+            last_activity=user.last_activity,
+            ratelimit_day=user.ratelimit_day,
+            ratelimit_hour=user.ratelimit_hour,
+            ratelimit_minute=user.ratelimit_minute,
+        )
 
 
 class UserManager:
@@ -76,7 +98,7 @@ class UserManager:
             async with get_db_session() as session:
                 user = await session.get(UserModel, userid)
                 if user:
-                    user.last_activity = datetime.now()
+                    user.last_activity = datetime.now(timezone.utc)
                     await session.commit()
                     logger.info(f"Updated last activity for user {userid}")
                 else:
@@ -252,9 +274,14 @@ class UserManager:
                         userid=user.userid,
                         name=user.name,
                         apikey=user.apikey,
-                        input_tokens=user.prompt_tokens,
-                        generated_tokens=user.completion_tokens,
+                        prompt_tokens=user.prompt_tokens,
+                        completion_tokens=user.completion_tokens,
                         queries=user.queries,
+                        signup_date=user.signup_date,
+                        last_activity=user.last_activity,
+                        ratelimit_day=user.ratelimit_day,
+                        ratelimit_hour=user.ratelimit_hour,
+                        ratelimit_minute=user.ratelimit_minute,
                     )
                     for user in users
                 ]
