@@ -1,7 +1,6 @@
 # Fast API and serving
 import asyncio
 import logging
-import os
 from base64 import b64encode
 from typing import AsyncGenerator, Optional, Union, List, Tuple
 from nilai_api.attestation import get_attestation_report
@@ -9,11 +8,11 @@ from nilai_api.handlers.nilrag import handle_nilrag
 
 from fastapi import APIRouter, Body, Depends, HTTPException, status, Request
 from fastapi.responses import StreamingResponse
-from nilai_api.auth import get_user
+from nilai_api.auth import get_auth_info, AuthenticationInfo
 from nilai_api.config import MODEL_CONCURRENT_RATE_LIMIT
 from nilai_api.crypto import sign_message
 from nilai_api.db.logs import QueryLogManager
-from nilai_api.db.users import UserManager, UserModel
+from nilai_api.db.users import UserManager
 from nilai_api.rate_limiting import RateLimit
 from nilai_api.state import state
 
@@ -35,7 +34,7 @@ router = APIRouter()
 
 
 @router.get("/v1/usage", tags=["Usage"])
-async def get_usage(user: UserModel = Depends(get_user)) -> Usage:
+async def get_usage(auth_info: AuthenticationInfo = Depends(get_auth_info)) -> Usage:
     """
     Retrieve the current token usage for the authenticated user.
 
@@ -49,16 +48,17 @@ async def get_usage(user: UserModel = Depends(get_user)) -> Usage:
     ```
     """
     return Usage(
-        prompt_tokens=user.prompt_tokens,
-        completion_tokens=user.completion_tokens,
-        total_tokens=user.prompt_tokens + user.completion_tokens,
-        queries=user.queries,  # type: ignore # FIXME this field is not part of Usage
+        prompt_tokens=auth_info.user.prompt_tokens,
+        completion_tokens=auth_info.user.completion_tokens,
+        total_tokens=auth_info.user.prompt_tokens + auth_info.user.completion_tokens,
+        queries=auth_info.user.queries,  # type: ignore # FIXME this field is not part of Usage
     )
 
 
 @router.get("/v1/attestation/report", tags=["Attestation"])
 async def get_attestation(
-    nonce: Optional[Nonce] = None, user: UserModel = Depends(get_user)
+    nonce: Optional[Nonce] = None,
+    auth_info: AuthenticationInfo = Depends(get_auth_info),
 ) -> AttestationReport:
     """
     Generate a cryptographic attestation report.
@@ -82,7 +82,9 @@ async def get_attestation(
 
 
 @router.get("/v1/models", tags=["Model"])
-async def get_models(user: UserModel = Depends(get_user)) -> List[ModelMetadata]:
+async def get_models(
+    auth_info: AuthenticationInfo = Depends(get_auth_info),
+) -> List[ModelMetadata]:
     """
     List all available models in the system.
 
@@ -95,7 +97,6 @@ async def get_models(user: UserModel = Depends(get_user)) -> List[ModelMetadata]
     models = await get_models(user)
     ```
     """
-    logger.info(f"Retrieving models for user {user.userid} from pid {os.getpid()}")
     return [endpoint.metadata for endpoint in (await state.models).values()]
 
 
@@ -125,7 +126,7 @@ async def chat_completion(
         )
     ),
     _=Depends(RateLimit(concurrent_extractor=chat_completion_concurrent_rate_limit)),
-    user: UserModel = Depends(get_user),
+    auth_info: AuthenticationInfo = Depends(get_auth_info),
 ) -> Union[SignedChatCompletion, StreamingResponse]:
     """
     Generate a chat completion response from the AI model.
@@ -187,7 +188,7 @@ async def chat_completion(
     model_url = endpoint.url + "/v1/"
 
     logger.info(
-        f"Chat completion request for model {model_name} from user {user.userid} on url: {model_url}"
+        f"Chat completion request for model {model_name} from user {auth_info.user.userid} on url: {model_url}"
     )
 
     if req.nilrag:
@@ -214,32 +215,29 @@ async def chat_completion(
                         }
                     },
                 )  # type: ignore
-
                 prompt_token_usage: int = 0
                 completion_token_usage: int = 0
                 async for chunk in response:
-                    if (
-                        chunk.usage is not None
-                        and chunk.usage.prompt_tokens is not None
-                        and chunk.usage.completion_tokens is not None
-                    ):
-                        prompt_token_usage = chunk.usage.prompt_tokens
-                        completion_token_usage += chunk.usage.completion_tokens
-
-                    logger.info(
-                        f"Prompt token usage: {chunk.usage.prompt_tokens}/{prompt_token_usage}, Completion token usage: {chunk.usage.completion_tokens}/{completion_token_usage}"
-                    )
                     data = chunk.model_dump_json(exclude_unset=True)
                     yield f"data: {data}\n\n"
                     await asyncio.sleep(0)
 
+                    prompt_token_usage = (
+                        chunk.usage.prompt_tokens if chunk.usage else prompt_token_usage
+                    )
+                    completion_token_usage = (
+                        chunk.usage.completion_tokens
+                        if chunk.usage
+                        else completion_token_usage
+                    )
+
                 await UserManager.update_token_usage(
-                    user.userid,
+                    auth_info.user.userid,
                     prompt_tokens=prompt_token_usage,
                     completion_tokens=completion_token_usage,
                 )
                 await QueryLogManager.log_query(
-                    user.userid,
+                    auth_info.user.userid,
                     model=req.model,
                     prompt_tokens=prompt_token_usage,
                     completion_tokens=completion_token_usage,
@@ -276,13 +274,13 @@ async def chat_completion(
         )
     # Update token usage
     await UserManager.update_token_usage(
-        user.userid,
+        auth_info.user.userid,
         prompt_tokens=model_response.usage.prompt_tokens,
         completion_tokens=model_response.usage.completion_tokens,
     )
 
     await QueryLogManager.log_query(
-        user.userid,
+        auth_info.user.userid,
         model=req.model,
         prompt_tokens=model_response.usage.prompt_tokens,
         completion_tokens=model_response.usage.completion_tokens,

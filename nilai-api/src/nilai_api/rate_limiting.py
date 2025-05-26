@@ -7,8 +7,7 @@ from fastapi.params import Depends
 from fastapi import status, HTTPException, Request
 from redis.asyncio import from_url, Redis
 
-from nilai_api.auth import get_user
-from nilai_api.db.users import UserModel
+from nilai_api.auth import get_auth_info, AuthenticationInfo, TokenRateLimits
 
 LUA_RATE_LIMIT_SCRIPT = """
 local key = KEYS[1]
@@ -41,13 +40,16 @@ async def setup_redis_conn(redis_url):
 
 
 class UserRateLimits(BaseModel):
-    id: str
+    subscription_holder: str
     day_limit: int | None
     hour_limit: int | None
     minute_limit: int | None
+    token_rate_limit: TokenRateLimits | None
 
 
-def get_user_limits(user: Annotated[UserModel, Depends(get_user)]) -> UserRateLimits:
+def get_user_limits(
+    auth_info: Annotated[AuthenticationInfo, Depends(get_auth_info)],
+) -> UserRateLimits:
     # TODO: When the only allowed strategy is NUC, we can change the apikey name to subscription_holder
     # In apikey mode, the apikey is unique as the userid.
     # In nuc mode, the apikey is associated with a subscription holder and the userid is the user
@@ -55,10 +57,11 @@ def get_user_limits(user: Annotated[UserModel, Depends(get_user)]) -> UserRateLi
     # In JWT mode, the apikey is the userid too
     # So we use the apikey as the id
     return UserRateLimits(
-        id=user.apikey,
-        day_limit=user.ratelimit_day,
-        hour_limit=user.ratelimit_hour,
-        minute_limit=user.ratelimit_minute,
+        subscription_holder=auth_info.user.apikey,
+        day_limit=auth_info.user.ratelimit_day,
+        hour_limit=auth_info.user.ratelimit_hour,
+        minute_limit=auth_info.user.ratelimit_minute,
+        token_rate_limit=auth_info.token_rate_limit,
     )
 
 
@@ -90,24 +93,43 @@ class RateLimit:
         await self.check_bucket(
             redis,
             redis_rate_limit_command,
-            f"minute:{user_limits.id}",
+            f"minute:{user_limits.subscription_holder}",
             user_limits.minute_limit,
             MINUTE_MS,
         )
         await self.check_bucket(
             redis,
             redis_rate_limit_command,
-            f"hour:{user_limits.id}",
+            f"hour:{user_limits.subscription_holder}",
             user_limits.hour_limit,
             HOUR_MS,
         )
         await self.check_bucket(
             redis,
             redis_rate_limit_command,
-            f"day:{user_limits.id}",
+            f"day:{user_limits.subscription_holder}",
             user_limits.day_limit,
             DAY_MS,
         )
+
+        if (
+            user_limits.token_rate_limit
+        ):  # If the token rate limit is not None, we need to check it
+            # We create a record in redis for the signature
+            # The key is the signature
+            # The value is the usage limit
+            # The expiration is the time remaining in validity of the token
+            # We use the time remaining to check if the token rate limit is exceeded
+
+            for limit in user_limits.token_rate_limit.limits:
+                await self.check_bucket(
+                    redis,
+                    redis_rate_limit_command,
+                    f"token:{limit.signature}",
+                    limit.usage_limit,
+                    limit.ms_remaining,
+                )
+
         key = await self.check_concurrent_and_increment(redis, request)
         try:
             yield

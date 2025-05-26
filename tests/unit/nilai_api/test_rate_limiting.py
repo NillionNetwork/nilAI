@@ -2,7 +2,9 @@ import asyncio
 import string
 import random
 from unittest.mock import MagicMock
+from datetime import datetime, timedelta, timezone
 
+from nilai_api.auth import TokenRateLimit, TokenRateLimits
 import pytest
 import pytest_asyncio
 from fastapi import HTTPException, Request
@@ -41,7 +43,11 @@ async def test_concurrent_rate_limit(req):
     rate_limit = RateLimit(concurrent_extractor=lambda _: (5, "test"))
 
     user_limits = UserRateLimits(
-        id=random_id(), day_limit=None, hour_limit=None, minute_limit=None
+        subscription_holder=random_id(),
+        day_limit=None,
+        hour_limit=None,
+        minute_limit=None,
+        token_rate_limit=None,
     )
 
     futures = [consume_generator(rate_limit(req, user_limits)) for _ in range(5)]
@@ -63,13 +69,40 @@ async def test_concurrent_rate_limit(req):
     "user_limits",
     [
         UserRateLimits(
-            id=random_id(), day_limit=10, hour_limit=None, minute_limit=None
+            subscription_holder=random_id(),
+            day_limit=10,
+            hour_limit=None,
+            minute_limit=None,
+            token_rate_limit=None,
         ),
         UserRateLimits(
-            id=random_id(), day_limit=None, hour_limit=11, minute_limit=None
+            subscription_holder=random_id(),
+            day_limit=None,
+            hour_limit=11,
+            minute_limit=None,
+            token_rate_limit=None,
         ),
         UserRateLimits(
-            id=random_id(), day_limit=None, hour_limit=None, minute_limit=12
+            subscription_holder=random_id(),
+            day_limit=None,
+            hour_limit=None,
+            minute_limit=12,
+            token_rate_limit=None,
+        ),
+        UserRateLimits(
+            subscription_holder=random_id(),
+            day_limit=None,
+            hour_limit=None,
+            minute_limit=None,
+            token_rate_limit=TokenRateLimits(
+                limits=[
+                    TokenRateLimit(
+                        signature=random_id(),
+                        usage_limit=11,
+                        expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
+                    )
+                ]
+            ),
         ),
     ],
 )

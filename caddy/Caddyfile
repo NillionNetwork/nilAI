@@ -2,7 +2,7 @@
 	tls {
 		protocols tls1.2 tls1.3
 	}
- }
+}
 
 {$NILAI_SERVER_DOMAIN} {
 	import ssl_config
@@ -12,12 +12,12 @@
 		reverse_proxy grafana:3000
 	}
 
-	handle_path /grafana {
-		uri strip_prefix /grafana
-		reverse_proxy grafana:3000
+	handle_path /nuc/* {
+		uri strip_prefix /nuc
+		reverse_proxy nuc-api:8080
 	}
 
 	handle {
 		reverse_proxy api:8080
 	}
- }
+}

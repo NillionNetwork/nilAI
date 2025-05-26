@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 import sqlalchemy
 
@@ -20,7 +20,7 @@ class QueryLog(Base):
         String(75), ForeignKey(UserModel.userid), nullable=False, index=True
     )  # type: ignore
     query_timestamp: datetime = Column(
-        DateTime, server_default=sqlalchemy.func.now(), nullable=False
+        DateTime(timezone=True), server_default=sqlalchemy.func.now(), nullable=False
     )  # type: ignore
     model: str = Column(Text, nullable=False)  # type: ignore
     prompt_tokens: int = Column(Integer, nullable=False)  # type: ignore
@@ -55,7 +55,7 @@ class QueryLogManager:
                     prompt_tokens=prompt_tokens,
                     completion_tokens=completion_tokens,
                     total_tokens=total_tokens,
-                    query_timestamp=datetime.now(),
+                    query_timestamp=datetime.now(timezone.utc),
                 )
                 session.add(query_log)
                 await session.commit()

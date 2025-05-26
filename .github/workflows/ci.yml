@@ -63,7 +63,7 @@ jobs:
           github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
           runners-per-machine: 1
           number-of-machines: 1
-          ec2-image-id: ami-0ac221d824dd88706
+          ec2-image-id: ami-0174a246556e8750b
           ec2-instance-type: g4dn.xlarge
           subnet-id: subnet-0ec4c353621eabae2
           security-group-id: sg-03ee5c56e1f467aa0
@@ -94,7 +94,7 @@ jobs:
           cache-dependency-glob: "**/pyproject.toml"
       - name: Install dependencies
         run: |
-          apt-get update && apt-get install curl git pkg-config automake file -y
+          apt-get update && apt-get install curl git pkg-config automake file python3.12-dev -y
           uv sync
 
       - name: Build vllm
@@ -103,7 +103,7 @@ jobs:
       - name: Build attestation
         run: docker build -t nillion/nilai-attestation:latest -f docker/attestation.Dockerfile .
 
-      - name: Build nilal API
+      - name: Build nilai API
         run: docker build -t nillion/nilai-api:latest -f docker/api.Dockerfile --target nilai --platform linux/amd64 .
 
       - name: Create .env
@@ -124,10 +124,20 @@ jobs:
       - name: Wait for services to be healthy
         run: bash scripts/wait_for_ci_services.sh
 
-      - name: Run E2E tests
+      - name: Run E2E tests for NUC
         run: |
           set -e
           export ENVIRONMENT=ci
+          uv run pytest -v tests/e2e
+
+      - name: Run E2E tests for API Key
+        run: |
+          set -e
+          # Create a user with a rate limit of 1000 requests per minute, hour, and day
+          export AUTH_TOKEN=$(docker exec nilai-api uv run src/nilai_api/commands/add_user.py --name test1 --ratelimit-minute 1000 --ratelimit-hour 1000 --ratelimit-day 1000 | jq ".apikey" -r)
+          export ENVIRONMENT=ci
+          # Set the environment variable for the API key
+          export AUTH_STRATEGY=api_key
           uv run pytest -v tests/e2e
 
       - name: Stop Services

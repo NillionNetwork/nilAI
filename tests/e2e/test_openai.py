@@ -9,19 +9,46 @@ pytest tests/e2e/test_openai.py
 """
 
 import json
-
+import httpx
 import pytest
 from openai import OpenAI
 from openai.types.chat import ChatCompletion
-from .config import BASE_URL, test_models
-from .nuc import get_nuc_token
+from .config import BASE_URL, test_models, AUTH_STRATEGY, api_key_getter
+from .nuc import (
+    get_rate_limited_nuc_token,
+    get_invalid_rate_limited_nuc_token,
+)
+
+
+def _create_openai_client(api_key: str) -> OpenAI:
+    """Helper function to create an OpenAI client with SSL verification disabled"""
+    transport = httpx.HTTPTransport(verify=False)
+    return OpenAI(
+        base_url=BASE_URL,
+        api_key=api_key,
+        http_client=httpx.Client(transport=transport),
+    )
 
 
 @pytest.fixture
 def client():
     """Create an OpenAI client configured to use the Nilai API"""
-    invocation_token = get_nuc_token()
-    return OpenAI(base_url=BASE_URL, api_key=invocation_token.token)
+    invocation_token: str = api_key_getter()
+    return _create_openai_client(invocation_token)
+
+
+@pytest.fixture
+def rate_limited_client():
+    """Create an OpenAI client configured to use the Nilai API with rate limiting"""
+    invocation_token = get_rate_limited_nuc_token(rate_limit=1)
+    return _create_openai_client(invocation_token.token)
+
+
+@pytest.fixture
+def invalid_rate_limited_client():
+    """Create an OpenAI client configured to use the Nilai API with rate limiting"""
+    invocation_token = get_invalid_rate_limited_nuc_token()
+    return _create_openai_client(invocation_token.token)
 
 
 @pytest.mark.parametrize(
@@ -78,6 +105,72 @@ def test_chat_completion(client, model):
 
     except Exception as e:
         pytest.fail(f"Error testing chat completion with {model}: {str(e)}")
+
+
+@pytest.mark.parametrize(
+    "model",
+    test_models,
+)
+@pytest.mark.skipif(
+    AUTH_STRATEGY != "nuc", reason="NUC rate limiting not used with API key"
+)
+def test_rate_limiting_nucs(rate_limited_client, model):
+    """Test rate limiting by sending multiple rapid requests"""
+    import openai
+
+    # Send multiple rapid requests
+    rate_limited = False
+    for _ in range(4):  # Adjust number based on expected rate limits
+        try:
+            _ = rate_limited_client.chat.completions.create(
+                model=model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a helpful assistant that provides accurate and concise information.",
+                    },
+                    {"role": "user", "content": "What is the capital of France?"},
+                ],
+                temperature=0.2,
+                max_tokens=100,
+            )
+        except openai.RateLimitError:
+            rate_limited = True
+
+    assert rate_limited, "No NUC rate limiting detected, when expected"
+
+
+@pytest.mark.parametrize(
+    "model",
+    test_models,
+)
+@pytest.mark.skipif(
+    AUTH_STRATEGY != "nuc", reason="NUC rate limiting not used with API key"
+)
+def test_invalid_rate_limiting_nucs(invalid_rate_limited_client, model):
+    """Test rate limiting by sending multiple rapid requests"""
+    import openai
+
+    # Send multiple rapid requests
+    forbidden = False
+    for _ in range(4):  # Adjust number based on expected rate limits
+        try:
+            _ = invalid_rate_limited_client.chat.completions.create(
+                model=model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a helpful assistant that provides accurate and concise information.",
+                    },
+                    {"role": "user", "content": "What is the capital of France?"},
+                ],
+                temperature=0.2,
+                max_tokens=100,
+            )
+        except openai.AuthenticationError:
+            forbidden = True
+
+    assert forbidden, "No NUC rate limiting detected, when expected"
 
 
 @pytest.mark.parametrize(
@@ -337,15 +430,16 @@ def test_usage_endpoint(client):
         # The OpenAI client doesn't have a built-in method for this
         import requests
 
-        invocation_token = get_nuc_token()
+        invocation_token = api_key_getter()
 
         url = BASE_URL + "/usage"
         response = requests.get(
             url,
             headers={
-                "Authorization": f"Bearer {invocation_token.token}",
+                "Authorization": f"Bearer {invocation_token}",
                 "Content-Type": "application/json",
             },
+            verify=False,
         )
         assert response.status_code == 200, "Usage endpoint should return 200 OK"
 
@@ -375,14 +469,15 @@ def test_attestation_endpoint(client):
         import requests
 
         url = BASE_URL + "/attestation/report"
-        invocation_token = get_nuc_token()
+        invocation_token = api_key_getter()
         response = requests.get(
             url,
             headers={
-                "Authorization": f"Bearer {invocation_token.token}",
+                "Authorization": f"Bearer {invocation_token}",
                 "Content-Type": "application/json",
             },
             params={"nonce": "0" * 64},
+            verify=False,
         )
 
         assert response.status_code == 200, "Attestation endpoint should return 200 OK"
@@ -414,6 +509,7 @@ def test_health_endpoint(client):
                 "Accept": "application/json",
                 "Content-Type": "application/json",
             },
+            verify=False,
         )
 
         print(f"Health response: {response.status_code} {response.text}")

@@ -6,6 +6,17 @@ services:
     volumes:
       - ./nilai-api/:/app/nilai-api/
       - ./packages/:/app/packages/
+      - ./nilai-auth/nuc-helpers/:/app/nilai-auth/nuc-helpers/
+    networks:
+      - nilauth
+  nuc-api:
+    platform: linux/amd64 # for macOS to force running on Rosetta 2
+    ports:
+      - "8088:8080"
+    volumes:
+      - ./nilai-api/:/app/nilai-api/
+      - ./packages/:/app/packages/
+      - ./nilai-auth/nuc-helpers/:/app/nilai-auth/nuc-helpers/
     networks:
       - nilauth
   attestation:
@@ -20,6 +31,9 @@ services:
   postgres:
     ports:
       - "5432:5432"
+  nuc-postgres:
+    ports:
+      - "5433:5432"
   grafana:
     ports:
       - "3000:3000"
