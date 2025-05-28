@@ -67,6 +67,21 @@ def invalid_rate_limited_client():
     )
 
 
+@pytest.fixture
+def nillion_2025_client():
+    """Create an HTTPX client with default headers"""
+    return httpx.Client(
+        base_url=BASE_URL,
+        headers={
+            "accept": "application/json",
+            "Content-Type": "application/json",
+            "Authorization": "Bearer Nillion2025",
+        },
+        verify=False,
+        timeout=None,
+    )
+
+
 def test_health_endpoint(client):
     """Test the health endpoint"""
     response = client.get("health")
@@ -149,6 +164,62 @@ def test_model_standard_request(client, model):
     }
 
     response = client.post("/chat/completions", json=payload, timeout=30)
+    assert response.status_code == 200, (
+        f"Standard request for {model} failed with status {response.status_code}"
+    )
+
+    response_json = response.json()
+    print(response_json)
+    assert "choices" in response_json, "Response should contain choices"
+    assert len(response_json["choices"]) > 0, "At least one choice should be present"
+
+    # Check content of response
+    content = response_json["choices"][0].get("message", {}).get("content", "")
+    assert content, f"No content returned for {model}"
+
+    # Check finish reason
+    assert response_json["choices"][0].get("finish_reason") == "stop", (
+        f"Finish reason should be stop for {model}"
+    )
+
+    # Check that the response is not empty
+    assert content.strip(), f"Empty response returned for {model}"
+
+    # Check that the usage is not 0
+    assert response_json["usage"]["prompt_tokens"] > 0, (
+        f"Prompt tokens are 0 for {model}"
+    )
+    assert response_json["usage"]["completion_tokens"] > 0, (
+        f"Completion tokens are 0 for {model}"
+    )
+    assert response_json["usage"]["total_tokens"] > 0, f"Total tokens are 0 for {model}"
+    # Log response for debugging
+    print(
+        f"\nModel {model} standard response: {content[:100]}..."
+        if len(content) > 100
+        else content
+    )
+
+
+@pytest.mark.parametrize(
+    "model",
+    test_models,
+)
+def test_model_standard_request_nillion_2025(nillion_2025_client, model):
+    """Test standard (non-streaming) request for different models"""
+    payload = {
+        "model": model,
+        "messages": [
+            {
+                "role": "system",
+                "content": "You are a helpful assistant that provides accurate and concise information.",
+            },
+            {"role": "user", "content": "What is the capital of France?"},
+        ],
+        "temperature": 0.2,
+    }
+
+    response = nillion_2025_client.post("/chat/completions", json=payload, timeout=30)
     assert response.status_code == 200, (
         f"Standard request for {model} failed with status {response.status_code}"
     )
