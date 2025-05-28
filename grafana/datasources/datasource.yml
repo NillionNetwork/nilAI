@@ -28,3 +28,22 @@ datasources:
       connMaxLifetime: 14400
       postgresVersion: 1200
       timescaledb: false
+
+  - name: PostgreSQL NUC
+    type: postgres
+    access: proxy
+    orgId: 1
+    url: nuc-${POSTGRES_HOST}:${POSTGRES_PORT}
+    isDefault: false
+    uid: "eehsf95n2at4wf"
+    database: ${POSTGRES_DB}
+    user: ${POSTGRES_USER}
+    secureJsonData:
+      password: ${POSTGRES_PASSWORD}
+    jsonData:
+      sslmode: 'disable'
+      maxOpenConns: 100
+      maxIdleConns: 100
+      connMaxLifetime: 14400
+      postgresVersion: 1200
+      timescaledb: false
