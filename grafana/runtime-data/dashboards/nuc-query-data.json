@@ -1,0 +1,615 @@
+{
+    "annotations": {
+      "list": [
+        {
+          "builtIn": 1,
+          "datasource": {
+            "type": "grafana",
+            "uid": "-- Grafana --"
+          },
+          "enable": true,
+          "hide": true,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "name": "Annotations & Alerts",
+          "type": "dashboard"
+        }
+      ]
+    },
+    "editable": true,
+    "fiscalYearStartMonth": 0,
+    "graphTooltip": 1,
+    "id": 6,
+    "links": [],
+    "panels": [
+      {
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "eehsf95n2at4wf"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "fixedColor": "blue",
+              "mode": "fixed",
+              "seriesBy": "max"
+            },
+            "custom": {
+              "axisBorderShow": false,
+              "axisCenteredZero": false,
+              "axisColorMode": "text",
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "barWidthFactor": 0.9,
+              "drawStyle": "bars",
+              "fillOpacity": 17,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "insertNulls": false,
+              "lineInterpolation": "linear",
+              "lineWidth": 2,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "never",
+              "spanNulls": false,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "decimals": 0,
+            "fieldMinMax": false,
+            "mappings": [],
+            "min": 0,
+            "noValue": "0",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 50
+                },
+                {
+                  "color": "red",
+                  "value": 100
+                }
+              ]
+            },
+            "unit": "short"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 9,
+          "w": 24,
+          "x": 0,
+          "y": 0
+        },
+        "id": 4,
+        "options": {
+          "legend": {
+            "calcs": [
+              "min",
+              "mean",
+              "max"
+            ],
+            "displayMode": "table",
+            "placement": "bottom",
+            "showLegend": true
+          },
+          "tooltip": {
+            "hideZeros": false,
+            "mode": "single",
+            "sort": "none"
+          }
+        },
+        "pluginVersion": "11.5.1",
+        "targets": [
+          {
+            "datasource": {
+              "type": "grafana-postgresql-datasource",
+              "uid": "eehsf95n2at4wf"
+            },
+            "editorMode": "code",
+            "format": "time_series",
+            "rawQuery": true,
+            "rawSql": "SELECT \n  date_trunc('${time_granularity}', q.query_timestamp) AS \"time\", \n  COUNT(q.id) AS \"Queries\"\nFROM query_logs q\nLEFT JOIN users u ON q.userid = u.userid\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${user_filter:value}' = 'All' OR u.name = '${user_filter:value}')\n  AND ('${model_filter:single}' = 'All' OR q.model = '${model_filter:single}')\nGROUP BY date_trunc('${time_granularity}', q.query_timestamp)\nORDER BY \"time\";",
+            "refId": "A",
+            "sql": {
+              "columns": [
+                {
+                  "parameters": [],
+                  "type": "function"
+                }
+              ],
+              "groupBy": [
+                {
+                  "property": {
+                    "type": "string"
+                  },
+                  "type": "groupBy"
+                }
+              ],
+              "limit": 50
+            }
+          }
+        ],
+        "title": "Query Volume Over Time (${time_granularity})",
+        "type": "timeseries"
+      },
+      {
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "eehsf95n2at4wf"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              }
+            },
+            "mappings": [],
+            "unit": "short"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 10,
+          "w": 8,
+          "x": 0,
+          "y": 9
+        },
+        "id": 3,
+        "options": {
+          "displayLabels": [
+            "name",
+            "percent",
+            "value"
+          ],
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "showLegend": true,
+            "values": [
+              "value",
+              "percent"
+            ]
+          },
+          "pieType": "donut",
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": "",
+            "values": true
+          },
+          "tooltip": {
+            "hideZeros": false,
+            "mode": "single",
+            "sort": "desc"
+          }
+        },
+        "pluginVersion": "11.5.1",
+        "targets": [
+          {
+            "datasource": {
+              "type": "grafana-postgresql-datasource",
+              "uid": "eehsf95n2at4wf"
+            },
+            "editorMode": "code",
+            "format": "table",
+            "rawQuery": true,
+            "rawSql": "SELECT \n  q.model, \n  COUNT(q.id) AS total_queries\nFROM query_logs q\nLEFT JOIN users u ON q.userid = u.userid\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${user_filter:single}' = 'All' OR u.name = '${user_filter:single}')\nGROUP BY q.model\nORDER BY total_queries DESC;",
+            "refId": "A",
+            "sql": {
+              "columns": [
+                {
+                  "name": "COUNT",
+                  "parameters": [
+                    {
+                      "name": "model",
+                      "type": "functionParameter"
+                    }
+                  ],
+                  "type": "function"
+                },
+                {
+                  "parameters": [
+                    {
+                      "name": "model",
+                      "type": "functionParameter"
+                    }
+                  ],
+                  "type": "function"
+                }
+              ],
+              "groupBy": [
+                {
+                  "property": {
+                    "name": "model",
+                    "type": "string"
+                  },
+                  "type": "groupBy"
+                }
+              ],
+              "limit": 50
+            },
+            "table": "query_logs"
+          }
+        ],
+        "title": "Model Usage Distribution",
+        "type": "piechart"
+      },
+      {
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "eehsf95n2at4wf"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              }
+            },
+            "mappings": [],
+            "unit": "short"
+          },
+          "overrides": [
+            {
+              "__systemRef": "hideSeriesFrom",
+              "matcher": {
+                "id": "byNames",
+                "options": {
+                  "mode": "exclude",
+                  "names": [
+                    "Queries"
+                  ],
+                  "prefix": "All except:",
+                  "readOnly": true
+                }
+              },
+              "properties": [
+                {
+                  "id": "custom.hideFrom",
+                  "value": {
+                    "legend": false,
+                    "tooltip": false,
+                    "viz": true
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "gridPos": {
+          "h": 10,
+          "w": 8,
+          "x": 8,
+          "y": 9
+        },
+        "id": 1,
+        "options": {
+          "displayLabels": [
+            "name",
+            "percent",
+            "value"
+          ],
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "showLegend": true,
+            "values": [
+              "value",
+              "percent"
+            ]
+          },
+          "pieType": "donut",
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": "",
+            "values": true
+          },
+          "tooltip": {
+            "hideZeros": false,
+            "mode": "single",
+            "sort": "desc"
+          }
+        },
+        "pluginVersion": "11.5.1",
+        "targets": [
+          {
+            "datasource": {
+              "type": "grafana-postgresql-datasource",
+              "uid": "eehsf95n2at4wf"
+            },
+            "editorMode": "code",
+            "format": "table",
+            "rawQuery": true,
+            "rawSql": "SELECT \n  CASE \n    WHEN LENGTH(u.name) > 12 THEN LEFT(u.name, 3) || '...' || RIGHT(u.name, 3)\n    ELSE u.name\n  END AS \"User\", \n  COUNT(q.id) AS \"Queries\" \nFROM query_logs q \nJOIN users u ON q.userid = u.userid\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${model_filter:single}' = 'All' OR q.model = '${model_filter:single}')\nGROUP BY u.name\nORDER BY \"Queries\" DESC;",
+            "refId": "A",
+            "sql": {
+              "columns": [
+                {
+                  "alias": "\"User\"",
+                  "parameters": [
+                    {
+                      "name": "userid",
+                      "type": "functionParameter"
+                    }
+                  ],
+                  "type": "function"
+                },
+                {
+                  "alias": "\"Queries\"",
+                  "name": "COUNT",
+                  "parameters": [
+                    {
+                      "name": "id",
+                      "type": "functionParameter"
+                    }
+                  ],
+                  "type": "function"
+                }
+              ],
+              "groupBy": [
+                {
+                  "property": {
+                    "name": "userid",
+                    "type": "string"
+                  },
+                  "type": "groupBy"
+                }
+              ],
+              "limit": 50
+            },
+            "table": "query_logs"
+          }
+        ],
+        "title": "User Activity Distribution",
+        "type": "piechart"
+      },
+      {
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "eehsf95n2at4wf"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "custom": {
+              "align": "auto",
+              "cellOptions": {
+                "type": "auto"
+              },
+              "inspect": false
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                }
+              ]
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Queries"
+              },
+              "properties": [
+                {
+                  "id": "custom.cellOptions",
+                  "value": {
+                    "mode": "gradient",
+                    "type": "gauge"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "gridPos": {
+          "h": 10,
+          "w": 8,
+          "x": 16,
+          "y": 9
+        },
+        "id": 5,
+        "options": {
+          "cellHeight": "sm",
+          "footer": {
+            "countRows": false,
+            "enablePagination": true,
+            "fields": "",
+            "reducer": [
+              "sum"
+            ],
+            "show": false
+          },
+          "showHeader": true,
+          "sortBy": [
+            {
+              "desc": true,
+              "displayName": "Queries"
+            }
+          ]
+        },
+        "pluginVersion": "11.5.1",
+        "targets": [
+          {
+            "datasource": {
+              "type": "grafana-postgresql-datasource",
+              "uid": "eehsf95n2at4wf"
+            },
+            "editorMode": "code",
+            "format": "table",
+            "rawQuery": true,
+            "rawSql": "SELECT \n  CASE \n    WHEN LENGTH(u.name) > 8 THEN LEFT(u.name, 3) || '...' || RIGHT(u.name, 3)\n    ELSE u.name\n  END AS \"User\",\n  q.model AS \"Model\",\n  COUNT(q.id) AS \"Queries\",\n  MIN(q.query_timestamp) AS \"First Query\",\n  MAX(q.query_timestamp) AS \"Last Query\"\nFROM query_logs q \nJOIN users u ON q.userid = u.userid\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${user_filter:single}' = 'All' OR u.name = '${user_filter:single}')\n  AND ('${model_filter:single}' = 'All' OR q.model = '${model_filter:single}')\nGROUP BY u.name, q.model\nORDER BY \"Queries\" DESC\nLIMIT 20;",
+            "refId": "A",
+            "sql": {
+              "columns": [
+                {
+                  "parameters": [],
+                  "type": "function"
+                }
+              ],
+              "groupBy": [
+                {
+                  "property": {
+                    "type": "string"
+                  },
+                  "type": "groupBy"
+                }
+              ],
+              "limit": 50
+            }
+          }
+        ],
+        "title": "Top User-Model Combinations",
+        "type": "table"
+      }
+    ],
+    "preload": false,
+    "refresh": "1m",
+    "schemaVersion": 40,
+    "tags": [
+      "postgres",
+      "queries",
+      "analytics"
+    ],
+    "templating": {
+      "list": [
+        {
+          "current": {
+            "text": "minute",
+            "value": "minute"
+          },
+          "includeAll": false,
+          "name": "time_granularity",
+          "options": [
+            {
+              "selected": true,
+              "text": "minute",
+              "value": "minute"
+            },
+            {
+              "selected": false,
+              "text": "hour",
+              "value": "hour"
+            },
+            {
+              "selected": false,
+              "text": "day",
+              "value": "day"
+            },
+            {
+              "selected": false,
+              "text": "week",
+              "value": "week"
+            }
+          ],
+          "query": "minute,hour,day,week",
+          "type": "custom"
+        },
+        {
+          "allValue": "All",
+          "current": {
+            "text": "All",
+            "value": "$__all"
+          },
+          "datasource": {
+            "type": "PostgreSQL",
+            "uid": "eehsf95n2at4we"
+          },
+          "definition": "SELECT DISTINCT \n  name AS text, \n  name AS value \nFROM users \nORDER BY name",
+          "includeAll": true,
+          "name": "user_filter",
+          "options": [],
+          "query": "SELECT DISTINCT \n  name AS text, \n  name AS value \nFROM users \nORDER BY name",
+          "refresh": 1,
+          "regex": "",
+          "sort": 1,
+          "type": "query"
+        },
+        {
+          "allValue": "All",
+          "current": {
+            "text": "All",
+            "value": "$__all"
+          },
+          "datasource": {
+            "type": "PostgreSQL",
+            "uid": "eehsf95n2at4we"
+          },
+          "definition": "SELECT DISTINCT model FROM query_logs ORDER BY model",
+          "includeAll": true,
+          "name": "model_filter",
+          "options": [],
+          "query": "SELECT DISTINCT model FROM query_logs ORDER BY model",
+          "refresh": 1,
+          "regex": "",
+          "sort": 1,
+          "type": "query"
+        }
+      ]
+    },
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "timepicker": {
+      "refresh_intervals": [
+        "10s",
+        "30s",
+        "1m",
+        "5m",
+        "15m",
+        "30m",
+        "1h",
+        "2h",
+        "1d"
+      ]
+    },
+    "timezone": "browser",
+    "title": "PostgreSQL Query Analytics Dashboard",
+    "uid": "den2cki7odfrek",
+    "version": 3,
+    "weekStart": ""
+  }
