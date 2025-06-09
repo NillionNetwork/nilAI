@@ -16,6 +16,8 @@ dependencies = [
     "fastapi[standard]>=0.115.5",
     "gunicorn>=23.0.0",
     "nilai-common",
+    "blindrag",
+    "nilrag",
     "python-dotenv>=1.0.1",
     "sqlalchemy>=2.0.36",
     "uvicorn>=0.32.1",
@@ -40,3 +42,5 @@ build-backend = "hatchling.build"
 
 [tool.uv.sources]
 nilai-common = { workspace = true }
+blindrag = { path = "./blindRAG" }
+nilrag = { path = "./nilrag" }
