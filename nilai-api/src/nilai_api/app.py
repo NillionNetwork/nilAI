@@ -88,14 +88,10 @@ app = FastAPI(
 app.include_router(public.router)
 app.include_router(private.router, dependencies=[Depends(get_auth_info)])
 
-origins = [
-    "https://docs.nillion.com",  # TODO: When users want to connect from browser
-]
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
