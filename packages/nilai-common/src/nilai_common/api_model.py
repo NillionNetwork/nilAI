@@ -24,6 +24,7 @@ class ChatRequest(BaseModel):
     stream: Optional[bool] = False
     tools: Optional[Iterable[ChatCompletionToolParam]] = None
     nilrag: Optional[dict] = {}
+    blindrag: Optional[dict] = {}
 
 
 class SignedChatCompletion(ChatCompletion):

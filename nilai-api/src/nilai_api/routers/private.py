@@ -6,6 +6,7 @@ from base64 import b64encode
 from typing import AsyncGenerator, Optional, Union, List, Tuple
 from nilai_api.attestation import get_attestation_report
 from nilai_api.handlers.nilrag import handle_nilrag
+from nilai_api.handlers.blindrag import handle_blindrag
 
 from fastapi import APIRouter, Body, Depends, HTTPException, status, Request
 from fastapi.responses import StreamingResponse
@@ -192,6 +193,9 @@ async def chat_completion(
 
     if req.nilrag:
         await handle_nilrag(req)
+
+    if req.blindrag:
+        await handle_blindrag(req)
 
     if req.stream:
         client = AsyncOpenAI(base_url=model_url, api_key="<not-needed>")
