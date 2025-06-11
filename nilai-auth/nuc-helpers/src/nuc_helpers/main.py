@@ -31,11 +31,14 @@ def b2b2b2c_test():
     nilauth_client = NilauthClient(f"http://{NILAUTH_ENDPOINT}")
 
     # Pay for the subscription
+    if not server_private_key.pubkey:
+        raise Exception("Failed to get public key")
+
     pay_for_subscription(
         nilauth_client,
         server_wallet,
         server_keypair,
-        server_private_key,
+        server_private_key.pubkey,
         f"http://{NILCHAIN_GRPC}",
     )
 
@@ -111,11 +114,14 @@ def b2b2c_test():
     nilauth_client = NilauthClient(f"http://{NILAUTH_ENDPOINT}")
 
     # Pay for the subscription
+    if not server_private_key.pubkey:
+        raise Exception("Failed to get public key")
+
     pay_for_subscription(
         nilauth_client,
         server_wallet,
         server_keypair,
-        server_private_key,
+        server_private_key.pubkey,
         f"http://{NILCHAIN_GRPC}",
     )
 
@@ -173,11 +179,14 @@ def b2c_test():
     nilauth_client = NilauthClient(f"http://{NILAUTH_ENDPOINT}")
 
     # Pay for the subscription
+    if not server_private_key.pubkey:
+        raise Exception("Failed to get public key")
+
     pay_for_subscription(
         nilauth_client,
         server_wallet,
         server_keypair,
-        server_private_key,
+        server_private_key.pubkey,
         f"http://{NILCHAIN_GRPC}",
     )
 

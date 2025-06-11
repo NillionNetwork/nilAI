@@ -31,12 +31,15 @@ def get_nuc_token() -> InvocationToken:
     )
     nilauth_client = NilauthClient(f"http://{NILAUTH_ENDPOINT}")
 
+    if not server_private_key.pubkey:
+        raise Exception("Failed to get public key")
+
     # Pay for the subscription
     pay_for_subscription(
         nilauth_client,
         server_wallet,
         server_keypair,
-        server_private_key,
+        server_private_key.pubkey,
         f"http://{NILCHAIN_GRPC}",
     )
 
@@ -79,15 +82,17 @@ def get_rate_limited_nuc_token(rate_limit: int = 3) -> InvocationToken:
     )
     nilauth_client = NilauthClient(f"http://{NILAUTH_ENDPOINT}")
 
+    if not server_private_key.pubkey:
+        raise Exception("Failed to get public key")
+
     # Pay for the subscription
     pay_for_subscription(
         nilauth_client,
         server_wallet,
         server_keypair,
-        server_private_key,
+        server_private_key.pubkey,
         f"http://{NILCHAIN_GRPC}",
     )
-
     # Create a root token
     root_token: RootToken = get_root_token(nilauth_client, server_private_key)
 
@@ -144,12 +149,15 @@ def get_invalid_rate_limited_nuc_token() -> InvocationToken:
     )
     nilauth_client = NilauthClient(f"http://{NILAUTH_ENDPOINT}")
 
+    if not server_private_key.pubkey:
+        raise Exception("Failed to get public key")
+
     # Pay for the subscription
     pay_for_subscription(
         nilauth_client,
         server_wallet,
         server_keypair,
-        server_private_key,
+        server_private_key.pubkey,
         f"http://{NILCHAIN_GRPC}",
     )
 

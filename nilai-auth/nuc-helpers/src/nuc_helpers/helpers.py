@@ -1,12 +1,11 @@
 import base64
 import datetime
 import logging
-from functools import lru_cache
 from typing import Tuple
 import httpx
 
-# Importing the pydantic library dependencies
-from pydantic import BaseModel
+# Importing the types
+from nuc_helpers.types import RootToken, DelegationToken, InvocationToken, ChainId
 
 # Importing the secp256k1 library dependencies
 from secp256k1 import PrivateKey as NilAuthPrivateKey, PublicKey as NilAuthPublicKey
@@ -14,7 +13,7 @@ from secp256k1 import PrivateKey as NilAuthPrivateKey, PublicKey as NilAuthPubli
 # Importing the nuc library dependencies
 from nuc.payer import Payer
 from nuc.builder import NucTokenBuilder
-from nuc.nilauth import NilauthClient
+from nuc.nilauth import NilauthClient, BlindModule
 from nuc.envelope import NucTokenEnvelope
 from nuc.token import Command, Did, InvocationBody
 from nuc.validate import NucTokenValidator, ValidationParameters
@@ -26,36 +25,42 @@ from cosmpy.aerial.client import LedgerClient, NetworkConfig
 
 logger = logging.getLogger(__name__)
 
-## Pydantic models
 
+def get_wallet_and_private_key_from_mnemonic(
+    mnemonic: str,
+) -> Tuple[LocalWallet, NilchainPrivateKey, NilAuthPrivateKey]:
+    """
+    Get the wallet and private key from a mnemonic
 
-class RootToken(BaseModel):
-    token: str
+    Args:
+        mnemonic: The mnemonic to use for the wallet
 
+    Returns:
+        wallet: The wallet of the user to use for payments on the nilchain
+        keypair: The keypair of the wallet
+        private_key: The private key of the keypair to use for nilauth
+    """
 
-class DelegationToken(BaseModel):
-    token: str
-
-
-class InvocationToken(BaseModel):
-    token: str
+    wallet = LocalWallet.from_mnemonic(mnemonic, prefix="nillion")
+    keypair = NilchainPrivateKey(base64.b64decode(wallet.signer().private_key))
+    private_key = NilAuthPrivateKey(base64.b64decode(keypair.private_key))
+    return wallet, keypair, private_key
 
 
 ## Helpers
-@lru_cache(maxsize=1)
 def get_wallet_and_private_key(
     private_key_bytes: str | bytes | None = None,
 ) -> Tuple[LocalWallet, NilchainPrivateKey, NilAuthPrivateKey]:
     """
-    Get the wallet and private key
+    Get the wallet and private key from a private key bytes
 
     Args:
         private_key_bytes: The private key bytes to use for the wallet
 
     Returns:
-        wallet: The wallet
-        keypair: The keypair
-        private_key: The private key
+        wallet: The wallet of the user to use for payments on the nilchain
+        keypair: The keypair of the wallet
+        private_key: The private key of the keypair to use for nilauth
     """
     keypair = NilchainPrivateKey(private_key_bytes)
     wallet = LocalWallet(keypair, prefix="nillion")
@@ -64,7 +69,9 @@ def get_wallet_and_private_key(
 
 
 def get_root_token(
-    nilauth_client: NilauthClient, private_key: NilAuthPrivateKey
+    nilauth_client: NilauthClient,
+    private_key: NilAuthPrivateKey,
+    blind_module: BlindModule = BlindModule.NILAI,
 ) -> RootToken:
     """
     Get the root token from nilauth
@@ -77,24 +84,31 @@ def get_root_token(
         The root token
     """
     ## Getting the root token from nilauth
-    root_token: str = nilauth_client.request_token(key=private_key)
+    root_token: str = nilauth_client.request_token(
+        key=private_key, blind_module=blind_module
+    )
 
     return RootToken(token=root_token)
 
 
-def get_unil_balance(address: Address, grpc_endpoint: str) -> int:
+def get_unil_balance(
+    address: Address,
+    grpc_endpoint: str,
+    chain_id: ChainId = ChainId.NILLION_CHAIN_DEVNET,
+) -> int:
     """
     Get the UNIL balance of the user
 
     Args:
         address: The address of the user
         grpc_endpoint: The endpoint of the grpc server
+        chain_id: The chain id of the nilchain (default is devnet)
 
     Returns:
         The balance of the user in UNIL
     """
     cfg = NetworkConfig(
-        chain_id="nillion-chain-devnet",
+        chain_id=chain_id.value,
         url="grpc+" + grpc_endpoint,
         fee_minimum_gas_price=1,
         fee_denomination="unil",
@@ -109,8 +123,10 @@ def pay_for_subscription(
     nilauth_client: NilauthClient,
     wallet: LocalWallet,
     keypair: NilchainPrivateKey,
-    private_key: NilAuthPrivateKey,
+    public_key: NilAuthPublicKey,
     grpc_endpoint: str,
+    blind_module: BlindModule = BlindModule.NILAI,
+    chain_id: ChainId = ChainId.NILLION_CHAIN_DEVNET,
 ) -> None:
     """
     Pay for the subscription using the Nilchain keypair if the user is not subscribed
@@ -120,23 +136,23 @@ def pay_for_subscription(
         keypair: The Nilchain keypair
         private_key: The NilAuth private key of the user
         grpc_endpoint: The endpoint of the grpc server
+        chain_id: The chain id of the nilchain (default is devnet)
     """
 
-    if (
-        get_unil_balance(wallet.address(), grpc_endpoint=grpc_endpoint)
-        < nilauth_client.subscription_cost()
-    ):
+    if get_unil_balance(
+        wallet.address(), grpc_endpoint=grpc_endpoint
+    ) < nilauth_client.subscription_cost(blind_module=blind_module):
         raise RuntimeError("User does not have enough UNIL to pay for the subscription")
 
     payer = Payer(
         wallet_private_key=keypair,
-        chain_id="nillion-chain-devnet",
+        chain_id=chain_id.value,
         grpc_endpoint=grpc_endpoint,
         gas_limit=1000000000000,
     )
 
     # Pretty print the subscription details
-    subscription_details = nilauth_client.subscription_status(private_key)
+    subscription_details = nilauth_client.subscription_status(public_key, blind_module)
     logger.info(f"IS SUBSCRIBED: {subscription_details.subscribed}")
     if not subscription_details or subscription_details.subscribed is None:
         raise RuntimeError(
@@ -146,8 +162,9 @@ def pay_for_subscription(
     if not subscription_details.subscribed:
         logger.info("[>] Paying for subscription")
         nilauth_client.pay_subscription(
-            key=private_key,
+            pubkey=public_key,
             payer=payer,
+            blind_module=blind_module,
         )
     else:
         logger.info("[>] Subscription is already paid for")

@@ -59,7 +59,7 @@ services:
       - nilauth
 
   nilauth:
-    image: public.ecr.aws/k5d9x2g2/nilauth:f17e05371d8639c2893643b0221c107e76e6c764
+    image: public.ecr.aws/k5d9x2g2/nilauth:ff0d9198d1b8819527bc036a58f875c4046b6f21
     depends_on:
       - nilauth-postgres
       - nilchain

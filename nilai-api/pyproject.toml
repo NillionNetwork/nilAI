@@ -43,4 +43,4 @@ build-backend = "hatchling.build"
 [tool.uv.sources]
 nilai-common = { workspace = true }
 nuc-helpers = { workspace = true }
-nuc = { git = "https://github.com/NillionNetwork/nuc-py.git", tag = "6c214c0586eabbd2653aed1cc49c62305bf335ed" }
+nuc = { git = "https://github.com/NillionNetwork/nuc-py.git", tag = "4922b5e9354e611cc31322d681eb29da05be584e" }
