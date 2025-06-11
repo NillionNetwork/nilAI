@@ -66,7 +66,9 @@ def validate_nuc(nuc_token: str) -> Tuple[str, str]:
     logger.info(f"Validating NUC token: {nuc_token_envelope.token.token}")
     logger.info(f"Validation parameters: {get_validation_parameters()}")
     logger.info(f"Public key: {state.public_key.serialize()}")
-    get_validator().validate(nuc_token_envelope, get_validation_parameters())
+    get_validator().validate(
+        nuc_token_envelope, context={}, parameters=get_validation_parameters()
+    )
     token: NucToken = nuc_token_envelope.token.token
 
     # Validate the
