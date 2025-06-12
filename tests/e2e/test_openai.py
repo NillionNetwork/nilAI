@@ -17,6 +17,7 @@ from .config import BASE_URL, test_models, AUTH_STRATEGY, api_key_getter
 from .nuc import (
     get_rate_limited_nuc_token,
     get_invalid_rate_limited_nuc_token,
+    get_nildb_nuc_token,
 )
 
 
@@ -48,6 +49,13 @@ def rate_limited_client():
 def invalid_rate_limited_client():
     """Create an OpenAI client configured to use the Nilai API with rate limiting"""
     invocation_token = get_invalid_rate_limited_nuc_token()
+    return _create_openai_client(invocation_token.token)
+
+
+@pytest.fixture
+def nildb_client():
+    """Create an OpenAI client configured to use the Nilai API with rate limiting"""
+    invocation_token = get_nildb_nuc_token()
     return _create_openai_client(invocation_token.token)
 
 
@@ -171,6 +179,39 @@ def test_invalid_rate_limiting_nucs(invalid_rate_limited_client, model):
             forbidden = True
 
     assert forbidden, "No NUC rate limiting detected, when expected"
+
+
+@pytest.mark.parametrize(
+    "model",
+    test_models,
+)
+@pytest.mark.skipif(
+    AUTH_STRATEGY != "nuc", reason="NUC rate limiting not used with API key"
+)
+def test_invalid_nildb_command_nucs(nildb_client, model):
+    """Test rate limiting by sending multiple rapid requests"""
+    import openai
+
+    # Send multiple rapid requests
+    forbidden = False
+    for _ in range(4):  # Adjust number based on expected rate limits
+        try:
+            _ = nildb_client.chat.completions.create(
+                model=model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a helpful assistant that provides accurate and concise information.",
+                    },
+                    {"role": "user", "content": "What is the capital of France?"},
+                ],
+                temperature=0.2,
+                max_tokens=100,
+            )
+        except openai.AuthenticationError:
+            forbidden = True
+
+    assert forbidden, "No NILDB command detected, when expected"
 
 
 @pytest.mark.parametrize(

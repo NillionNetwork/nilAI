@@ -3,7 +3,7 @@ from typing import Optional, Tuple
 from nuc.validate import NucTokenValidator, ValidationParameters, InvocationRequirement
 from nuc.envelope import NucTokenEnvelope
 from nuc.nilauth import NilauthClient
-from nuc.token import Did, NucToken
+from nuc.token import Did, NucToken, Command
 from functools import lru_cache
 from nilai_api.config import NILAUTH_TRUSTED_ROOT_ISSUERS
 from nilai_api.state import state
@@ -14,6 +14,9 @@ from nilai_common.logger import setup_logger
 from nuc_helpers.usage import TokenRateLimits
 
 logger = setup_logger(__name__)
+
+
+NILAI_BASE_COMMAND: Command = Command.parse("/nil/ai")
 
 
 @lru_cache(maxsize=1)
@@ -52,6 +55,14 @@ def get_validation_parameters() -> ValidationParameters:
     return default_parameters
 
 
+def check_is_nilai_subcommand(nuc_token_envelope: NucTokenEnvelope) -> bool:
+    """
+    Check if the NUC token is a Nilai subcommand
+    """
+    command: Command = nuc_token_envelope.token.token.command
+    return command.is_attenuation_of(NILAI_BASE_COMMAND)
+
+
 def validate_nuc(nuc_token: str) -> Tuple[str, str]:
     """
     Validate a NUC token
@@ -66,6 +77,12 @@ def validate_nuc(nuc_token: str) -> Tuple[str, str]:
     logger.info(f"Validating NUC token: {nuc_token_envelope.token.token}")
     logger.info(f"Validation parameters: {get_validation_parameters()}")
     logger.info(f"Public key: {state.public_key.serialize()}")
+    if not check_is_nilai_subcommand(nuc_token_envelope):
+        logger.error(
+            f"NUC token namespace is not a /nil/ai attenuation: {nuc_token_envelope.token.token.command}"
+        )
+        raise AuthenticationError("NUC token namespace is not a /nil/ai attenuation")
+
     get_validator().validate(
         nuc_token_envelope, context={}, parameters=get_validation_parameters()
     )
