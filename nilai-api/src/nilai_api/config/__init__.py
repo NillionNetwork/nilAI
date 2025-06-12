@@ -13,6 +13,7 @@ ETCD_PORT = int(os.getenv("ETCD_PORT", 2379))
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 
+DOCS_TOKEN = os.getenv("DOCS_TOKEN", None)
 
 DB_USER = os.getenv("POSTGRES_USER", "postgres")
 DB_PASS = os.getenv("POSTGRES_PASSWORD", "")
