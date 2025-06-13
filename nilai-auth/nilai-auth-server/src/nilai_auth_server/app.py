@@ -38,12 +38,15 @@ def delegate(request: DelegateRequest) -> DelegationToken:
     )
     nilauth_client = NilauthClient(f"http://{NILAUTH_TRUSTED_ROOT_ISSUER}")
 
+    if not server_private_key.pubkey:
+        raise Exception("Failed to get public key")
+
     # Pay for the subscription
     pay_for_subscription(
         nilauth_client,
         server_wallet,
         server_keypair,
-        server_private_key,
+        server_private_key.pubkey,
         f"http://{NILCHAIN_GRPC}",
     )
 

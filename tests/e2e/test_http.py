@@ -14,6 +14,7 @@ from .config import BASE_URL, test_models, AUTH_STRATEGY, api_key_getter
 from .nuc import (
     get_rate_limited_nuc_token,
     get_invalid_rate_limited_nuc_token,
+    get_nildb_nuc_token,
 )
 import httpx
 import pytest
@@ -55,6 +56,22 @@ def rate_limited_client():
 def invalid_rate_limited_client():
     """Create an HTTPX client with default headers"""
     invocation_token = get_invalid_rate_limited_nuc_token()
+    return httpx.Client(
+        base_url=BASE_URL,
+        headers={
+            "accept": "application/json",
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {invocation_token.token}",
+        },
+        timeout=None,
+        verify=False,
+    )
+
+
+@pytest.fixture
+def nildb_client():
+    """Create an HTTPX client with default headers"""
+    invocation_token = get_nildb_nuc_token()
     return httpx.Client(
         base_url=BASE_URL,
         headers={
@@ -566,6 +583,20 @@ def test_invalid_rate_limiting_nucs(invalid_rate_limited_client):
     assert len(rate_limited_responses) > 0, (
         "No NUC rate limiting detected, when expected"
     )
+
+
+@pytest.mark.skipif(
+    AUTH_STRATEGY != "nuc", reason="NUC rate limiting not used with API key"
+)
+def test_invalid_nildb_command_nucs(nildb_client):
+    """Test rate limiting by sending multiple rapid requests"""
+    # Payload for repeated requests
+    payload = {
+        "model": test_models[0],
+        "messages": [{"role": "user", "content": "What is your name?"}],
+    }
+    response = nildb_client.post("/chat/completions", json=payload)
+    assert response.status_code == 401, "Invalid NILDB command should return 401"
 
 
 def test_large_payload_handling(client):

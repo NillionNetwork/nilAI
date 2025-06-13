@@ -1387,7 +1387,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.27.2" },
     { name = "nilai-common", editable = "packages/nilai-common" },
     { name = "nilrag", specifier = ">=0.1.11" },
-    { name = "nuc", git = "https://github.com/NillionNetwork/nuc-py.git" },
+    { name = "nuc", git = "https://github.com/NillionNetwork/nuc-py.git?tag=4922b5e9354e611cc31322d681eb29da05be584e" },
     { name = "nuc-helpers", editable = "nilai-auth/nuc-helpers" },
     { name = "openai", specifier = ">=1.59.9" },
     { name = "pg8000", specifier = ">=1.31.2" },
@@ -1511,7 +1511,7 @@ wheels = [
 [[package]]
 name = "nuc"
 version = "0.0.0a0"
-source = { git = "https://github.com/NillionNetwork/nuc-py.git#ff950979d3ebe0c0808453e578fc76c927575687" }
+source = { git = "https://github.com/NillionNetwork/nuc-py.git?tag=4922b5e9354e611cc31322d681eb29da05be584e#4922b5e9354e611cc31322d681eb29da05be584e" }
 dependencies = [
     { name = "cosmpy" },
     { name = "requests" },
@@ -1534,7 +1534,7 @@ dependencies = [
 requires-dist = [
     { name = "cosmpy", specifier = "==0.9.2" },
     { name = "httpx", specifier = ">=0.28.1" },
-    { name = "nuc", git = "https://github.com/NillionNetwork/nuc-py.git" },
+    { name = "nuc", git = "https://github.com/NillionNetwork/nuc-py.git?tag=4922b5e9354e611cc31322d681eb29da05be584e" },
     { name = "pydantic", specifier = ">=2.11.2" },
     { name = "secp256k1", specifier = ">=0.14.0" },
 ]

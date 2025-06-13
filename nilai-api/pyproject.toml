@@ -31,8 +31,8 @@ dependencies = [
     "verifier",
     "web3>=7.8.0",
     "click>=8.1.8",
-    "nuc",
     "nuc-helpers",
+    "nuc",
 ]
 
 
@@ -42,5 +42,5 @@ build-backend = "hatchling.build"
 
 [tool.uv.sources]
 nilai-common = { workspace = true }
-nuc = { git = "https://github.com/NillionNetwork/nuc-py.git" }
 nuc-helpers = { workspace = true }
+nuc = { git = "https://github.com/NillionNetwork/nuc-py.git", tag = "4922b5e9354e611cc31322d681eb29da05be584e" }

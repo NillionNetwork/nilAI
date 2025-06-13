@@ -13,7 +13,9 @@ payments:
   subscriptions:
     renewal_threshold_seconds: 1000
     length_seconds: 120
-    dollar_cost: 1
+    dollar_cost:
+      nilai: 1
+      nildb: 1
 
   token_price:
     base_url: http://token-price-api/api/v3/simple/price

@@ -13,45 +13,119 @@ from nuc_helpers import (
     get_delegation_token,
     DelegationToken,
 )
-from nuc.nilauth import NilauthClient
+from nuc.nilauth import NilauthClient, BlindModule
 from nuc.token import Did
 from nuc.validate import ValidationParameters, InvocationRequirement
 
 
-def get_nuc_token() -> InvocationToken:
-    # Services must be running for this to work
-    PRIVATE_KEY = "l/SYifzu2Iqc3dsWoWHRP2oSMHwrORY/PDw5fDwtJDQ="  # This is an example private key with funds for testing devnet, and should not be used in production
+def get_nuc_token(
+    usage_limit: int | None = None,
+    expires_at: datetime | None = None,
+    blind_module: BlindModule = BlindModule.NILAI,
+    create_delegation: bool = False,
+    create_invalid_delegation: bool = False,
+) -> InvocationToken:
+    """
+    Unified function to get NUC tokens with various configurations.
+
+    Args:
+        usage_limit: Optional usage limit for delegation tokens
+        expires_at: Optional expiration time for delegation tokens
+        blind_module: Optional blind module to use for the token
+        create_delegation: Whether to create a delegation token (for rate limiting)
+        create_invalid_delegation: Whether to create an invalid delegation chain (for testing)
+
+    Returns:
+        InvocationToken: The generated token
+    """
+    # Constants
+    PRIVATE_KEY = "l/SYifzu2Iqc3dsWoWHRP2oSMHwrORY/PDw5fDwtJDQ="  # Example private key for testing devnet
     NILAI_ENDPOINT = "localhost:8080"
     NILAUTH_ENDPOINT = "localhost:30921"
     NILCHAIN_GRPC = "localhost:26649"
 
-    # Server private key
+    # Setup server private key and client
     server_wallet, server_keypair, server_private_key = get_wallet_and_private_key(
         PRIVATE_KEY
     )
     nilauth_client = NilauthClient(f"http://{NILAUTH_ENDPOINT}")
 
-    # Pay for the subscription
+    if not server_private_key.pubkey:
+        raise Exception("Failed to get public key")
+
+    # Pay for subscription
     pay_for_subscription(
         nilauth_client,
         server_wallet,
         server_keypair,
-        server_private_key,
+        server_private_key.pubkey,
         f"http://{NILCHAIN_GRPC}",
+        blind_module=blind_module,
     )
 
-    # Create a root token
-    root_token: RootToken = get_root_token(nilauth_client, server_private_key)
+    # Create root token
+    root_token: RootToken = get_root_token(
+        nilauth_client,
+        server_private_key,
+        blind_module=blind_module,
+    )
 
+    # Get Nilai public key
     nilai_public_key: NilAuthPublicKey = get_nilai_public_key(
         f"http://{NILAI_ENDPOINT}"
     )
-    invocation_token: InvocationToken = get_invocation_token(
-        root_token,
-        nilai_public_key,
-        server_private_key,
-    )
 
+    # Handle delegation token creation if requested
+    if create_delegation or create_invalid_delegation:
+        # Create user private key and public key
+        user_private_key = NilAuthPrivateKey()
+        user_public_key = user_private_key.pubkey
+
+        if user_public_key is None:
+            raise Exception("Failed to get user public key")
+
+        # Set default values for delegation
+        delegation_usage_limit = usage_limit if usage_limit is not None else 3
+        delegation_expires_at = (
+            expires_at
+            if expires_at is not None
+            else datetime.now(timezone.utc) + timedelta(minutes=5)
+        )
+
+        # Create delegation token
+        delegation_token: DelegationToken = get_delegation_token(
+            root_token,
+            server_private_key,
+            user_public_key,
+            usage_limit=delegation_usage_limit,
+            expires_at=delegation_expires_at,
+        )
+
+        # Create invalid delegation chain if requested (for testing)
+        if create_invalid_delegation:
+            delegation_token = get_delegation_token(
+                delegation_token,
+                user_private_key,
+                user_public_key,
+                usage_limit=5,
+                expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
+            )
+
+        # Create invocation token from delegation
+        invocation_token: InvocationToken = get_invocation_token(
+            delegation_token,
+            nilai_public_key,
+            user_private_key,
+        )
+    else:
+        # Create invocation token directly from root token
+        invocation_token: InvocationToken = get_invocation_token(
+            root_token,
+            nilai_public_key,
+            server_private_key,
+        )
+
+    # Validate the token
     default_validation_parameters = ValidationParameters.default()
     default_validation_parameters.token_requirements = InvocationRequirement(
         audience=Did(nilai_public_key.serialize())
@@ -67,138 +141,26 @@ def get_nuc_token() -> InvocationToken:
 
 
 def get_rate_limited_nuc_token(rate_limit: int = 3) -> InvocationToken:
-    # Services must be running for this to work
-    PRIVATE_KEY = "l/SYifzu2Iqc3dsWoWHRP2oSMHwrORY/PDw5fDwtJDQ="  # This is an example private key with funds for testing devnet, and should not be used in production
-    NILAI_ENDPOINT = "localhost:8080"
-    NILAUTH_ENDPOINT = "localhost:30921"
-    NILCHAIN_GRPC = "localhost:26649"
-
-    # Server private key
-    server_wallet, server_keypair, server_private_key = get_wallet_and_private_key(
-        PRIVATE_KEY
-    )
-    nilauth_client = NilauthClient(f"http://{NILAUTH_ENDPOINT}")
-
-    # Pay for the subscription
-    pay_for_subscription(
-        nilauth_client,
-        server_wallet,
-        server_keypair,
-        server_private_key,
-        f"http://{NILCHAIN_GRPC}",
-    )
-
-    # Create a root token
-    root_token: RootToken = get_root_token(nilauth_client, server_private_key)
-
-    nilai_public_key: NilAuthPublicKey = get_nilai_public_key(
-        f"http://{NILAI_ENDPOINT}"
-    )
-
-    # Create a user private key and public key
-    user_private_key = NilAuthPrivateKey()
-    user_public_key = user_private_key.pubkey
-
-    if user_public_key is None:
-        raise Exception("Failed to get public key")
-    # b64_public_key = base64.b64encode(public_key.serialize()).decode("utf-8")
-
-    delegation_token: DelegationToken = get_delegation_token(
-        root_token,
-        server_private_key,
-        user_public_key,
-        usage_limit=3,
+    """Convenience function for getting rate-limited tokens."""
+    return get_nuc_token(
+        usage_limit=rate_limit,
         expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
+        create_delegation=True,
     )
-
-    invocation_token: InvocationToken = get_invocation_token(
-        delegation_token,
-        nilai_public_key,
-        user_private_key,
-    )
-
-    default_validation_parameters = ValidationParameters.default()
-    default_validation_parameters.token_requirements = InvocationRequirement(
-        audience=Did(nilai_public_key.serialize())
-    )
-
-    validate_token(
-        f"http://{NILAUTH_ENDPOINT}",
-        invocation_token.token,
-        default_validation_parameters,
-    )
-
-    return invocation_token
 
 
 def get_invalid_rate_limited_nuc_token() -> InvocationToken:
-    # Services must be running for this to work
-    PRIVATE_KEY = "l/SYifzu2Iqc3dsWoWHRP2oSMHwrORY/PDw5fDwtJDQ="  # This is an example private key with funds for testing devnet, and should not be used in production
-    NILAI_ENDPOINT = "localhost:8080"
-    NILAUTH_ENDPOINT = "localhost:30921"
-    NILCHAIN_GRPC = "localhost:26649"
-
-    # Server private key
-    server_wallet, server_keypair, server_private_key = get_wallet_and_private_key(
-        PRIVATE_KEY
-    )
-    nilauth_client = NilauthClient(f"http://{NILAUTH_ENDPOINT}")
-
-    # Pay for the subscription
-    pay_for_subscription(
-        nilauth_client,
-        server_wallet,
-        server_keypair,
-        server_private_key,
-        f"http://{NILCHAIN_GRPC}",
-    )
-
-    # Create a root token
-    root_token: RootToken = get_root_token(nilauth_client, server_private_key)
-
-    nilai_public_key: NilAuthPublicKey = get_nilai_public_key(
-        f"http://{NILAI_ENDPOINT}"
-    )
-
-    # Create a user private key and public key
-    user_private_key = NilAuthPrivateKey()
-    user_public_key = user_private_key.pubkey
-
-    if user_public_key is None:
-        raise Exception("Failed to get public key")
-    # b64_public_key = base64.b64encode(public_key.serialize()).decode("utf-8")
-
-    delegation_token: DelegationToken = get_delegation_token(
-        root_token,
-        server_private_key,
-        user_public_key,
+    """Convenience function for getting invalid rate-limited tokens (for testing)."""
+    return get_nuc_token(
         usage_limit=3,
         expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
+        create_delegation=True,
+        create_invalid_delegation=True,
     )
 
-    delegation_token: DelegationToken = get_delegation_token(
-        delegation_token,
-        user_private_key,
-        user_public_key,
-        usage_limit=5,
-        expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
-    )
 
-    invocation_token: InvocationToken = get_invocation_token(
-        delegation_token,
-        nilai_public_key,
-        user_private_key,
+def get_nildb_nuc_token() -> InvocationToken:
+    """Convenience function for getting NILDB NUC tokens."""
+    return get_nuc_token(
+        blind_module=BlindModule.NILDB,
     )
-
-    default_validation_parameters = ValidationParameters.default()
-    default_validation_parameters.token_requirements = InvocationRequirement(
-        audience=Did(nilai_public_key.serialize())
-    )
-
-    validate_token(
-        f"http://{NILAUTH_ENDPOINT}",
-        invocation_token.token,
-        default_validation_parameters,
-    )
-
-    return invocation_token
