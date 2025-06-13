@@ -139,11 +139,6 @@ def pay_for_subscription(
         chain_id: The chain id of the nilchain (default is devnet)
     """
 
-    if get_unil_balance(
-        wallet.address(), grpc_endpoint=grpc_endpoint
-    ) < nilauth_client.subscription_cost(blind_module=blind_module):
-        raise RuntimeError("User does not have enough UNIL to pay for the subscription")
-
     payer = Payer(
         wallet_private_key=keypair,
         chain_id=chain_id.value,
@@ -160,6 +155,12 @@ def pay_for_subscription(
         )
 
     if not subscription_details.subscribed:
+        if get_unil_balance(
+            wallet.address(), grpc_endpoint=grpc_endpoint
+        ) < nilauth_client.subscription_cost(blind_module=blind_module):
+            raise RuntimeError(
+                "User does not have enough UNIL to pay for the subscription"
+            )
         logger.info("[>] Paying for subscription")
         nilauth_client.pay_subscription(
             pubkey=public_key,
