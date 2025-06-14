@@ -88,8 +88,8 @@ async def test_get_auth_info_invalid_token(mock_user_manager):
         scheme="Bearer", credentials="invalid-token"
     )
     with pytest.raises(HTTPException) as exc_info:
-        auth_infor = await get_auth_info(credentials)
-        print(auth_infor)
+        auth_info = await get_auth_info(credentials)
+        print(auth_info)
     print(exc_info)
     assert exc_info.value.status_code == 401, (
         f"Expected status code 401 but got {exc_info.value.status_code}"
