@@ -1,10 +1,12 @@
-name: Python Tests
+name: CI/CD
 
 on:
   push:
     branches: [ "main" ]
   pull_request:
-    branches: [ "**"] # Adjust branches as needed
+    branches: [ "**" ] # Adjust branches as needed
+  release:
+    types: [published]
 
 jobs:
   test:
@@ -45,6 +47,7 @@ jobs:
   start-runner:
     name: Start self-hosted EC2 runner
     runs-on: ubuntu-24.04
+    needs: test
     outputs:
       label: ${{ steps.start-ec2-runner.outputs.label }}
       ec2-instances-ids: ${{ steps.start-ec2-runner.outputs.ec2-instances-ids }}
@@ -168,3 +171,65 @@ jobs:
           github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
           label: ${{ needs.start-runner.outputs.label }}
           ec2-instances-ids: ${{ needs.start-runner.outputs.ec2-instances-ids }}
+
+  # Deploy vllm image
+  deploy-vllm:
+    name: Deploy vllm to ECR
+    needs: e2e-tests
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'release'
+    uses: NillionNetwork/devops/.github/workflows/deploy_ecr_and_push.yaml@master
+    with:
+      image_tag: ${{ github.event_name == 'release' && github.ref_name || github.sha }}
+      image_name: "nilai-vllm"
+      dockerfile_path: "docker/vllm.Dockerfile"
+      docker_context_path: "."
+      aws_region: "eu-west-1"
+      # any extra build args:
+      docker_build_extra_args: ""
+      # pass through your JSON arrays of roles/IDs:
+      environment_roles: ${{ secrets.ENVIRONMENT_ROLES }}
+      deployment_account_ids: ${{ secrets.DEPLOYMENT_ACCOUNT_IDS }}
+    secrets:
+      NILLION_GITHUB_ACTIONS_APP_ID: ${{ secrets.NILLION_GITHUB_ACTIONS_APP_ID }}
+      NILLION_GITHUB_ACTIONS_APP_PRIVATE_KEY: ${{ secrets.NILLION_GITHUB_ACTIONS_APP_PRIVATE_KEY }}
+      SECRETS_MASTER_PASSWORD:       ${{ secrets.SECRETS_MASTER_PASSWORD }}
+
+  # Deploy attestation image
+  deploy-attestation:
+    name: Deploy attestation to ECR
+    needs: e2e-tests
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'release'
+    uses: NillionNetwork/devops/.github/workflows/deploy_ecr_and_push.yaml@master
+    with:
+      image_tag: ${{ github.event_name == 'release' && github.ref_name || github.sha }}
+      image_name: "nilai-attestation"
+      dockerfile_path: "docker/attestation.Dockerfile"
+      docker_context_path: "."
+      aws_region: "eu-west-1"
+      docker_build_extra_args: ""
+      environment_roles: ${{ secrets.ENVIRONMENT_ROLES }}
+      deployment_account_ids: ${{ secrets.DEPLOYMENT_ACCOUNT_IDS }}
+    secrets:
+      NILLION_GITHUB_ACTIONS_APP_ID: ${{ secrets.NILLION_GITHUB_ACTIONS_APP_ID }}
+      NILLION_GITHUB_ACTIONS_APP_PRIVATE_KEY: ${{ secrets.NILLION_GITHUB_ACTIONS_APP_PRIVATE_KEY }}
+      SECRETS_MASTER_PASSWORD:       ${{ secrets.SECRETS_MASTER_PASSWORD }}
+
+  # Deploy nilai-api image
+  deploy-api:
+    name: Deploy nilai-api to ECR
+    needs: e2e-tests
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'release'
+    uses: NillionNetwork/devops/.github/workflows/deploy_ecr_and_push.yaml@master
+    with:
+      image_tag: ${{ github.event_name == 'release' && github.ref_name || github.sha }}
+      image_name: "nilai-api"
+      dockerfile_path: "docker/api.Dockerfile"
+      docker_context_path: "."
+      aws_region: "eu-west-1"
+      docker_build_extra_args: ""
+      environment_roles: ${{ secrets.ENVIRONMENT_ROLES }}
+      deployment_account_ids: ${{ secrets.DEPLOYMENT_ACCOUNT_IDS }}
+    secrets:
+      NILLION_GITHUB_ACTIONS_APP_ID: ${{ secrets.NILLION_GITHUB_ACTIONS_APP_ID }}
+      NILLION_GITHUB_ACTIONS_APP_PRIVATE_KEY: ${{ secrets.NILLION_GITHUB_ACTIONS_APP_PRIVATE_KEY }}
+      SECRETS_MASTER_PASSWORD:       ${{ secrets.SECRETS_MASTER_PASSWORD }}
