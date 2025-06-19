@@ -1,17 +1,17 @@
-name: CD
+name: CI/CD
 
-# Only run on pushes to main (you can also add tags or workflow_dispatch if you like)
 on:
   push:
-    branches: ["main"]
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "**" ] # Adjust branches as needed
   release:
     types: [published]
 
 jobs:
-  # 1. Run your Python unit and lint tests
   test:
-    name: Run Python Tests
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
@@ -29,7 +29,8 @@ jobs:
             ${{ runner.os }}-uv-
 
       - name: Install dependencies
-        run: uv sync
+        run: |
+          uv sync
 
       - name: Run Ruff format check
         run: uv run ruff format --check
@@ -43,7 +44,6 @@ jobs:
       - name: pyright
         run: uv run pyright
 
-  # 2. Spin up an EC2 runner for your E2E jobs
   start-runner:
     name: Start self-hosted EC2 runner
     runs-on: ubuntu-24.04
@@ -53,7 +53,7 @@ jobs:
       ec2-instances-ids: ${{ steps.start-ec2-runner.outputs.ec2-instances-ids }}
     steps:
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v4.0.2
         with:
           aws-access-key-id: ${{ secrets.GH_AWS_ACCESS_KEY }}
           aws-secret-access-key: ${{ secrets.GH_AWS_SECRET_KEY }}
@@ -83,19 +83,18 @@ jobs:
               {"Key": "Environment", "Value": "production"}
             ]
 
-  # 3. Run your end-to-end tests on that runner
   e2e-tests:
     name: E2E Tests
     needs: start-runner
     runs-on: ${{ needs.start-runner.outputs.label }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v2
 
       - uses: astral-sh/setup-uv@v4
         with:
           enable-cache: true
           cache-dependency-glob: "**/pyproject.toml"
-
       - name: Install dependencies
         run: |
           apt-get update && apt-get install curl git pkg-config automake file python3.12-dev -y
@@ -112,15 +111,17 @@ jobs:
 
       - name: Create .env
         run: |
-          cp .env.ci .env
-          sed -i 's/HF_TOKEN=.*/HF_TOKEN=${{ secrets.HF_TOKEN }}/' .env
+         cp .env.ci .env
+         # Copy secret into .env replacing the existing HF_TOKEN
+         sed -i 's/HF_TOKEN=.*/HF_TOKEN=${{ secrets.HF_TOKEN }}/' .env
 
       - name: Start Services
         run: |
           docker-compose -f docker-compose.yml \
-            -f docker-compose.dev.yml \
-            -f docker-compose.prod.yml \
-            -f docker/compose/docker-compose.llama-1b-gpu.ci.yml up -d
+          -f docker-compose.dev.yml \
+          -f docker-compose.prod.yml \
+          -f docker/compose/docker-compose.llama-1b-gpu.ci.yml \
+          up -d
           docker ps -a
 
       - name: Wait for services to be healthy
@@ -128,47 +129,54 @@ jobs:
 
       - name: Run E2E tests for NUC
         run: |
+          set -e
           export ENVIRONMENT=ci
           uv run pytest -v tests/e2e
 
       - name: Run E2E tests for API Key
         run: |
-          export AUTH_TOKEN=$(docker exec nilai-api uv run src/nilai_api/commands/add_user.py --name test1 --ratelimit-minute 1000 --ratelimit-hour 1000 --ratelimit-day 1000 | jq -r ".apikey")
+          set -e
+          # Create a user with a rate limit of 1000 requests per minute, hour, and day
+          export AUTH_TOKEN=$(docker exec nilai-api uv run src/nilai_api/commands/add_user.py --name test1 --ratelimit-minute 1000 --ratelimit-hour 1000 --ratelimit-day 1000 | jq ".apikey" -r)
           export ENVIRONMENT=ci
+          # Set the environment variable for the API key
           export AUTH_STRATEGY=api_key
           uv run pytest -v tests/e2e
 
       - name: Stop Services
         run: |
           docker-compose -f docker-compose.yml \
-            -f docker-compose.dev.yml \
-            -f docker-compose.prod.yml \
-            -f docker/compose/docker-compose.llama-1b-gpu.ci.yml down -v
+          -f docker-compose.dev.yml \
+          -f docker-compose.prod.yml \
+          -f docker/compose/docker-compose.llama-1b-gpu.ci.yml \
+          down -v
 
-  # 4. Tear down the EC2 runner, no matter what
   stop-runner:
     name: Stop self-hosted EC2 runner
-    needs: [start-runner, e2e-tests]
-    if: ${{ always() }}
+    needs: [ start-runner, e2e-tests ]
     runs-on: ubuntu-24.04
+    if: ${{ always() }}
     steps:
-      - uses: aws-actions/configure-aws-credentials@v4
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-access-key-id: ${{ secrets.GH_AWS_ACCESS_KEY }}
           aws-secret-access-key: ${{ secrets.GH_AWS_SECRET_KEY }}
           aws-region: "eu-west-1"
-      - uses: NillionNetwork/ec2-github-runner@v2.2
+
+      - name: Stop EC2 runner
+        uses: NillionNetwork/ec2-github-runner@v2.2
         with:
           mode: stop
           github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
           label: ${{ needs.start-runner.outputs.label }}
           ec2-instances-ids: ${{ needs.start-runner.outputs.ec2-instances-ids }}
 
-
   # Deploy vllm image
   deploy-vllm:
     name: Deploy vllm to ECR
     needs: e2e-tests
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'release'
     uses: NillionNetwork/devops/.github/workflows/deploy_ecr_and_push.yaml@master
     with:
       image_tag: ${{ github.event_name == 'release' && github.ref_name || github.sha }}
@@ -190,6 +198,7 @@ jobs:
   deploy-attestation:
     name: Deploy attestation to ECR
     needs: e2e-tests
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'release'
     uses: NillionNetwork/devops/.github/workflows/deploy_ecr_and_push.yaml@master
     with:
       image_tag: ${{ github.event_name == 'release' && github.ref_name || github.sha }}
@@ -209,6 +218,7 @@ jobs:
   deploy-api:
     name: Deploy nilai-api to ECR
     needs: e2e-tests
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'release'
     uses: NillionNetwork/devops/.github/workflows/deploy_ecr_and_push.yaml@master
     with:
       image_tag: ${{ github.event_name == 'release' && github.ref_name || github.sha }}
