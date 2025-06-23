@@ -8,6 +8,10 @@ on:
   release:
     types: [published]
 
+permissions:
+  id-token: write # Required for OIDC
+  contents: read  # Required for checkout
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -172,64 +176,49 @@ jobs:
           label: ${{ needs.start-runner.outputs.label }}
           ec2-instances-ids: ${{ needs.start-runner.outputs.ec2-instances-ids }}
 
-  # Deploy vllm image
-  deploy-vllm:
-    name: Deploy vllm to ECR
+  deploy-images:
+    name: Publish ${{ matrix.component }} to ECR
     needs: e2e-tests
     if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'release'
-    uses: NillionNetwork/devops/.github/workflows/deploy_ecr_and_push.yaml@master
-    with:
-      image_tag: ${{ github.event_name == 'release' && github.ref_name || github.sha }}
-      image_name: "nilai-vllm"
-      dockerfile_path: "docker/vllm.Dockerfile"
-      docker_context_path: "."
-      aws_region: "eu-west-1"
-      # any extra build args:
-      docker_build_extra_args: ""
-      # pass through your JSON arrays of roles/IDs:
-      environment_roles: ${{ secrets.ENVIRONMENT_ROLES }}
-      deployment_account_ids: ${{ secrets.DEPLOYMENT_ACCOUNT_IDS }}
-    secrets:
-      NILLION_GITHUB_ACTIONS_APP_ID: ${{ secrets.NILLION_GITHUB_ACTIONS_APP_ID }}
-      NILLION_GITHUB_ACTIONS_APP_PRIVATE_KEY: ${{ secrets.NILLION_GITHUB_ACTIONS_APP_PRIVATE_KEY }}
-      SECRETS_MASTER_PASSWORD:       ${{ secrets.SECRETS_MASTER_PASSWORD }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - component: vllm
+            docker_build_extra_args: ""
+          - component: attestation
+            docker_build_extra_args: ""
+          - component: api
+            docker_build_extra_args: "--target nilai --platform linux/amd64"
+    steps:
+      - uses: actions/checkout@v4
 
-  # Deploy attestation image
-  deploy-attestation:
-    name: Deploy attestation to ECR
-    needs: e2e-tests
-    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'release'
-    uses: NillionNetwork/devops/.github/workflows/deploy_ecr_and_push.yaml@master
-    with:
-      image_tag: ${{ github.event_name == 'release' && github.ref_name || github.sha }}
-      image_name: "nilai-attestation"
-      dockerfile_path: "docker/attestation.Dockerfile"
-      docker_context_path: "."
-      aws_region: "eu-west-1"
-      docker_build_extra_args: ""
-      environment_roles: ${{ secrets.ENVIRONMENT_ROLES }}
-      deployment_account_ids: ${{ secrets.DEPLOYMENT_ACCOUNT_IDS }}
-    secrets:
-      NILLION_GITHUB_ACTIONS_APP_ID: ${{ secrets.NILLION_GITHUB_ACTIONS_APP_ID }}
-      NILLION_GITHUB_ACTIONS_APP_PRIVATE_KEY: ${{ secrets.NILLION_GITHUB_ACTIONS_APP_PRIVATE_KEY }}
-      SECRETS_MASTER_PASSWORD:       ${{ secrets.SECRETS_MASTER_PASSWORD }}
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: "arn:aws:iam::054037142884:role/nilai-github"
+          aws-region: "us-east-1"
 
-  # Deploy nilai-api image
-  deploy-api:
-    name: Deploy nilai-api to ECR
-    needs: e2e-tests
-    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'release'
-    uses: NillionNetwork/devops/.github/workflows/deploy_ecr_and_push.yaml@master
-    with:
-      image_tag: ${{ github.event_name == 'release' && github.ref_name || github.sha }}
-      image_name: "nilai-api"
-      dockerfile_path: "docker/api.Dockerfile"
-      docker_context_path: "."
-      aws_region: "eu-west-1"
-      docker_build_extra_args: ""
-      environment_roles: ${{ secrets.ENVIRONMENT_ROLES }}
-      deployment_account_ids: ${{ secrets.DEPLOYMENT_ACCOUNT_IDS }}
-    secrets:
-      NILLION_GITHUB_ACTIONS_APP_ID: ${{ secrets.NILLION_GITHUB_ACTIONS_APP_ID }}
-      NILLION_GITHUB_ACTIONS_APP_PRIVATE_KEY: ${{ secrets.NILLION_GITHUB_ACTIONS_APP_PRIVATE_KEY }}
-      SECRETS_MASTER_PASSWORD:       ${{ secrets.SECRETS_MASTER_PASSWORD }}
+      - uses: aws-actions/amazon-ecr-login@v2
+        id: login-ecr
+        with:
+          registry-type: public
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build and push ${{ matrix.component }} image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REGISTRY_ALIAS: k5d9x2g2
+          ECR_REPOSITORY: nilai-${{ matrix.component }}
+          IMAGE_TAG: ${{ github.event_name == 'release' && github.ref_name || github.sha }}
+        run: |
+          ECR_REGISTRY_URL="${ECR_REGISTRY}/${ECR_REGISTRY_ALIAS}/${ECR_REPOSITORY}"
+
+          docker build \
+            --push \
+            -f docker/${{ matrix.component }}.Dockerfile \
+            -t ${ECR_REGISTRY_URL}:${IMAGE_TAG} \
+            ${{ matrix.docker_build_extra_args }} \
+            .
+
+          echo "Pushed ${{ matrix.component }} image: ${ECR_REGISTRY_URL}:${IMAGE_TAG}" >> $GITHUB_STEP_SUMMARY
