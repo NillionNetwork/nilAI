@@ -20,4 +20,4 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.uv.sources]
-nuc = { git = "https://github.com/NillionNetwork/nuc-py.git", tag = "4922b5e9354e611cc31322d681eb29da05be584e" }
+nuc = { git = "https://github.com/NillionNetwork/nuc-py.git", rev = "4922b5e9354e611cc31322d681eb29da05be584e" }
