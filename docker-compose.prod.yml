@@ -7,3 +7,5 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+    volumes:
+      - /dev/sev-guest:/dev/sev-guest # for AMD SEV

@@ -128,7 +128,7 @@ services:
     image: nillion/nilai-api:latest
     privileged: true
     volumes:
-      - /dev/sev-guest:/dev/sev-guest # for AMD SEV
+      - ./nilai-api/src/nilai_api/config/:/app/nilai-api/src/nilai_api/config/
     depends_on:
       etcd:
         condition: service_healthy
@@ -152,7 +152,7 @@ services:
     image: nillion/nilai-api:latest
     privileged: true
     volumes:
-      - /dev/sev-guest:/dev/sev-guest # for AMD SEV
+      - ./nilai-api/src/nilai_api/config/:/app/nilai-api/src/nilai_api/config/
     depends_on:
       etcd:
         condition: service_healthy
