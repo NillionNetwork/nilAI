@@ -17,8 +17,7 @@ async def lifespan(app: FastAPI):
 
     yield {"redis": client, "redis_rate_limit_command": rate_limit_command}
 
-
-host = "nilai.sandbox.nilogy.xyz"
+host = "nilai-a779.nillion.network"
 description = f"""
 An AI model serving platform powered by secure, confidential computing.
 
