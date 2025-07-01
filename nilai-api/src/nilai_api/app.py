@@ -9,6 +9,7 @@ from nilai_api.routers import private, public
 from nilai_api import config
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
+from nilai_common.config import SETTINGS
 
 
 @asynccontextmanager
@@ -17,7 +18,8 @@ async def lifespan(app: FastAPI):
 
     yield {"redis": client, "redis_rate_limit_command": rate_limit_command}
 
-host = "nilai-a779.nillion.network"
+
+host = SETTINGS.host
 description = f"""
 An AI model serving platform powered by secure, confidential computing.
 
