@@ -556,7 +556,7 @@
           },
           "datasource": {
             "type": "PostgreSQL",
-            "uid": "eehsf95n2at4we"
+            "uid": "eehsf95n2at4wf"
           },
           "definition": "SELECT DISTINCT \n  name AS text, \n  name AS value \nFROM users \nORDER BY name",
           "includeAll": true,
@@ -576,7 +576,7 @@
           },
           "datasource": {
             "type": "PostgreSQL",
-            "uid": "eehsf95n2at4we"
+            "uid": "eehsf95n2at4wf"
           },
           "definition": "SELECT DISTINCT model FROM query_logs ORDER BY model",
           "includeAll": true,
@@ -608,7 +608,7 @@
       ]
     },
     "timezone": "browser",
-    "title": "PostgreSQL Query Analytics Dashboard",
+    "title": "NUC PostgreSQL Query Analytics Dashboard",
     "uid": "den2cki7odfrek",
     "version": 3,
     "weekStart": ""
