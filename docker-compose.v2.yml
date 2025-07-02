@@ -83,6 +83,7 @@ services:
       start_period: 10s
 
   grafana:
+    container_name: prod-grafana
     image: 'grafana/grafana:11.5.1'
     restart: unless-stopped
     networks:
