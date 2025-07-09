@@ -1,18 +1,9 @@
+#!  This is a docker compose to deploy another endpoint for the nilai-api
+#!  This is used to deploy the nilai-api for the production environment
+#!  It include the api, nuc-api, postgres dbs, redis, prometheus, grafana and node-exporter
+#!  It doesn't use caddy (as it is unique for the whole system)
+#!  It doesn't include any models as it is redundant with the main nilAI instance
 services:
-  etcd:
-    image: 'bitnami/etcd:latest'
-    environment:
-      - ALLOW_NONE_AUTHENTICATION=yes
-      - ETCD_ADVERTISE_CLIENT_URLS=http://etcd:2379
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "etcdctl", "endpoint", "health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 5s
-    networks:
-      - backend_net
   redis:
     image: 'redis:latest'
     networks:
@@ -26,7 +17,6 @@ services:
       start_period: 5s
   postgres:
     image: postgres:16
-    container_name: postgres
     restart: always
     env_file:
       - .env
@@ -43,7 +33,6 @@ services:
 
   nuc-postgres:
     image: postgres:16
-    container_name: nuc-postgres
     restart: always
     env_file:
       - .env
@@ -60,7 +49,6 @@ services:
       start_period: 10s
       timeout: 10s
   prometheus:
-    container_name: prometheus
     image: prom/prometheus:v3.1.0
     restart: unless-stopped
     networks:
@@ -70,8 +58,6 @@ services:
       - ${PWD}/prometheus/config/prometheus.yml:/etc/prometheus/prometheus.yml
       - ${PWD}/prometheus/data:/prometheus/data
     command: "--config.file=/etc/prometheus/prometheus.yml --storage.tsdb.retention.time=30d --web.enable-admin-api"
-    ports:
-      - "127.0.0.1:9090:9090"
     healthcheck:
       test: ["CMD", "wget", "http://localhost:9090/-/healthy", "-O", "/dev/null", "-o", "/dev/null"]
       interval: 30s
@@ -80,7 +66,6 @@ services:
       start_period: 10s
 
   node_exporter:
-    container_name: node-exporter
     image: quay.io/prometheus/node-exporter:v1.8.2
     command:
       - '--path.rootfs=/host'
@@ -98,7 +83,7 @@ services:
       start_period: 10s
 
   grafana:
-    container_name: grafana
+    container_name: prod-grafana
     image: 'grafana/grafana:11.5.1'
     restart: unless-stopped
     networks:
@@ -124,14 +109,12 @@ services:
       start_period: 10s
 
   api:
-    container_name: nilai-api
+    container_name: prod-nilai-api
     image: nillion/nilai-api:latest
     privileged: true
     volumes:
       - ./nilai-api/src/nilai_api/config/:/app/nilai-api/src/nilai_api/config/
     depends_on:
-      etcd:
-        condition: service_healthy
       postgres:
         condition: service_healthy
     restart: unless-stopped
@@ -148,14 +131,12 @@ services:
       start_period: 15s
       timeout: 10s
   nuc-api:
-    container_name: nilai-nuc-api
+    container_name: prod-nilai-nuc-api
     image: nillion/nilai-api:latest
     privileged: true
     volumes:
       - ./nilai-api/src/nilai_api/config/:/app/nilai-api/src/nilai_api/config/
     depends_on:
-      etcd:
-        condition: service_healthy
       nuc-postgres:
         condition: service_healthy
       api:
@@ -176,57 +157,28 @@ services:
       retries: 3
       start_period: 15s
       timeout: 10s
-  attestation:
-    image: nillion/nilai-attestation:latest
-    restart: unless-stopped
-    networks:
-      - backend_net
-    env_file:
-      - .env
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 30s
-      retries: 3
-      start_period: 15s
-      timeout: 10s
 
-  caddy:
-    image: caddy:latest
-    container_name: caddy
-    restart: unless-stopped
-    networks:
-      - proxy_net
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    env_file:
-      - .env
-    volumes:
-      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
-      - ./caddy/caddy_data:/data
-      - ./caddy/caddy_config:/config
 networks:
   # *  This is the network that is used for the "api" related services
   ## * API, user management (postgres), caching (redis) and monitoring (prometheus, grafana)
   ## * This network is used to connect the api, nuc-api, postgres, redis, prometheus, grafana and node-exporter
-  ## * Because they are unique to the deployment the name is not specified, the network is not external
+  ## * Because they are unique, the network is not external
   frontend_net:
   # * This is the network that is used for the model related services:
   ## * API, models, and etcd
   ## * This network is used to connect the api, nuc-api, models, and etcd
-  ## * This network is meant to be external, so the name is specified
-  ## * Other API instances will use this network
+  ## * This network is created by the main nilAI instance
+  ## * This network is external
   backend_net:
     name: backend_net
+    external: true
   # * This network is meant to connect from the outside world to the API
   ## * This connects the API and Caddy
   ## * This network is created by the main nilAI instance
   ## * This requires each API instance to have a unique container name
-  ## * This network is meant to be external, so the name is specified
-  ## * Other API instances will use this network
   proxy_net:
     name: proxy_net
+    external: true
 
 volumes:
   postgres_data:
