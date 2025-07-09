@@ -99,7 +99,7 @@ services:
 
   grafana:
     container_name: grafana
-    image: 'grafana/grafana:11.5.1'
+    image: nillion/nilai-grafana:latest
     restart: unless-stopped
     networks:
       - frontend_net
@@ -109,9 +109,6 @@ services:
       - prometheus
     volumes:
       - ${PWD}/grafana/runtime-data:/var/lib/grafana
-      - ${PWD}/grafana/datasources/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
-      - ${PWD}/grafana/dashboards/filesystem.yml:/etc/grafana/provisioning/dashboards/filesystem.yml
-      - ${PWD}/grafana/config/grafana.ini:/etc/grafana/grafana.ini
     env_file:
       - .env
     environment:
