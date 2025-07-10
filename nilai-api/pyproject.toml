@@ -33,6 +33,7 @@ dependencies = [
     "click>=8.1.8",
     "nuc-helpers",
     "nuc",
+    "pyyaml>=6.0.1",
 ]
 
 
@@ -45,4 +46,3 @@ nilai-common = { workspace = true }
 nuc-helpers = { workspace = true }
 
 nuc = { git = "https://github.com/NillionNetwork/nuc-py.git", rev = "4922b5e9354e611cc31322d681eb29da05be584e" }
-
