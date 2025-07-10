@@ -5,9 +5,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-ENVIRONMENT: str = os.getenv("ENVIRONMENT", "testnet")
-
-
 ETCD_HOST: str = os.getenv("ETCD_HOST", "localhost")
 ETCD_PORT: int = int(os.getenv("ETCD_PORT", 2379))
 
@@ -43,11 +40,11 @@ def load_config_from_yaml(config_path: str) -> Dict[str, Any]:
     return {}
 
 
-config_file = f"{ENVIRONMENT}.yaml"
+config_file: str = "config.yaml"
 config_path = os.path.join(os.path.dirname(__file__), config_file)
 
 if not os.path.exists(config_path):
-    config_file = "mainnet.yaml"
+    config_file = "config.yaml"
     config_path = os.path.join(os.path.dirname(__file__), config_file)
 
 config_data = load_config_from_yaml(config_path)

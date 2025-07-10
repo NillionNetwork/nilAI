@@ -7,4 +7,4 @@ db/*
 caddy/caddy_config
 caddy/caddy_data
 tests/
-grafana/*
+grafana/runtime-data/

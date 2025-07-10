@@ -60,14 +60,13 @@ services:
       start_period: 10s
       timeout: 10s
   prometheus:
+    image: registry.thallium.dev/nillion/nilai-prometheus:latest
     container_name: prometheus
-    image: prom/prometheus:v3.1.0
     restart: unless-stopped
     networks:
       - frontend_net
     user: "$UID:$GID"
     volumes:
-      - ${PWD}/prometheus/config/prometheus.yml:/etc/prometheus/prometheus.yml
       - ${PWD}/prometheus/data:/prometheus/data
     command: "--config.file=/etc/prometheus/prometheus.yml --storage.tsdb.retention.time=30d --web.enable-admin-api"
     ports:
@@ -99,7 +98,7 @@ services:
 
   grafana:
     container_name: grafana
-    image: nillion/nilai-grafana:latest
+    image: registry.thallium.dev/nillion/nilai-grafana:latest
     restart: unless-stopped
     networks:
       - frontend_net
@@ -122,10 +121,8 @@ services:
 
   api:
     container_name: nilai-api
-    image: nillion/nilai-api:latest
+    image: registry.thallium.dev/nillion/nilai-api:latest
     privileged: true
-    volumes:
-      - ./nilai-api/src/nilai_api/config/:/app/nilai-api/src/nilai_api/config/
     depends_on:
       etcd:
         condition: service_healthy
@@ -146,10 +143,8 @@ services:
       timeout: 10s
   nuc-api:
     container_name: nilai-nuc-api
-    image: nillion/nilai-api:latest
+    image: registry.thallium.dev/nillion/nilai-api:latest
     privileged: true
-    volumes:
-      - ./nilai-api/src/nilai_api/config/:/app/nilai-api/src/nilai_api/config/
     depends_on:
       etcd:
         condition: service_healthy
@@ -174,7 +169,7 @@ services:
       start_period: 15s
       timeout: 10s
   attestation:
-    image: nillion/nilai-attestation:latest
+    image: public.ecr.aws/k5d9x2g2/nilai-attestation:v0.1.0-rc1
     restart: unless-stopped
     networks:
       - backend_net
@@ -186,9 +181,18 @@ services:
       retries: 3
       start_period: 15s
       timeout: 10s
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    volumes:
+      - /dev/sev-guest:/dev/sev-guest # for AMD SEV
 
   caddy:
-    image: caddy:latest
+    image: registry.thallium.dev/nillion/nilai-caddy:latest
     container_name: caddy
     restart: unless-stopped
     networks:
@@ -200,9 +204,51 @@ services:
     env_file:
       - .env
     volumes:
-      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
       - ./caddy/caddy_data:/data
       - ./caddy/caddy_config:/config
+  llama_70b_gpu:
+    image: public.ecr.aws/k5d9x2g2/nilai-vllm:v0.1.0-rc1
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ipc: host
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    env_file:
+      - .env
+    restart: unless-stopped
+    depends_on:
+      etcd:
+        condition: service_healthy
+    command: >
+      --model hugging-quants/Meta-Llama-3.1-70B-Instruct-AWQ-INT4
+      --gpu-memory-utilization 0.95
+      --max-model-len 60000
+      --tensor-parallel-size 1
+      --enable-auto-tool-choice
+      --tool-call-parser llama3_json
+      --uvicorn-log-level warning
+    environment:
+      - SVC_HOST=llama_70b_gpu
+      - SVC_PORT=8000
+      - ETCD_HOST=etcd
+      - ETCD_PORT=2379
+      - TOOL_SUPPORT=true
+    volumes:
+      - hugging_face_models:/root/.cache/huggingface  # cache models
+    networks:
+      - backend_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      retries: 3
+      start_period: 60s
+      timeout: 10s
 networks:
   # *  This is the network that is used for the "api" related services
   ## * API, user management (postgres), caching (redis) and monitoring (prometheus, grafana)
