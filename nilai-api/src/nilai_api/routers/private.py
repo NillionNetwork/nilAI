@@ -170,6 +170,7 @@ async def chat_completion(
         ]
     )
     response = await chat_completion(request, user)
+    ```
     """
 
     model_name = req.model
@@ -178,6 +179,12 @@ async def chat_completion(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid model name {model_name}, check /v1/models for options",
+        )
+
+    if req.image and model_name != "google/gemma-3-27b-it":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Image inputs are only supported for the google/gemma-3-27b-it model",
         )
 
     if not endpoint.metadata.tool_support and req.tools:
@@ -197,13 +204,23 @@ async def chat_completion(
     if req.stream:
         client = AsyncOpenAI(base_url=model_url, api_key="<not-needed>")
 
-        # Forwarding Streamed Responses
+        oa_messages = [m.model_dump() for m in req.messages]
+
+        if req.image:
+            if not oa_messages or oa_messages[-1]["role"] != "user":
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Last message must be from user when providing image")
+            text = oa_messages[-1].get("content", "")
+            oa_messages[-1]["content"] = [
+                {"type": "text", "text": text},
+                {"type": "image_url", "image_url": {"url": req.image}}
+            ]
+
         async def chat_completion_stream_generator() -> AsyncGenerator[str, None]:
             try:
                 response = await client.chat.completions.create(
                     model=req.model,
-                    messages=req.messages,  # type: ignore
-                    stream=req.stream,  # type: ignore
+                    messages=oa_messages,
+                    stream=True,
                     top_p=req.top_p,
                     temperature=req.temperature,
                     max_tokens=req.max_tokens,
@@ -252,43 +269,53 @@ async def chat_completion(
             chat_completion_stream_generator(),
             media_type="text/event-stream",  # Ensure client interprets as Server-Sent Events
         )
-    client = OpenAI(base_url=model_url, api_key="<not-needed>")
-    response = client.chat.completions.create(
-        model=req.model,
-        messages=req.messages,  # type: ignore
-        stream=req.stream,
-        top_p=req.top_p,
-        temperature=req.temperature,
-        max_tokens=req.max_tokens,
-        tools=req.tools,  # type: ignore
-    )  # type: ignore
+    else:
+        client = OpenAI(base_url=model_url, api_key="<not-needed>")
+        oa_messages = [m.model_dump() for m in req.messages]
+        if req.image:
+            if not oa_messages or oa_messages[-1]["role"] != "user":
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Last message must be from user when providing image")
+            text = oa_messages[-1].get("content", "")
+            oa_messages[-1]["content"] = [
+                {"type": "text", "text": text},
+                {"type": "image_url", "image_url": {"url": req.image}}
+            ]
+        response = client.chat.completions.create(
+            model=req.model,
+            messages=oa_messages,
+            stream=req.stream,
+            top_p=req.top_p,
+            temperature=req.temperature,
+            max_tokens=req.max_tokens,
+            tools=req.tools,  # type: ignore
+        )  # type: ignore
 
-    model_response = SignedChatCompletion(
-        **response.model_dump(),
-        signature="",
-    )
-    if model_response.usage is None:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Model response does not contain usage statistics",
+        model_response = SignedChatCompletion(
+            **response.model_dump(),
+            signature="",
         )
-    # Update token usage
-    await UserManager.update_token_usage(
-        auth_info.user.userid,
-        prompt_tokens=model_response.usage.prompt_tokens,
-        completion_tokens=model_response.usage.completion_tokens,
-    )
+        if model_response.usage is None:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Model response does not contain usage statistics",
+            )
+        # Update token usage
+        await UserManager.update_token_usage(
+            auth_info.user.userid,
+            prompt_tokens=model_response.usage.prompt_tokens,
+            completion_tokens=model_response.usage.completion_tokens,
+        )
 
-    await QueryLogManager.log_query(
-        auth_info.user.userid,
-        model=req.model,
-        prompt_tokens=model_response.usage.prompt_tokens,
-        completion_tokens=model_response.usage.completion_tokens,
-    )
+        await QueryLogManager.log_query(
+            auth_info.user.userid,
+            model=req.model,
+            prompt_tokens=model_response.usage.prompt_tokens,
+            completion_tokens=model_response.usage.completion_tokens,
+        )
 
-    # Sign the response
-    response_json = model_response.model_dump_json()
-    signature = sign_message(state.private_key, response_json)
-    model_response.signature = b64encode(signature).decode()
+        # Sign the response
+        response_json = model_response.model_dump_json()
+        signature = sign_message(state.private_key, response_json)
+        model_response.signature = b64encode(signature).decode()
 
-    return model_response
+        return model_response

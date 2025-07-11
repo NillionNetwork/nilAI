@@ -13,9 +13,8 @@ COPY --link . /daemon/
 
 WORKDIR /daemon/nilai-models/
 
-RUN apt-get update && \
-    apt-get install build-essential -y && \
-    pip install uv && \
+RUN apt-get install -y ffmpeg libsm6 libxext6 libgl1 build-essential && \
+    pip install uv pillow torchvision torchaudio && \
     uv sync && \
     apt-get clean && \
     apt-get autoremove && \
@@ -23,6 +22,9 @@ RUN apt-get update && \
 
 # Expose port 8000 for incoming requests
 EXPOSE 8000
+
+# Multimodal models dependencies
+RUN pip install pillow ftfy regex git+https://github.com/huggingface/transformers@v4.49.0-Gemma-3
 
 ENTRYPOINT ["bash", "run.sh"]
 

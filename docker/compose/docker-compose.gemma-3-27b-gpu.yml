@@ -1,0 +1,47 @@
+services:
+  gemma_3_27b_gpu:
+    image: nillion/nilai-vllm:latest
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ipc: host
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    env_file:
+      - .env
+    restart: unless-stopped
+    depends_on:
+      etcd:
+        condition: service_healthy
+    command: >
+      --model google/gemma-3-27b-it
+      --gpu-memory-utilization 0.95
+      --max-model-len 60000
+      --tensor-parallel-size 1
+      --uvicorn-log-level warning
+    environment:
+      - SVC_HOST=llama_70b_gpu
+      - SVC_PORT=8000
+      - ETCD_HOST=etcd
+      - ETCD_PORT=2379
+      - TOOL_SUPPORT=true
+    volumes:
+      - hugging_face_models:/root/.cache/huggingface  # cache models
+    networks:
+      - backend_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      retries: 3
+      start_period: 60s
+      timeout: 10s
+volumes:
+  hugging_face_models:
+
+networks:
+  backend_net:
