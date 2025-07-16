@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import List, Optional, Tuple, Dict
+from typing import List, Tuple, Dict
 from duckduckgo_search import DDGS
 from nilai_common import Message
 
