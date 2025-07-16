@@ -18,7 +18,7 @@ from nilai_api.rate_limiting import RateLimit
 from nilai_api.state import state
 
 # Internal libraries
-from nilai_common import (
+from nilai_common.api_model import (
     AttestationReport,
     ChatRequest,
     Message,
