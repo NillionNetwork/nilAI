@@ -26,6 +26,7 @@ from nilai_common import (
     SignedChatCompletion,
     Usage,
     Nonce,
+    WebSearchSource,
 )
 from openai import AsyncOpenAI, OpenAI
 
@@ -205,9 +206,10 @@ async def chat_completion(
         await handle_nilrag(req)
 
     enhanced_messages = req.messages
-    sources = None
+    sources: Optional[List[WebSearchSource]] = None
     if req.web_search:
-        enhanced_messages, sources = await handle_web_search(req.messages)
+        enhanced_messages, raw_sources = await handle_web_search(req.messages)
+        sources = [WebSearchSource(**src) for src in raw_sources]
 
     if req.stream:
         client = AsyncOpenAI(base_url=model_url, api_key="<not-needed>")

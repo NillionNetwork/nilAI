@@ -101,7 +101,7 @@ async def test_enhance_messages_with_web_search():
         assert enhanced_messages[0].role == "system"
         assert enhanced_messages[0].content == "You are a helpful assistant"
         assert enhanced_messages[1].role == "system"
-        assert "Latest AI Developments" in enhanced_messages[1].content
+        assert "Latest AI Developments" in str(enhanced_messages[1].content)
         assert enhanced_messages[2].role == "user"
         assert enhanced_messages[2].content == "What is the latest AI news?"
         assert sources == []
