@@ -1,6 +1,10 @@
 import pytest
 from unittest.mock import patch, MagicMock
-from nilai_api.handlers.web_search import perform_web_search_sync, enhance_messages_with_web_search, handle_web_search
+from nilai_api.handlers.web_search import (
+    perform_web_search_sync,
+    enhance_messages_with_web_search,
+    handle_web_search,
+)
 from nilai_common import Message
 
 
@@ -18,8 +22,8 @@ def test_perform_web_search_sync_success():
             "href": "https://example.com/ai2",
         },
     ]
-    
-    with patch('nilai_api.handlers.web_search.DDGS') as mock_ddgs:
+
+    with patch("nilai_api.handlers.web_search.DDGS") as mock_ddgs:
         mock_instance = MagicMock()
         mock_ddgs.return_value.__enter__.return_value = mock_instance
         mock_instance.text.return_value = mock_search_results
@@ -38,7 +42,7 @@ def test_perform_web_search_sync_success():
 
 def test_perform_web_search_sync_no_results():
     """Test web search with no results"""
-    with patch('nilai_api.handlers.web_search.DDGS') as mock_ddgs:
+    with patch("nilai_api.handlers.web_search.DDGS") as mock_ddgs:
         mock_instance = MagicMock()
         mock_ddgs.return_value.__enter__.return_value = mock_instance
         mock_instance.text.return_value = []
@@ -56,11 +60,11 @@ def test_perform_web_search_sync_fallback_to_news():
         {
             "title": "Breaking AI News",
             "body": "Major breakthrough in artificial intelligence research announced today.",
-            "href": "https://example.com/news1"
+            "href": "https://example.com/news1",
         }
     ]
-    
-    with patch('nilai_api.handlers.web_search.DDGS') as mock_ddgs:
+
+    with patch("nilai_api.handlers.web_search.DDGS") as mock_ddgs:
         mock_instance = MagicMock()
         mock_ddgs.return_value.__enter__.return_value = mock_instance
         mock_instance.text.return_value = []
@@ -77,10 +81,10 @@ async def test_enhance_messages_with_web_search():
     """Test message enhancement with web search results"""
     original_messages = [
         Message(role="system", content="You are a helpful assistant"),
-        Message(role="user", content="What is the latest AI news?")
+        Message(role="user", content="What is the latest AI news?"),
     ]
-    
-    with patch('nilai_api.handlers.web_search.perform_web_search_sync') as mock_search:
+
+    with patch("nilai_api.handlers.web_search.perform_web_search_sync") as mock_search:
         mock_search.return_value = (
             [
                 "Latest AI Developments: OpenAI announces GPT-5",
@@ -89,7 +93,9 @@ async def test_enhance_messages_with_web_search():
             [],
         )
 
-        enhanced_messages, sources = await enhance_messages_with_web_search(original_messages, "AI news")
+        enhanced_messages, sources = await enhance_messages_with_web_search(
+            original_messages, "AI news"
+        )
 
         assert len(enhanced_messages) == 3
         assert enhanced_messages[0].role == "system"
@@ -106,11 +112,16 @@ async def test_handle_web_search():
     """Test web search handler with user messages"""
     messages = [
         Message(role="system", content="You are a helpful assistant"),
-        Message(role="user", content="Tell me about current events")
+        Message(role="user", content="Tell me about current events"),
     ]
-    
-    with patch('nilai_api.handlers.web_search.enhance_messages_with_web_search') as mock_enhance:
-        mock_enhance.return_value = (messages + [Message(role="system", content="Enhanced context")], [])
+
+    with patch(
+        "nilai_api.handlers.web_search.enhance_messages_with_web_search"
+    ) as mock_enhance:
+        mock_enhance.return_value = (
+            messages + [Message(role="system", content="Enhanced context")],
+            [],
+        )
 
         result, sources = await handle_web_search(messages)
 
@@ -124,9 +135,9 @@ async def test_handle_web_search_no_user_message():
     """Test web search handler with no user message"""
     messages = [
         Message(role="system", content="You are a helpful assistant"),
-        Message(role="assistant", content="Hello! How can I help you?")
+        Message(role="assistant", content="Hello! How can I help you?"),
     ]
-    
+
     result, sources = await handle_web_search(messages)
 
     assert result == messages
@@ -138,10 +149,12 @@ async def test_handle_web_search_exception_handling():
     """Test web search handler exception handling"""
     messages = [
         Message(role="system", content="You are a helpful assistant"),
-        Message(role="user", content="What's the weather like?")
+        Message(role="user", content="What's the weather like?"),
     ]
-    
-    with patch('nilai_api.handlers.web_search.enhance_messages_with_web_search') as mock_enhance:
+
+    with patch(
+        "nilai_api.handlers.web_search.enhance_messages_with_web_search"
+    ) as mock_enhance:
         mock_enhance.side_effect = Exception("Search service unavailable")
 
         result, sources = await handle_web_search(messages)

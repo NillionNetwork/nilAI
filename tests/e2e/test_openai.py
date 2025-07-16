@@ -735,7 +735,10 @@ def test_chat_completion_with_web_search(client, model):
                     "role": "system",
                     "content": "You are a helpful assistant that provides accurate and up-to-date information.",
                 },
-                {"role": "user", "content": "What is the latest news about artificial intelligence?"},
+                {
+                    "role": "user",
+                    "content": "What is the latest news about artificial intelligence?",
+                },
             ],
             web_search=True,
             temperature=0.2,
@@ -767,4 +770,6 @@ def test_chat_completion_with_web_search(client, model):
         ), "Response should mention recent or web-contextual information"
 
     except Exception as e:
-        pytest.fail(f"Error testing chat completion with web_search for {model}: {str(e)}")
+        pytest.fail(
+            f"Error testing chat completion with web_search for {model}: {str(e)}"
+        )

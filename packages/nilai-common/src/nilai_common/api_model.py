@@ -31,12 +31,17 @@ class ChatRequest(BaseModel):
     stream: Optional[bool] = False
     tools: Optional[Iterable[ChatCompletionToolParam]] = None
     nilrag: Optional[dict] = {}
-    web_search: Optional[bool] = Field(default=False, description="Enable web search to enhance context with current information")
+    web_search: Optional[bool] = Field(
+        default=False,
+        description="Enable web search to enhance context with current information",
+    )
 
 
 class SignedChatCompletion(ChatCompletion):
     signature: str
-    sources: Optional[List[WebSearchSource]] = Field(default=None, description="Sources used for web search when enabled")
+    sources: Optional[List[WebSearchSource]] = Field(
+        default=None, description="Sources used for web search when enabled"
+    )
 
 
 class ModelMetadata(BaseModel):
