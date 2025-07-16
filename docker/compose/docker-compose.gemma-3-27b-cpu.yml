@@ -1,0 +1,41 @@
+# docker/compose/docker-compose.gemma-3-27b-cpu.yml
+services:
+  gemma_3_27b_cpu:
+    image: nillion/nilai-vllm:latest
+    ipc: host
+    env_file:
+      - .env
+    restart: unless-stopped
+    depends_on:
+      etcd:
+        condition: service_healthy
+    command: >
+      --model google/gemma-3-27b-it
+      --device cpu
+      --max-model-len 1000
+      --tensor-parallel-size 1
+      --uvicorn-log-level warning
+      --dtype float32
+    environment:
+      - VLLM_CACHE_DIR=/root/.cache/huggingface
+      - SVC_HOST=gemma_3_27b_cpu
+      - SVC_PORT=8000
+      - ETCD_HOST=etcd
+      - ETCD_PORT=2379
+      - TOOL_SUPPORT=true
+    volumes:
+      - hugging_face_models:/root/.cache/huggingface # cache models
+    networks:
+      - backend_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      retries: 3
+      start_period: 300s
+      timeout: 10s
+
+volumes:
+  hugging_face_models:
+
+networks:
+  backend_net:

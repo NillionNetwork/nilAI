@@ -33,6 +33,26 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def prepare_messages_with_image(messages: List[dict], image: Optional[str]) -> List[dict]:
+    """Prepare messages for OpenAI API, handling image inputs if present."""
+    if not image:
+        return messages
+    
+    if not messages or messages[-1]["role"] != "user":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Last message must be from user when providing image"
+        )
+    
+    text = messages[-1].get("content", "")
+    messages[-1]["content"] = [
+        {"type": "text", "text": text},
+        {"type": "image_url", "image_url": {"url": image}}
+    ]
+    
+    return messages
+
+
 @router.get("/v1/usage", tags=["Usage"])
 async def get_usage(auth_info: AuthenticationInfo = Depends(get_auth_info)) -> Usage:
     """
@@ -139,6 +159,7 @@ async def chat_completion(
     - Must include non-empty list of messages
     - Must specify a model
     - Supports multiple message formats (system, user, assistant)
+    - Supports image inputs for compatible models
 
     ### Response Components
     - Model-generated text completion
@@ -156,6 +177,8 @@ async def chat_completion(
     - **400 Bad Request**:
       - Missing messages list
       - No model specified
+      - Image provided for incompatible model
+      - Image provided without user message
     - **500 Internal Server Error**:
       - Model fails to generate a response
 
@@ -201,19 +224,11 @@ async def chat_completion(
     if req.nilrag:
         await handle_nilrag(req)
 
+    oa_messages = [m.model_dump() for m in req.messages]
+    oa_messages = prepare_messages_with_image(oa_messages, req.image)
+
     if req.stream:
         client = AsyncOpenAI(base_url=model_url, api_key="<not-needed>")
-
-        oa_messages = [m.model_dump() for m in req.messages]
-
-        if req.image:
-            if not oa_messages or oa_messages[-1]["role"] != "user":
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Last message must be from user when providing image")
-            text = oa_messages[-1].get("content", "")
-            oa_messages[-1]["content"] = [
-                {"type": "text", "text": text},
-                {"type": "image_url", "image_url": {"url": req.image}}
-            ]
 
         async def chat_completion_stream_generator() -> AsyncGenerator[str, None]:
             try:
@@ -264,22 +279,13 @@ async def chat_completion(
                 logger.error(f"Error streaming response: {e}")
                 return
 
-        # Return the streaming response
         return StreamingResponse(
             chat_completion_stream_generator(),
-            media_type="text/event-stream",  # Ensure client interprets as Server-Sent Events
+            media_type="text/event-stream",
         )
     else:
         client = OpenAI(base_url=model_url, api_key="<not-needed>")
-        oa_messages = [m.model_dump() for m in req.messages]
-        if req.image:
-            if not oa_messages or oa_messages[-1]["role"] != "user":
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Last message must be from user when providing image")
-            text = oa_messages[-1].get("content", "")
-            oa_messages[-1]["content"] = [
-                {"type": "text", "text": text},
-                {"type": "image_url", "image_url": {"url": req.image}}
-            ]
+        
         response = client.chat.completions.create(
             model=req.model,
             messages=oa_messages,
@@ -299,7 +305,7 @@ async def chat_completion(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Model response does not contain usage statistics",
             )
-        # Update token usage
+        
         await UserManager.update_token_usage(
             auth_info.user.userid,
             prompt_tokens=model_response.usage.prompt_tokens,
@@ -313,7 +319,6 @@ async def chat_completion(
             completion_tokens=model_response.usage.completion_tokens,
         )
 
-        # Sign the response
         response_json = model_response.model_dump_json()
         signature = sign_message(state.private_key, response_json)
         model_response.signature = b64encode(signature).decode()
