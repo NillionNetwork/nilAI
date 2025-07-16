@@ -24,10 +24,10 @@ from nilai_common.api_model import (
     Message,
     ModelMetadata,
     SignedChatCompletion,
-    Usage,
     Nonce,
     WebSearchSource,
 )
+from openai.types.completion_usage import CompletionUsage as Usage
 from openai import AsyncOpenAI, OpenAI
 
 logger = logging.getLogger(__name__)
