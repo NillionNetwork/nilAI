@@ -93,6 +93,7 @@ class AttestationReport(BaseModel):
     cpu_attestation: AMDAttestationToken
     gpu_attestation: NVAttestationToken
 
+
 __all__ = [
     "Usage",
 ]
