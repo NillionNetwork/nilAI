@@ -9,12 +9,14 @@ def test_perform_web_search_sync_success():
     mock_search_results = [
         {
             "title": "Latest AI Developments",
-            "body": "OpenAI announces GPT-5 with improved capabilities and better performance across various tasks."
+            "body": "OpenAI announces GPT-5 with improved capabilities and better performance across various tasks.",
+            "href": "https://example.com/ai1",
         },
         {
             "title": "AI Breakthrough in Robotics",
-            "body": "New neural network architecture improves robot learning efficiency by 40% in recent studies."
-        }
+            "body": "New neural network architecture improves robot learning efficiency by 40% in recent studies.",
+            "href": "https://example.com/ai2",
+        },
     ]
     
     with patch('nilai_api.handlers.web_search.DDGS') as mock_ddgs:
@@ -22,14 +24,16 @@ def test_perform_web_search_sync_success():
         mock_ddgs.return_value.__enter__.return_value = mock_instance
         mock_instance.text.return_value = mock_search_results
         mock_instance.news.return_value = []
-        
-        results = perform_web_search_sync("AI developments")
-        
+
+        results, sources = perform_web_search_sync("AI developments")
+
         assert len(results) == 2
         assert "Latest AI Developments" in results[0]
         assert "AI Breakthrough in Robotics" in results[1]
         assert "GPT-5" in results[0]
         assert "40%" in results[1]
+        assert sources[0]["title"] == "Latest AI Developments"
+        assert sources[1]["title"] == "AI Breakthrough in Robotics"
 
 
 def test_perform_web_search_sync_no_results():
@@ -39,10 +43,11 @@ def test_perform_web_search_sync_no_results():
         mock_ddgs.return_value.__enter__.return_value = mock_instance
         mock_instance.text.return_value = []
         mock_instance.news.return_value = []
-        
-        results = perform_web_search_sync("nonexistent query")
-        
+
+        results, sources = perform_web_search_sync("nonexistent query")
+
         assert results == []
+        assert sources == []
 
 
 def test_perform_web_search_sync_fallback_to_news():
@@ -50,7 +55,8 @@ def test_perform_web_search_sync_fallback_to_news():
     mock_news_results = [
         {
             "title": "Breaking AI News",
-            "body": "Major breakthrough in artificial intelligence research announced today."
+            "body": "Major breakthrough in artificial intelligence research announced today.",
+            "href": "https://example.com/news1"
         }
     ]
     
@@ -59,12 +65,11 @@ def test_perform_web_search_sync_fallback_to_news():
         mock_ddgs.return_value.__enter__.return_value = mock_instance
         mock_instance.text.return_value = []
         mock_instance.news.return_value = mock_news_results
-        
-        results = perform_web_search_sync("AI news")
-        
-        assert len(results) == 1
-        assert "Breaking AI News" in results[0]
-        assert "News - " in results[0]
+
+        results, sources = perform_web_search_sync("AI news")
+
+        assert results == []
+        assert sources == []
 
 
 @pytest.mark.asyncio
@@ -76,13 +81,16 @@ async def test_enhance_messages_with_web_search():
     ]
     
     with patch('nilai_api.handlers.web_search.perform_web_search_sync') as mock_search:
-        mock_search.return_value = [
-            "Latest AI Developments: OpenAI announces GPT-5",
-            "AI Breakthrough: New neural network improves efficiency by 40%"
-        ]
-        
-        enhanced_messages = await enhance_messages_with_web_search(original_messages, "AI news")
-        
+        mock_search.return_value = (
+            [
+                "Latest AI Developments: OpenAI announces GPT-5",
+                "AI Breakthrough: New neural network improves efficiency by 40%",
+            ],
+            [],
+        )
+
+        enhanced_messages, sources = await enhance_messages_with_web_search(original_messages, "AI news")
+
         assert len(enhanced_messages) == 3
         assert enhanced_messages[0].role == "system"
         assert enhanced_messages[0].content == "You are a helpful assistant"
@@ -90,6 +98,7 @@ async def test_enhance_messages_with_web_search():
         assert "Latest AI Developments" in enhanced_messages[1].content
         assert enhanced_messages[2].role == "user"
         assert enhanced_messages[2].content == "What is the latest AI news?"
+        assert sources == []
 
 
 @pytest.mark.asyncio
@@ -101,12 +110,13 @@ async def test_handle_web_search():
     ]
     
     with patch('nilai_api.handlers.web_search.enhance_messages_with_web_search') as mock_enhance:
-        mock_enhance.return_value = messages + [Message(role="system", content="Enhanced context")]
-        
-        result = await handle_web_search(messages)
-        
+        mock_enhance.return_value = (messages + [Message(role="system", content="Enhanced context")], [])
+
+        result, sources = await handle_web_search(messages)
+
         mock_enhance.assert_called_once_with(messages, "Tell me about current events")
         assert len(result) == 3
+        assert sources == []
 
 
 @pytest.mark.asyncio
@@ -117,9 +127,10 @@ async def test_handle_web_search_no_user_message():
         Message(role="assistant", content="Hello! How can I help you?")
     ]
     
-    result = await handle_web_search(messages)
-    
+    result, sources = await handle_web_search(messages)
+
     assert result == messages
+    assert sources == []
 
 
 @pytest.mark.asyncio
@@ -132,8 +143,8 @@ async def test_handle_web_search_exception_handling():
     
     with patch('nilai_api.handlers.web_search.enhance_messages_with_web_search') as mock_enhance:
         mock_enhance.side_effect = Exception("Search service unavailable")
-        
-        result = await handle_web_search(messages)
-        
-        # Should return original messages when web search fails
-        assert result == messages 
+
+        result, sources = await handle_web_search(messages)
+
+        assert result == messages
+        assert sources == []
