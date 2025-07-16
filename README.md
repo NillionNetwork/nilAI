@@ -108,17 +108,19 @@ up -d
    docker run -d --name redis \
      -p 6379:6379 \
      redis:latest
+    ```
 
-# Start PostgreSQL
-docker run -d --name postgres \
-  -e POSTGRES_USER=${POSTGRES_USER} \
-  -e POSTGRES_PASSWORD=${POSTGRES_PASSWORD} \
-  -e POSTGRES_DB=${POSTGRES_DB} \
-  -p 5432:5432 \
-  --network frontend_net \
-  --volume postgres_data:/var/lib/postgresql/data \
-  postgres:16
-```
+2. **Start PostgreSQL**
+    ```shell
+    docker run -d --name postgres \
+      -e POSTGRES_USER=${POSTGRES_USER} \
+      -e POSTGRES_PASSWORD=${POSTGRES_PASSWORD} \
+      -e POSTGRES_DB=${POSTGRES_DB} \
+      -p 5432:5432 \
+      --network frontend_net \
+      --volume postgres_data:/var/lib/postgresql/data \
+      postgres:16
+    ```
 
 2. **Run API Server**
    ```shell
