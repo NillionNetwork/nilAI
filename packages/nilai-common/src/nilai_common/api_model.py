@@ -6,6 +6,8 @@ from openai.types.chat.chat_completion import Choice as OpenaAIChoice
 from openai.types.chat import ChatCompletionToolParam
 from pydantic import BaseModel, Field
 
+from openai.types.completion_usage import CompletionUsage as Usage
+
 
 class Message(ChatCompletionMessage):
     role: Literal["system", "user", "assistant", "tool"]  # type: ignore

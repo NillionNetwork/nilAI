@@ -26,8 +26,8 @@ from nilai_common.api_model import (
     SignedChatCompletion,
     Nonce,
     WebSearchSource,
+    Usage,
 )
-from openai.types.completion_usage import CompletionUsage as Usage
 from openai import AsyncOpenAI, OpenAI
 
 logger = logging.getLogger(__name__)

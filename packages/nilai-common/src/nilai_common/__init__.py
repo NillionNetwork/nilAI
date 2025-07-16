@@ -10,8 +10,8 @@ from nilai_common.api_model import (
     Nonce,
     AMDAttestationToken,
     NVAttestationToken,
+    Usage,
 )
-from openai.types.completion_usage import CompletionUsage as Usage
 from nilai_common.config import SETTINGS
 from nilai_common.discovery import ModelServiceDiscovery
 
