@@ -92,3 +92,7 @@ class AttestationReport(BaseModel):
     verifying_key: Annotated[str, Field(description="PEM encoded public key")]
     cpu_attestation: AMDAttestationToken
     gpu_attestation: NVAttestationToken
+
+__all__ = [
+    "Usage",
+]
