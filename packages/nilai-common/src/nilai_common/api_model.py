@@ -1,5 +1,6 @@
 import uuid
 
+from typing import Annotated, Iterable, List, Literal, Optional
 
 from openai.types.chat import ChatCompletion, ChatCompletionMessage
 from openai.types.chat.chat_completion import Choice as OpenaAIChoice
