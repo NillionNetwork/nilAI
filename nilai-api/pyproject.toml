@@ -11,8 +11,10 @@ authors = [
 requires-python = ">=3.12"
 dependencies = [
     "accelerate>=1.1.1",
+    "aiohttp>=3.9.0",
     "alembic>=1.14.1",
     "cryptography>=43.0.1",
+    "duckduckgo-search>=8.1.1",
     "fastapi[standard]>=0.115.5",
     "gunicorn>=23.0.0",
     "nilai-common",

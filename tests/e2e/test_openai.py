@@ -719,3 +719,52 @@ def test_model_streaming_request_high_token(client):
     assert chunk_count > 0, (
         "Should receive at least one chunk for high token streaming request"
     )
+
+
+@pytest.mark.parametrize(
+    "model",
+    test_models,
+)
+def test_chat_completion_with_web_search(client, model):
+    """Test chat completion with web_search enabled"""
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a helpful assistant that provides accurate and up-to-date information.",
+                },
+                {"role": "user", "content": "What is the latest news about artificial intelligence?"},
+            ],
+            web_search=True,
+            temperature=0.2,
+            max_tokens=200,
+        )
+
+        # Verify response structure
+        assert isinstance(response, ChatCompletion), (
+            "Response should be a ChatCompletion object"
+        )
+        assert response.model == model, f"Response model should be {model}"
+        assert len(response.choices) > 0, "Response should contain at least one choice"
+
+        # Check content
+        content = response.choices[0].message.content
+        assert content, f"No content returned for {model}"
+        print(
+            f"\nModel {model} web search response: {content[:200]}..."
+            if len(content) > 200
+            else content
+        )
+
+        # Optionally, check for some web-contextual keywords
+        assert (
+            "news" in content.lower()
+            or "recent" in content.lower()
+            or "latest" in content.lower()
+            or "artificial intelligence" in content.lower()
+        ), "Response should mention recent or web-contextual information"
+
+    except Exception as e:
+        pytest.fail(f"Error testing chat completion with web_search for {model}: {str(e)}")

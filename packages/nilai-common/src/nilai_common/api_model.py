@@ -1,5 +1,5 @@
 import uuid
-from typing import Annotated, List, Optional, Literal, Iterable
+from typing import Annotated, List, Optional, Literal, Iterable, Dict
 
 from openai.types.chat import ChatCompletion, ChatCompletionMessage
 from openai.types.chat.chat_completion import Choice as OpenaAIChoice
@@ -15,6 +15,13 @@ class Choice(OpenaAIChoice):
     pass
 
 
+class WebSearchSource(BaseModel):
+    title: str
+    url: str
+    snippet: str
+    type: str
+
+
 class ChatRequest(BaseModel):
     model: str
     messages: List[Message] = Field(..., min_length=1)
@@ -24,10 +31,12 @@ class ChatRequest(BaseModel):
     stream: Optional[bool] = False
     tools: Optional[Iterable[ChatCompletionToolParam]] = None
     nilrag: Optional[dict] = {}
+    web_search: Optional[bool] = Field(default=False, description="Enable web search to enhance context with current information")
 
 
 class SignedChatCompletion(ChatCompletion):
     signature: str
+    sources: Optional[List[WebSearchSource]] = Field(default=None, description="Sources used for web search when enabled")
 
 
 class ModelMetadata(BaseModel):
