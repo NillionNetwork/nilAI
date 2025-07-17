@@ -740,7 +740,7 @@ def test_chat_completion_with_web_search(client, model):
                     "content": "What is the latest news about artificial intelligence?",
                 },
             ],
-            web_search=True,
+            extra_body={"web_search": True},
             temperature=0.2,
             max_tokens=200,
         )
