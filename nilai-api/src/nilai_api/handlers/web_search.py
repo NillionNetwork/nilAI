@@ -1,128 +1,84 @@
 import asyncio
 import logging
-from typing import List, Tuple, Dict
+from typing import List
+
 from duckduckgo_search import DDGS
+from fastapi import HTTPException, status
+
+from nilai_common.api_model import Source
 from nilai_common import Message
+from nilai_common.api_model import EnhancedMessages, WebSearchContext
 
 logger = logging.getLogger(__name__)
 
 
-async def enhance_messages_with_web_search(
-    messages: List[Message], query: str
-) -> Tuple[List[Message], List[Dict[str, str]]]:
+def perform_web_search_sync(query: str) -> WebSearchContext:
+    """Synchronously query DuckDuckGo and build a contextual prompt.
+
+    The function sends *query* to DuckDuckGo, extracts the first three text results,
+    formats them in a single prompt, and returns that prompt together with the
+    metadata (URL and snippet) of every result.
     """
-    Enhance the conversation context with web search results.
+    if not query or not query.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Web search requested with an empty query",
+        )
 
-    Args:
-        messages: Original conversation messages
-        query: The search query to perform
-
-    Returns:
-        Tuple of (enhanced messages with web search context, list of sources used)
-    """
-    if not query:
-        return messages, []
-
-    loop = asyncio.get_event_loop()
-    search_results, sources = await loop.run_in_executor(
-        None, lambda: perform_web_search_sync(query)
-    )
-
-    if not search_results:
-        return messages, []
-
-    web_context = "Based on recent web search results:\n" + "\n".join(search_results)
-
-    user_query = ""
-    for message in reversed(messages):
-        if message.role == "user":
-            user_query = message.content
-            break
-
-    enhanced_system_message = Message(
-        role="system",
-        content=f"You have access to the following current information from web search:\n{web_context}\n\nPlease use this information to provide accurate and up-to-date responses to the user's query: {user_query}\n\nYou must add between brackets the source of the information you are using to answer the user's query.",
-    )
-
-    enhanced_messages = []
-    system_messages_added = False
-
-    for message in messages:
-        enhanced_messages.append(message)
-        if message.role == "system" and not system_messages_added:
-            enhanced_messages.append(enhanced_system_message)
-            system_messages_added = True
-
-    if not system_messages_added:
-        enhanced_messages.insert(0, enhanced_system_message)
-
-    return enhanced_messages, sources
-
-
-def perform_web_search_sync(query: str) -> Tuple[List[str], List[Dict[str, str]]]:
-    """
-    Synchronous version of web search for use with run_in_executor.
-
-    Args:
-        query: The search query to perform
-
-    Returns:
-        Tuple of (list of search result snippets, list of sources with metadata)
-    """
     try:
         with DDGS() as ddgs:
-            search_results = list(ddgs.text(query, max_results=3, region="us-en"))
+            raw_results = list(ddgs.text(query, max_results=3, region="us-en"))
 
-            results = []
-            sources = []
+        if not raw_results:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Web search failed, service currently unavailable",
+            )
 
-            for result in search_results:
-                if result.get("title") and result.get("body"):
-                    title = result["title"]
-                    body = result["body"][:500]
-                    results.append(f"{title}: {body}")
+        snippets: List[str] = []
+        sources: List[Source] = []
 
-                    source_info = {
-                        "title": title,
-                        "url": result["href"],
-                        "snippet": body,
-                        "type": "web_search",
-                    }
-                    sources.append(source_info)
+        for result in raw_results:
+            if result.get("title") and result.get("body"):
+                title = result["title"]
+                body = result["body"][:500]
+                snippets.append(f"{title}: {body}")
+                sources.append(Source(source=result["href"], content=body))
 
-            return results, sources
-
-    except Exception as e:
-        logger.error(f"Error performing web search: {e}")
-        return [], []
-
-
-async def handle_web_search(
-    req_messages: List[Message],
-) -> Tuple[List[Message], List[Dict[str, str]]]:
-    """
-    Handle web search functionality for chat requests.
-
-    Args:
-        req_messages: Original request messages
-
-    Returns:
-        Tuple of (enhanced messages with web search context if enabled, list of sources used)
-    """
-    user_query = ""
-    for message in reversed(req_messages):
-        if message.role == "user":
-            user_query = message.content
-            break
-
-    if not user_query:
-        return req_messages, []
-
-    try:
-        enhanced_messages, sources = await enhance_messages_with_web_search(
-            req_messages, user_query
+        prompt = (
+            "You have access to the following current information from web search:\n"
+            + "\n".join(snippets)
         )
-        return enhanced_messages, sources
-    except Exception as e:
-        logger.error(f"Error in web search handler: {e}")
-        return req_messages, []
+
+        return WebSearchContext(prompt=prompt, sources=sources)
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("Error performing web search: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Web search failed, service currently unavailable",
+        ) from exc
+
+
+async def get_web_search_context(query: str) -> WebSearchContext:
+    """Non-blocking wrapper around *perform_web_search_sync*."""
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, perform_web_search_sync, query)
+
+
+async def enhance_messages_with_web_search(messages: List[Message], query: str) -> EnhancedMessages:
+    ctx = await get_web_search_context(query)
+    enhanced = [Message(role="system", content=ctx.prompt)] + messages
+    return EnhancedMessages(messages=enhanced, sources=ctx.sources)
+
+
+async def handle_web_search(req_messages: List[Message]) -> EnhancedMessages:
+    user_query = req_messages[0].content if req_messages and req_messages[0].role == "user" else ""
+    if not user_query:
+        return EnhancedMessages(messages=req_messages, sources=[])
+    try:
+        return await enhance_messages_with_web_search(req_messages, user_query)
+    except Exception:
+        return EnhancedMessages(messages=req_messages, sources=[])

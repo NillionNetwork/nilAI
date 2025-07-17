@@ -725,51 +725,28 @@ def test_model_streaming_request_high_token(client):
     "model",
     test_models,
 )
-def test_chat_completion_with_web_search(client, model):
-    """Test chat completion with web_search enabled"""
-    try:
-        response = client.chat.completions.create(
-            model=model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a helpful assistant that provides accurate and up-to-date information.",
-                },
-                {
-                    "role": "user",
-                    "content": "What is the latest news about artificial intelligence?",
-                },
-            ],
-            extra_body={"web_search": True},
-            temperature=0.2,
-            max_tokens=200,
-        )
-
-        # Verify response structure
-        assert isinstance(response, ChatCompletion), (
-            "Response should be a ChatCompletion object"
-        )
-        assert response.model == model, f"Response model should be {model}"
-        assert len(response.choices) > 0, "Response should contain at least one choice"
-
-        # Check content
-        content = response.choices[0].message.content
-        assert content, f"No content returned for {model}"
-        print(
-            f"\nModel {model} web search response: {content[:200]}..."
-            if len(content) > 200
-            else content
-        )
-
-        # Optionally, check for some web-contextual keywords
-        assert (
-            "news" in content.lower()
-            or "recent" in content.lower()
-            or "latest" in content.lower()
-            or "artificial intelligence" in content.lower()
-        ), "Response should mention recent or web-contextual information"
-
-    except Exception as e:
-        pytest.fail(
-            f"Error testing chat completion with web_search for {model}: {str(e)}"
-        )
+def test_web_search_eurovision_2024(client, model):
+    """Test web_search using a query that requires up-to-date information (Eurovision 2024 winner)."""
+    response = client.chat.completions.create(
+        model=model,
+        messages=[
+            {
+                "role": "system",
+                "content": "You are a helpful assistant that provides accurate and up-to-date information.",
+            },
+            {
+                "role": "user",
+                "content": "Who won the Eurovision Song Contest 2024 and with which song?",
+            },
+        ],
+        extra_body={"web_search": True},
+        temperature=0.2,
+        max_tokens=150,
+    )
+    assert isinstance(response, ChatCompletion)
+    assert response.model == model
+    assert len(response.choices) > 0
+    content = response.choices[0].message.content
+    assert content
+    keywords = ["switzerland", "nemo", "the code"]
+    assert any(k in content.lower() for k in keywords)

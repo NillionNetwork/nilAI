@@ -18,11 +18,20 @@ class Choice(OpenaAIChoice):
     pass
 
 
-class WebSearchSource(BaseModel):
-    title: str
-    url: str
-    snippet: str
-    type: str
+class Source(BaseModel):
+    source: str
+    content: str
+
+class EnhancedMessages(BaseModel):
+    messages: List[Message]
+    sources: List[Source]
+
+
+class WebSearchContext(BaseModel):
+    """Prompt and sources obtained from a web search."""
+
+    prompt: str
+    sources: List[Source]
 
 
 class ChatRequest(BaseModel):
@@ -42,7 +51,7 @@ class ChatRequest(BaseModel):
 
 class SignedChatCompletion(ChatCompletion):
     signature: str
-    sources: Optional[List[WebSearchSource]] = Field(
+    sources: Optional[List[Source]] = Field(
         default=None, description="Sources used for web search when enabled"
     )
 
@@ -95,5 +104,19 @@ class AttestationReport(BaseModel):
 
 
 __all__ = [
+    "Message",
+    "Choice",
+    "Source",
+    "ChatRequest",
+    "SignedChatCompletion",
+    "EnhancedMessages",
+    "ModelMetadata",
+    "ModelEndpoint",
+    "HealthCheckResponse",
     "Usage",
+    "Nonce",
+    "AMDAttestationToken",
+    "NVAttestationToken",
+    "AttestationReport",
+    "WebSearchContext",
 ]
