@@ -75,7 +75,17 @@ async def enhance_messages_with_web_search(messages: List[Message], query: str) 
 
 
 async def handle_web_search(req_messages: List[Message]) -> EnhancedMessages:
-    user_query = req_messages[0].content if req_messages and req_messages[0].role == "user" else ""
+    """Handle web search for the given messages. 
+    
+    Only the last user message is used as the query.
+    """
+
+    user_query = ""
+    for message in reversed(req_messages):
+        if message.role == "user":
+            user_query = message.content
+            break
+
     if not user_query:
         return EnhancedMessages(messages=req_messages, sources=[])
     try:
