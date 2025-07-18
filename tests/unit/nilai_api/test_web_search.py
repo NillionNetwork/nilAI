@@ -86,9 +86,7 @@ async def test_enhance_messages_with_web_search():
             sources=[],
         )
 
-        enhanced = await enhance_messages_with_web_search(
-            original_messages, "AI news"
-        )
+        enhanced = await enhance_messages_with_web_search(original_messages, "AI news")
 
         assert len(enhanced.messages) == 3
         assert enhanced.messages[0].role == "system"
@@ -106,7 +104,10 @@ async def test_handle_web_search():
     with patch(
         "nilai_api.handlers.web_search.enhance_messages_with_web_search"
     ) as mock_enhance:
-        mock_enhance.return_value = EnhancedMessages(messages=[Message(role="system", content="Enhanced context")] + messages, sources=[])
+        mock_enhance.return_value = EnhancedMessages(
+            messages=[Message(role="system", content="Enhanced context")] + messages,
+            sources=[],
+        )
         enhanced = await handle_web_search(messages)
 
         mock_enhance.assert_called_once_with(messages, "Tell me about current events")

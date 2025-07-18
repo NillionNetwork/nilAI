@@ -22,6 +22,7 @@ class Source(BaseModel):
     source: str
     content: str
 
+
 class EnhancedMessages(BaseModel):
     messages: List[Message]
     sources: List[Source]

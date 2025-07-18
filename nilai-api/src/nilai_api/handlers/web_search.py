@@ -68,15 +68,17 @@ async def get_web_search_context(query: str) -> WebSearchContext:
     return await loop.run_in_executor(None, perform_web_search_sync, query)
 
 
-async def enhance_messages_with_web_search(messages: List[Message], query: str) -> EnhancedMessages:
+async def enhance_messages_with_web_search(
+    messages: List[Message], query: str
+) -> EnhancedMessages:
     ctx = await get_web_search_context(query)
     enhanced = [Message(role="system", content=ctx.prompt)] + messages
     return EnhancedMessages(messages=enhanced, sources=ctx.sources)
 
 
 async def handle_web_search(req_messages: List[Message]) -> EnhancedMessages:
-    """Handle web search for the given messages. 
-    
+    """Handle web search for the given messages.
+
     Only the last user message is used as the query.
     """
 
