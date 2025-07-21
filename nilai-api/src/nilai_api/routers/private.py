@@ -5,6 +5,7 @@ from base64 import b64encode
 from typing import AsyncGenerator, Optional, Union, List, Tuple
 from nilai_api.attestation import get_attestation_report
 from nilai_api.handlers.nilrag import handle_nilrag
+from nilai_api.handlers.web_search import handle_web_search
 
 from fastapi import APIRouter, Body, Depends, HTTPException, status, Request
 from fastapi.responses import StreamingResponse
@@ -23,8 +24,9 @@ from nilai_common import (
     Message,
     ModelMetadata,
     SignedChatCompletion,
-    Usage,
     Nonce,
+    Source,
+    Usage,
 )
 from openai import AsyncOpenAI, OpenAI
 
@@ -139,6 +141,7 @@ async def chat_completion(
     - Must include non-empty list of messages
     - Must specify a model
     - Supports multiple message formats (system, user, assistant)
+    - Optional web_search parameter to enhance context with current information
 
     ### Response Components
     - Model-generated text completion
@@ -147,10 +150,18 @@ async def chat_completion(
 
     ### Processing Steps
     1. Validate input request parameters
-    2. Prepare messages for model processing
-    3. Generate AI model response
-    4. Track and update token usage
-    5. Cryptographically sign the response
+    2. If web_search is enabled, perform web search and enhance context
+    3. Prepare messages for model processing
+    4. Generate AI model response
+    5. Track and update token usage
+    6. Cryptographically sign the response
+
+    ### Web Search Feature
+    When web_search=True, the system will:
+    - Extract the user's query from the last user message
+    - Perform a web search using DuckDuckGo API
+    - Enhance the conversation context with current information
+    - Add search results as a system message for better responses
 
     ### Potential HTTP Errors
     - **400 Bad Request**:
@@ -161,13 +172,13 @@ async def chat_completion(
 
     ### Example
     ```python
-    # Generate a chat completion
+    # Generate a chat completion with web search
     request = ChatRequest(
         model="meta-llama/Llama-3.2-1B-Instruct",
         messages=[
             {"role": "system", "content": "You are a helpful assistant"},
-            {"role": "user", "content": "Hello, who are you?"}
-        ]
+            {"role": "user", "content": "What's the latest news about AI?"}
+        ],
     )
     response = await chat_completion(request, user)
     """
@@ -194,6 +205,13 @@ async def chat_completion(
     if req.nilrag:
         await handle_nilrag(req)
 
+    messages = req.messages
+    sources: Optional[List[Source]] = None
+    if req.web_search:
+        web_search_result = await handle_web_search(messages)
+        messages = web_search_result.messages
+        sources = web_search_result.sources
+
     if req.stream:
         client = AsyncOpenAI(base_url=model_url, api_key="<not-needed>")
 
@@ -202,7 +220,7 @@ async def chat_completion(
             try:
                 response = await client.chat.completions.create(
                     model=req.model,
-                    messages=req.messages,  # type: ignore
+                    messages=messages,  # type: ignore
                     stream=req.stream,  # type: ignore
                     top_p=req.top_p,
                     temperature=req.temperature,
@@ -255,7 +273,7 @@ async def chat_completion(
     client = OpenAI(base_url=model_url, api_key="<not-needed>")
     response = client.chat.completions.create(
         model=req.model,
-        messages=req.messages,  # type: ignore
+        messages=messages,  # type: ignore
         stream=req.stream,
         top_p=req.top_p,
         temperature=req.temperature,
@@ -266,7 +284,9 @@ async def chat_completion(
     model_response = SignedChatCompletion(
         **response.model_dump(),
         signature="",
+        sources=sources,
     )
+
     if model_response.usage is None:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

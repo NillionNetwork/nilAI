@@ -170,12 +170,16 @@ def test_get_models(mock_user, mock_user_manager, mock_state, client):
 
 def test_chat_completion(mock_user, mock_state, mock_user_manager, mocker, client):
     mocker.patch("openai.api_key", new="test-api-key")
-    # Mock the response from the OpenAI API
+
     from openai.types.chat import ChatCompletion
 
     data = RESPONSE.model_dump()
+
     data.pop("signature")
+    data.pop("sources", None)
+
     response_data = ChatCompletion(**data)
+
     mocker.patch(
         "openai._base_client.SyncAPIClient._request", return_value=response_data
     )

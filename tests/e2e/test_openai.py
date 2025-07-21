@@ -719,3 +719,34 @@ def test_model_streaming_request_high_token(client):
     assert chunk_count > 0, (
         "Should receive at least one chunk for high token streaming request"
     )
+
+
+@pytest.mark.parametrize(
+    "model",
+    test_models,
+)
+def test_web_search_eurovision_2024(client, model):
+    """Test web_search using a query that requires up-to-date information (Eurovision 2024 winner)."""
+    response = client.chat.completions.create(
+        model=model,
+        messages=[
+            {
+                "role": "system",
+                "content": "You are a helpful assistant that provides accurate and up-to-date information.",
+            },
+            {
+                "role": "user",
+                "content": "Who won the Roland Garros 0pen in 2024?",
+            },
+        ],
+        extra_body={"web_search": True},
+        temperature=0.2,
+        max_tokens=150,
+    )
+    assert isinstance(response, ChatCompletion)
+    assert response.model == model
+    assert len(response.choices) > 0
+    content = response.choices[0].message.content
+    assert content
+    keywords = ["carlos", "alcaraz", "iga", "świątek", "swiatek"]
+    assert any(k in content.lower() for k in keywords)

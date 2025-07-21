@@ -1,5 +1,6 @@
 import uuid
-from typing import Annotated, List, Optional, Literal, Iterable
+
+from typing import Annotated, Iterable, List, Literal, Optional
 
 from openai.types.chat import ChatCompletion, ChatCompletionMessage
 from openai.types.chat.chat_completion import Choice as OpenaAIChoice
@@ -15,6 +16,23 @@ class Choice(OpenaAIChoice):
     pass
 
 
+class Source(BaseModel):
+    source: str
+    content: str
+
+
+class EnhancedMessages(BaseModel):
+    messages: List[Message]
+    sources: List[Source]
+
+
+class WebSearchContext(BaseModel):
+    """Prompt and sources obtained from a web search."""
+
+    prompt: str
+    sources: List[Source]
+
+
 class ChatRequest(BaseModel):
     model: str
     messages: List[Message] = Field(..., min_length=1)
@@ -24,10 +42,17 @@ class ChatRequest(BaseModel):
     stream: Optional[bool] = False
     tools: Optional[Iterable[ChatCompletionToolParam]] = None
     nilrag: Optional[dict] = {}
+    web_search: Optional[bool] = Field(
+        default=False,
+        description="Enable web search to enhance context with current information",
+    )
 
 
 class SignedChatCompletion(ChatCompletion):
     signature: str
+    sources: Optional[List[Source]] = Field(
+        default=None, description="Sources used for web search when enabled"
+    )
 
 
 class ModelMetadata(BaseModel):
@@ -75,3 +100,21 @@ class AttestationReport(BaseModel):
     verifying_key: Annotated[str, Field(description="PEM encoded public key")]
     cpu_attestation: AMDAttestationToken
     gpu_attestation: NVAttestationToken
+
+
+__all__ = [
+    "Message",
+    "Choice",
+    "Source",
+    "ChatRequest",
+    "SignedChatCompletion",
+    "EnhancedMessages",
+    "ModelMetadata",
+    "ModelEndpoint",
+    "HealthCheckResponse",
+    "Nonce",
+    "AMDAttestationToken",
+    "NVAttestationToken",
+    "AttestationReport",
+    "WebSearchContext",
+]
