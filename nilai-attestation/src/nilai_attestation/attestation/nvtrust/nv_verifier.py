@@ -5,10 +5,10 @@
 # Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 from nilai_common.api_model import AttestationReport
-from nv_attestation_sdk import attestation  # type: ignore
 import json
 import base64
 from nilai_common.logger import setup_logger
+from nilai_attestation.attestation.nvtrust import get_client
 
 logger = setup_logger(__name__)
 
@@ -43,9 +43,7 @@ POLICY = {
 }
 
 
-def verify_attestation(
-    attestation_report: AttestationReport, name: str = "thisNode1"
-) -> bool:
+def verify_attestation(attestation_report: AttestationReport) -> bool:
     """Verify an NVIDIA attestation token against a policy.
 
     Args:
@@ -58,12 +56,8 @@ def verify_attestation(
 
     # Create an attestation client instance for token verification.
     logger.info(f"Attestation report: {attestation_report}")
-    client = attestation.Attestation()
-    client.set_name(name)
+    client = get_client()
     client.set_nonce(attestation_report.nonce)
-    client.add_verifier(
-        attestation.Devices.GPU, attestation.Environment.REMOTE, NRAS_URL, ""
-    )
 
     token = base64.b64decode(attestation_report.gpu_attestation).decode("utf-8")
     logger.info(f"Token: {token}")

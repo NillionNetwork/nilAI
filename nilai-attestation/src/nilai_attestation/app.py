@@ -3,6 +3,18 @@
 from fastapi import FastAPI
 from nilai_attestation.routers import private, public
 
+# Fast API and serving
+
+
+import logging
+
+logging.getLogger("nv_attestation_sdk").setLevel(logging.WARNING)
+logging.getLogger("sdk-logger").setLevel(logging.WARNING)
+logging.getLogger("sdk-console").setLevel(logging.WARNING)
+logging.getLogger("sdk-file").setLevel(logging.WARNING)
+logging.getLogger("gpu-verifier-event").setLevel(logging.WARNING)
+logging.getLogger("gpu-verifier-info").setLevel(logging.WARNING)
+
 
 description = """
 An AI model serving platform powered by secure, confidential computing.
