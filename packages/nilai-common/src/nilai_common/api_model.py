@@ -100,21 +100,3 @@ class AttestationReport(BaseModel):
     verifying_key: Annotated[str, Field(description="PEM encoded public key")]
     cpu_attestation: AMDAttestationToken
     gpu_attestation: NVAttestationToken
-
-
-__all__ = [
-    "Message",
-    "Choice",
-    "Source",
-    "ChatRequest",
-    "SignedChatCompletion",
-    "EnhancedMessages",
-    "ModelMetadata",
-    "ModelEndpoint",
-    "HealthCheckResponse",
-    "Nonce",
-    "AMDAttestationToken",
-    "NVAttestationToken",
-    "AttestationReport",
-    "WebSearchContext",
-]
