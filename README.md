@@ -108,17 +108,19 @@ up -d
    docker run -d --name redis \
      -p 6379:6379 \
      redis:latest
+    ```
 
-# Start PostgreSQL
-docker run -d --name postgres \
-  -e POSTGRES_USER=${POSTGRES_USER} \
-  -e POSTGRES_PASSWORD=${POSTGRES_PASSWORD} \
-  -e POSTGRES_DB=${POSTGRES_DB} \
-  -p 5432:5432 \
-  --network frontend_net \
-  --volume postgres_data:/var/lib/postgresql/data \
-  postgres:16
-```
+2. **Start PostgreSQL**
+    ```shell
+    docker run -d --name postgres \
+      -e POSTGRES_USER=${POSTGRES_USER} \
+      -e POSTGRES_PASSWORD=${POSTGRES_PASSWORD} \
+      -e POSTGRES_DB=${POSTGRES_DB} \
+      -p 5432:5432 \
+      --network frontend_net \
+      --volume postgres_data:/var/lib/postgresql/data \
+      postgres:16
+    ```
 
 2. **Run API Server**
    ```shell
@@ -191,11 +193,12 @@ To configure vLLM for **local execution on macOS**, execute the following steps:
 ```shell
 # Clone vLLM repository (root folder)
 git clone https://github.com/vllm-project/vllm.git
+cd vllm
 git checkout v0.7.3 # We use v0.7.3
 # Build vLLM OpenAI (vllm folder)
-cd vllm
 docker build -f Dockerfile.arm -t vllm/vllm-openai . --shm-size=4g
-# Build nilai attestation container
+
+# Build nilai attestation container (root folder)
 docker build -t nillion/nilai-attestation:latest -f docker/attestation.Dockerfile .
 # Build vLLM docker container (root folder)
 docker build -t nillion/nilai-vllm:latest -f docker/vllm.Dockerfile .
