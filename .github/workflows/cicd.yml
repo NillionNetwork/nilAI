@@ -195,7 +195,7 @@ jobs:
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: "arn:aws:iam::054037142884:role/nilai-github"
+          role-to-assume: "arn:aws:iam::054037142884:role/nilAI-github"
           aws-region: "us-east-1"
 
       - uses: aws-actions/amazon-ecr-login@v2
