@@ -727,7 +727,7 @@ def test_model_streaming_request_high_token(client):
 )
 def test_web_search_roland_garros_2024(client, model):
     """Test web_search using a query that requires up-to-date information (Roland Garros 2024 winner)."""
-    max_retries = 3
+    max_retries = 10
     last_exception = None
 
     for attempt in range(max_retries):
