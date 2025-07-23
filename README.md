@@ -26,6 +26,12 @@ nilAI is a platform designed to run on Confidential VMs with Trusted Execution E
 
 #### Development Environment
 ```shell
+# Build nilai prometheus
+docker build -t nillion/nilai-prometheus:latest -f docker/prometheus.Dockerfile .
+# Build nilai caddy
+docker build -t nillion/nilai-caddy:latest -f docker/caddy.Dockerfile .
+# Build nilai grafana derivation image
+docker build -t nillion/nilai-grafana:latest -f docker/grafana.Dockerfile .
 # Build nilai_attestation endpoint
 docker build -t nillion/nilai-attestation:latest -f docker/attestation.Dockerfile .
 # Build vLLM docker container
@@ -52,6 +58,12 @@ docker compose -f docker-compose.yml \
 
 #### Production Environment
 ```shell
+# Build nilai prometheus
+docker build -t nillion/nilai-prometheus:latest -f docker/prometheus.Dockerfile .
+# Build nilai caddy
+docker build -t nillion/nilai-caddy:latest -f docker/caddy.Dockerfile .
+# Build nilai grafana derivation image
+docker build -t nillion/nilai-grafana:latest -f docker/grafana.Dockerfile .
 # Build nilai_attestation endpoint
 docker build -t nillion/nilai-attestation:latest -f docker/attestation.Dockerfile .
 # Build vLLM docker container
@@ -72,6 +84,12 @@ up -d
 #### Testing Without GPU
 
 ```shell
+# Build nilai prometheus
+docker build -t nillion/nilai-prometheus:latest -f docker/prometheus.Dockerfile .
+# Build nilai caddy
+docker build -t nillion/nilai-caddy:latest -f docker/caddy.Dockerfile .
+# Build nilai grafana derivation image
+docker build -t nillion/nilai-grafana:latest -f docker/grafana.Dockerfile .
 # Build nilai_attestation endpoint
 docker build -t nillion/nilai-attestation:latest -f docker/attestation.Dockerfile .
 # Build vLLM docker container
