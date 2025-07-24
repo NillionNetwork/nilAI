@@ -170,21 +170,22 @@ def test_get_models(mock_user, mock_user_manager, mock_state, client):
 
 def test_chat_completion(mock_user, mock_state, mock_user_manager, mocker, client):
     mocker.patch("openai.api_key", new="test-api-key")
-
     from openai.types.chat import ChatCompletion
 
     data = RESPONSE.model_dump()
-
     data.pop("signature")
     data.pop("sources", None)
-
     response_data = ChatCompletion(**data)
-
+    # Patch nilai_api.routers.private.AsyncOpenAI to return a mock instance with chat.completions.create as an AsyncMock
+    mock_chat_completions = MagicMock()
+    mock_chat_completions.create = mocker.AsyncMock(return_value=response_data)
+    mock_chat = MagicMock()
+    mock_chat.completions = mock_chat_completions
+    mock_async_openai_instance = MagicMock()
+    mock_async_openai_instance.chat = mock_chat
     mocker.patch(
-        "openai._base_client.SyncAPIClient._request", return_value=response_data
+        "nilai_api.routers.private.AsyncOpenAI", return_value=mock_async_openai_instance
     )
-
-    # Mock client.post behavior
     response = client.post(
         "/v1/chat/completions",
         json={
@@ -196,8 +197,6 @@ def test_chat_completion(mock_user, mock_state, mock_user_manager, mocker, clien
         },
         headers={"Authorization": "Bearer test-api-key"},
     )
-
-    # Assertions
     assert response.status_code == 200
     assert "usage" in response.json()
     assert response.json()["usage"] == {

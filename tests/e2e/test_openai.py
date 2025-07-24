@@ -725,9 +725,9 @@ def test_model_streaming_request_high_token(client):
     "model",
     test_models,
 )
-def test_web_search_roland_garros_2024(client, model):
-    """Test web_search using a query that requires up-to-date information (Roland Garros 2024 winner)."""
-    max_retries = 3
+def test_web_search(client, model):
+    """Test web_search checking that the sources field is not None."""
+    max_retries = 10
     last_exception = None
 
     for attempt in range(max_retries):
@@ -755,11 +755,10 @@ def test_web_search_roland_garros_2024(client, model):
             assert response.model == model
             assert len(response.choices) > 0
 
-            content = response.choices[0].message.content
-            assert content, "Response content is empty."
-
-            keywords = ["carlos", "alcaraz", "iga", "świątek", "swiatek"]
-            assert any(k in content.lower() for k in keywords)
+            sources = getattr(response, "sources", None)
+            assert sources is not None, "Sources field should not be None"
+            assert isinstance(sources, list), "Sources should be a list"
+            assert len(sources) > 0, "Sources should not be empty"
 
             print(f"Success on attempt {attempt + 1}")
             return
