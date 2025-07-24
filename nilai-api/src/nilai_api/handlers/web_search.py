@@ -85,7 +85,7 @@ async def enhance_messages_with_web_search(
 async def generate_search_query_from_llm(
     user_message: str, model_name: str, client
 ) -> str:
-    system_prompt = """You are given a user's prompt and your task is to write a short, straight to the point search query that will retrieve the best information to answer it. No punctuation, no newlines, no formatting, no explanation. Do not answer the query but simply write a good query for web search. Only output the query."""
+    system_prompt = """You are given a user question. Generate a concise web search query that would help retrieve information to answer the question. If you cannot improve the user's question, simply repeat it as the search query. Do not answer the query. The query must be at least 10 words long. Output only the search query.\n\nExample:\nUser: Who won the Roland Garros Open in 2024? Just reply with the winner's name.\nSearch query: Roland Garros 2024 winner"""
     messages = [
         Message(role="system", content=system_prompt),
         Message(role="user", content=user_message),
@@ -97,7 +97,7 @@ async def generate_search_query_from_llm(
     }
     response = await client.chat.completions.create(**req)
     logger.info(
-        f"For {user_message}, Generated search query: {response.choices[0].message.content.strip()}"
+        f"For {[m.model_dump() for m in messages]}, Generated search query: {response.choices[0].message.content.strip()}"
     )
     return response.choices[0].message.content.strip()
 
