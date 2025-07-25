@@ -115,3 +115,49 @@ async def test_user_limit(req, user_limits):
     futures = [consume_generator(rate_limit(req, user_limits)) for _ in range(3)]
     with pytest.raises(HTTPException):
         await asyncio.gather(*futures)
+
+
+@pytest.mark.asyncio
+async def test_web_search_rate_limit_hour(redis_client):
+    """Verify that a user can only perform three web-search requests per hour."""
+    from nilai_api.rate_limiting import web_search_rate_limit
+    from nilai_api.auth.common import AuthenticationInfo
+    from nilai_api.db.users import UserData
+
+    # Build a dummy authenticated user
+    user_id = random_id()
+    user = UserData(
+        userid=user_id,
+        name="test",
+        apikey=random_id(),
+        prompt_tokens=0,
+        completion_tokens=0,
+        queries=0,
+        signup_date=datetime.now(timezone.utc),
+        ratelimit_day=None,
+        ratelimit_hour=None,
+        ratelimit_minute=None,
+    )
+    auth_info = AuthenticationInfo(user=user, token_rate_limit=None)
+
+    # Mock the incoming request with web_search enabled
+    mock_request = MagicMock(spec=Request)
+    mock_request.state.redis = redis_client[0]
+    mock_request.state.redis_rate_limit_command = redis_client[1]
+
+    async def json_body():
+        return {
+            "model": "meta-llama/Llama-3.2-1B-Instruct",
+            "messages": [{"role": "user", "content": "hi"}],
+            "web_search": True,
+        }
+
+    mock_request.json = json_body
+
+    # First three requests should succeed
+    for _ in range(3):
+        await web_search_rate_limit(mock_request, auth_info)
+
+    # Fourth request should be rejected
+    with pytest.raises(HTTPException):
+        await web_search_rate_limit(mock_request, auth_info)

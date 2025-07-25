@@ -186,3 +186,52 @@ class RateLimit:
         if key is None:
             return
         await redis.decr(f"concurrent:{key}")
+
+
+async def check_web_search_rate_limit(
+    redis: Redis, redis_rate_limit_command: str, user_id: str
+):
+    from nilai_api.config import WEB_SEARCH_RATE_LIMIT_HOUR
+
+    if WEB_SEARCH_RATE_LIMIT_HOUR is None:
+        return
+    await RateLimit.check_bucket(
+        redis,
+        redis_rate_limit_command,
+        f"web_search:{user_id}",
+        WEB_SEARCH_RATE_LIMIT_HOUR,
+        HOUR_MS,
+    )
+
+
+async def web_search_rate_limit(
+    request: Request,
+    auth_info: Annotated[AuthenticationInfo, Depends(get_auth_info)],
+):
+    """Dependency that checks the hourly web search limit for a user.
+
+    It parses the incoming request body as a `ChatRequest` and, if `web_search` is
+    enabled, calls `check_web_search_rate_limit` to ensure the user has not
+    exceeded their hourly allowance.
+    """
+
+    try:
+        body = await request.json()
+    except Exception:
+        return
+
+    try:
+        from nilai_common import ChatRequest
+
+        chat_request = ChatRequest(**body)
+    except Exception:
+        return
+
+    if not getattr(chat_request, "web_search", False):
+        return
+
+    await check_web_search_rate_limit(
+        request.state.redis,  # type: ignore[attr-defined]
+        request.state.redis_rate_limit_command,  # type: ignore[attr-defined]
+        auth_info.user.userid,
+    )
