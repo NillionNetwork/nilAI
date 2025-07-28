@@ -28,7 +28,7 @@ from nilai_common import (
     Source,
     Usage,
 )
-from openai import AsyncOpenAI, OpenAI
+from openai import AsyncOpenAI
 
 logger = logging.getLogger(__name__)
 
@@ -159,7 +159,7 @@ async def chat_completion(
     ### Web Search Feature
     When web_search=True, the system will:
     - Extract the user's query from the last user message
-    - Perform a web search using DuckDuckGo API
+    - Perform a web search using Brave API
     - Enhance the conversation context with current information
     - Add search results as a system message for better responses
 
@@ -202,19 +202,19 @@ async def chat_completion(
         f"Chat completion request for model {model_name} from user {auth_info.user.userid} on url: {model_url}"
     )
 
+    client = AsyncOpenAI(base_url=model_url, api_key="<not-needed>")
+
     if req.nilrag:
         await handle_nilrag(req)
 
     messages = req.messages
     sources: Optional[List[Source]] = None
     if req.web_search:
-        web_search_result = await handle_web_search(messages)
+        web_search_result = await handle_web_search(messages, model_name, client)
         messages = web_search_result.messages
         sources = web_search_result.sources
 
     if req.stream:
-        client = AsyncOpenAI(base_url=model_url, api_key="<not-needed>")
-
         # Forwarding Streamed Responses
         async def chat_completion_stream_generator() -> AsyncGenerator[str, None]:
             try:
@@ -270,8 +270,7 @@ async def chat_completion(
             chat_completion_stream_generator(),
             media_type="text/event-stream",  # Ensure client interprets as Server-Sent Events
         )
-    client = OpenAI(base_url=model_url, api_key="<not-needed>")
-    response = client.chat.completions.create(
+    response = await client.chat.completions.create(
         model=req.model,
         messages=messages,  # type: ignore
         stream=req.stream,

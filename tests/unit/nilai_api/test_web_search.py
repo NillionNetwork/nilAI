@@ -7,7 +7,7 @@ from nilai_api.handlers.web_search import (
     handle_web_search,
 )
 from nilai_common import Message
-from nilai_common.api_model import WebSearchContext, EnhancedMessages
+from nilai_common.api_model import WebSearchContext, WebSearchEnhancedMessages
 
 
 def test_perform_web_search_sync_success():
@@ -100,16 +100,22 @@ async def test_handle_web_search():
     messages = [
         Message(role="user", content="Tell me about current events"),
     ]
-
-    with patch(
-        "nilai_api.handlers.web_search.enhance_messages_with_web_search"
-    ) as mock_enhance:
-        mock_enhance.return_value = EnhancedMessages(
+    with (
+        patch(
+            "nilai_api.handlers.web_search.enhance_messages_with_web_search"
+        ) as mock_enhance,
+        patch(
+            "nilai_api.handlers.web_search.generate_search_query_from_llm"
+        ) as mock_generate_query,
+    ):
+        mock_enhance.return_value = WebSearchEnhancedMessages(
             messages=[Message(role="system", content="Enhanced context")] + messages,
             sources=[],
         )
-        enhanced = await handle_web_search(messages)
-
+        mock_generate_query.return_value = "Tell me about current events"
+        dummy_client = MagicMock()
+        enhanced = await handle_web_search(messages, "dummy-model", dummy_client)
+        mock_generate_query.assert_called_once()
         mock_enhance.assert_called_once_with(messages, "Tell me about current events")
         assert len(enhanced.messages) == len(messages) + 1
         assert enhanced.sources == []
@@ -121,9 +127,8 @@ async def test_handle_web_search_no_user_message():
     messages = [
         Message(role="assistant", content="Hello! How can I help you?"),
     ]
-
-    enhanced = await handle_web_search(messages)
-
+    dummy_client = MagicMock()
+    enhanced = await handle_web_search(messages, "dummy-model", dummy_client)
     assert enhanced.messages == messages
     assert enhanced.sources == []
 
@@ -135,14 +140,19 @@ async def test_handle_web_search_exception_handling():
         Message(role="system", content="You are a helpful assistant"),
         Message(role="user", content="What's the weather like?"),
     ]
-
-    with patch(
-        "nilai_api.handlers.web_search.enhance_messages_with_web_search"
-    ) as mock_enhance:
+    with (
+        patch(
+            "nilai_api.handlers.web_search.enhance_messages_with_web_search"
+        ) as mock_enhance,
+        patch(
+            "nilai_api.handlers.web_search.generate_search_query_from_llm"
+        ) as mock_generate_query,
+    ):
         mock_enhance.side_effect = Exception("Search service unavailable")
-
-        enhanced = await handle_web_search(messages)
-
+        mock_generate_query.return_value = "What's the weather like?"
+        dummy_client = MagicMock()
+        enhanced = await handle_web_search(messages, "dummy-model", dummy_client)
+        mock_generate_query.assert_called_once()
         assert enhanced.messages == messages
         assert enhanced.sources == []
 

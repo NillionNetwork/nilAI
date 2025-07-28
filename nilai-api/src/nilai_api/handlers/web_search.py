@@ -2,20 +2,20 @@ import asyncio
 import logging
 from typing import List
 
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 from fastapi import HTTPException, status
 
 from nilai_common.api_model import Source
 from nilai_common import Message
-from nilai_common.api_model import EnhancedMessages, WebSearchContext
+from nilai_common.api_model import WebSearchEnhancedMessages, WebSearchContext
 
 logger = logging.getLogger(__name__)
 
 
 def perform_web_search_sync(query: str) -> WebSearchContext:
-    """Synchronously query DuckDuckGo and build a contextual prompt.
+    """Synchronously query Brave and build a contextual prompt.
 
-    The function sends *query* to DuckDuckGo, extracts the first three text results,
+    The function sends *query* to Brave, extracts the first three text results,
     formats them in a single prompt, and returns that prompt together with the
     metadata (URL and snippet) of every result.
     """
@@ -27,7 +27,9 @@ def perform_web_search_sync(query: str) -> WebSearchContext:
 
     try:
         with DDGS() as ddgs:
-            raw_results = list(ddgs.text(query, max_results=3, region="us-en"))
+            raw_results = list(
+                ddgs.text(query=query, max_results=3, region="us-en", backend="brave")
+            )
 
         if not raw_results:
             raise HTTPException(
@@ -43,7 +45,11 @@ def perform_web_search_sync(query: str) -> WebSearchContext:
                 title = result["title"]
                 body = result["body"][:500]
                 snippets.append(f"{title}: {body}")
-                sources.append(Source(source=result["href"], content=body))
+                sources.append(
+                    Source(
+                        source=result.get("href", result.get("url", "")), content=body
+                    )
+                )
 
         prompt = (
             "You have access to the following current information from web search:\n"
@@ -70,27 +76,83 @@ async def get_web_search_context(query: str) -> WebSearchContext:
 
 async def enhance_messages_with_web_search(
     messages: List[Message], query: str
-) -> EnhancedMessages:
+) -> WebSearchEnhancedMessages:
+    """Enhance a list of messages with web search context.
+
+    Args:
+        messages: List of conversation messages to enhance
+        query: Search query to retrieve web search results for
+
+    Returns:
+        WebSearchEnhancedMessages containing the original messages with web search
+        context prepended as a system message, along with source information
+    """
     ctx = await get_web_search_context(query)
     enhanced = [Message(role="system", content=ctx.prompt)] + messages
-    return EnhancedMessages(messages=enhanced, sources=ctx.sources)
+    return WebSearchEnhancedMessages(messages=enhanced, sources=ctx.sources)
 
 
-async def handle_web_search(req_messages: List[Message]) -> EnhancedMessages:
-    """Handle web search for the given messages.
+async def generate_search_query_from_llm(
+    user_message: str, model_name: str, client
+) -> str:
+    """Generate a web search query from a user message using an LLM.
 
-    Only the last user message is used as the query.
+    Args:
+        user_message: The user's input message to convert into a search query
+        model_name: The name of the LLM model to use for query generation
+        client: The LLM client instance for making API calls
+
+    Returns:
+        A concise web search query string optimized for information retrieval
+
+    Raises:
+        Exception: If the LLM API call fails or returns an invalid response
     """
+    system_prompt = """You are given a user question. Generate a concise web search query that would help retrieve information to answer the question. If you cannot improve the user's question, simply repeat it as the search query. Do not answer the query. The query must be at least 10 words long. Output only the search query.\n\nExample:\nUser: Who won the Roland Garros Open in 2024? Just reply with the winner's name.\nSearch query: Roland Garros 2024 winner"""
+    messages = [
+        Message(role="system", content=system_prompt),
+        Message(role="user", content=user_message),
+    ]
+    req = {
+        "model": model_name,
+        "messages": [m.model_dump() for m in messages],
+        "max_tokens": 150,
+    }
+    response = await client.chat.completions.create(**req)
+    logger.info(
+        f"For {[m.model_dump() for m in messages]}, Generated search query: {response.choices[0].message.content.strip()}"
+    )
+    return response.choices[0].message.content.strip()
 
+
+async def handle_web_search(
+    req_messages: List[Message], model_name: str, client
+) -> WebSearchEnhancedMessages:
+    """Handle web search enhancement for a conversation.
+
+    Extracts the most recent user message, generates an optimized search query
+    using an LLM, and enhances the conversation with web search results.
+
+    Args:
+        req_messages: List of conversation messages to process
+        model_name: Name of the LLM model to use for query generation
+        client: LLM client instance for making API calls
+
+    Returns:
+        WebSearchEnhancedMessages with web search context added, or original
+        messages if no user query is found or search fails
+    """
     user_query = ""
     for message in reversed(req_messages):
         if message.role == "user":
             user_query = message.content
             break
-
     if not user_query:
-        return EnhancedMessages(messages=req_messages, sources=[])
+        return WebSearchEnhancedMessages(messages=req_messages, sources=[])
     try:
-        return await enhance_messages_with_web_search(req_messages, user_query)
+        concise_query = await generate_search_query_from_llm(
+            user_query, model_name, client
+        )
+        return await enhance_messages_with_web_search(req_messages, concise_query)
     except Exception:
-        return EnhancedMessages(messages=req_messages, sources=[])
+        return WebSearchEnhancedMessages(messages=req_messages, sources=[])
