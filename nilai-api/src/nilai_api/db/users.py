@@ -14,6 +14,9 @@ from nilai_api.config import (
     USER_RATE_LIMIT_MINUTE,
     USER_RATE_LIMIT_HOUR,
     USER_RATE_LIMIT_DAY,
+    WEB_SEARCH_RATE_LIMIT_MINUTE,
+    WEB_SEARCH_RATE_LIMIT_HOUR,
+    WEB_SEARCH_RATE_LIMIT_DAY,
 )
 
 logger = logging.getLogger(__name__)
@@ -38,6 +41,15 @@ class UserModel(Base):
     ratelimit_minute: int = Column(
         Integer, default=USER_RATE_LIMIT_MINUTE, nullable=True
     )  # type: ignore
+    web_search_ratelimit_day: int = Column(
+        Integer, default=WEB_SEARCH_RATE_LIMIT_DAY, nullable=True
+    )  # type: ignore
+    web_search_ratelimit_hour: int = Column(
+        Integer, default=WEB_SEARCH_RATE_LIMIT_HOUR, nullable=True
+    )  # type: ignore
+    web_search_ratelimit_minute: int = Column(
+        Integer, default=WEB_SEARCH_RATE_LIMIT_MINUTE, nullable=True
+    )  # type: ignore
 
     def __repr__(self):
         return f"<User(userid={self.userid}, name={self.name})>"
@@ -55,6 +67,9 @@ class UserData(BaseModel):
     ratelimit_day: Optional[int] = None
     ratelimit_hour: Optional[int] = None
     ratelimit_minute: Optional[int] = None
+    web_search_ratelimit_day: Optional[int] = None
+    web_search_ratelimit_hour: Optional[int] = None
+    web_search_ratelimit_minute: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -72,6 +87,9 @@ class UserData(BaseModel):
             ratelimit_day=user.ratelimit_day,
             ratelimit_hour=user.ratelimit_hour,
             ratelimit_minute=user.ratelimit_minute,
+            web_search_ratelimit_day=user.web_search_ratelimit_day,
+            web_search_ratelimit_hour=user.web_search_ratelimit_hour,
+            web_search_ratelimit_minute=user.web_search_ratelimit_minute,
         )
 
 

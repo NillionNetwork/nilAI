@@ -39,12 +39,22 @@ async def setup_redis_conn(redis_url):
     return client, lua_sha
 
 
+async def _extract_coroutine_result(maybe_future, request: Request):
+    if iscoroutine(maybe_future):
+        return await maybe_future
+    else:
+        return maybe_future
+
+
 class UserRateLimits(BaseModel):
     subscription_holder: str
     day_limit: int | None
     hour_limit: int | None
     minute_limit: int | None
     token_rate_limit: TokenRateLimits | None
+    web_search_day_limit: int | None
+    web_search_hour_limit: int | None
+    web_search_minute_limit: int | None
 
 
 def get_user_limits(
@@ -62,6 +72,9 @@ def get_user_limits(
         hour_limit=auth_info.user.ratelimit_hour,
         minute_limit=auth_info.user.ratelimit_minute,
         token_rate_limit=auth_info.token_rate_limit,
+        web_search_day_limit=auth_info.user.web_search_ratelimit_day,
+        web_search_hour_limit=auth_info.user.web_search_ratelimit_hour,
+        web_search_minute_limit=auth_info.user.web_search_ratelimit_minute,
     )
 
 
@@ -73,15 +86,18 @@ class RateLimit:
             [Request], Tuple[int, str] | Awaitable[Tuple[int, str]]
         ]
         | None = None,
+        web_search_extractor: Callable[[Request], bool | Awaitable[bool]] | None = None,
     ):
         """
         concurrent: Maximum number of concurrent requests allowed for a single path
         concurrent_extractor: A callable that extracts the concurrent limit and key from the request
+        web_search_extractor: A callable that extracts the web_search flag from the request
 
         concurrent and concurrent_extractor are mutually exclusive
         """
         self.max_concurrent = concurrent
         self.concurrent_extractor = concurrent_extractor
+        self.web_search_extractor = web_search_extractor
 
     async def __call__(
         self,
@@ -90,6 +106,7 @@ class RateLimit:
     ):
         redis = request.state.redis
         redis_rate_limit_command = request.state.redis_rate_limit_command
+
         await self.check_bucket(
             redis,
             redis_rate_limit_command,
@@ -130,6 +147,27 @@ class RateLimit:
                     limit.ms_remaining,
                 )
 
+        if self.web_search_extractor:
+            web_search_enabled = await _extract_coroutine_result(
+                self.web_search_extractor(request), request
+            )
+
+            if web_search_enabled:
+                web_search_limits = [
+                    (user_limits.web_search_minute_limit, MINUTE_MS, "minute"),
+                    (user_limits.web_search_hour_limit, HOUR_MS, "hour"),
+                    (user_limits.web_search_day_limit, DAY_MS, "day"),
+                ]
+
+                for limit, milliseconds, time_unit in web_search_limits:
+                    await self.check_bucket(
+                        redis,
+                        redis_rate_limit_command,
+                        f"web_search_{time_unit}:{user_limits.subscription_holder}",
+                        limit,
+                        milliseconds,
+                    )
+
         key = await self.check_concurrent_and_increment(redis, request)
         try:
             yield
@@ -164,11 +202,9 @@ class RateLimit:
             return None
 
         if self.concurrent_extractor:
-            maybe_future = self.concurrent_extractor(request)
-            if iscoroutine(maybe_future):
-                max_concurrent, key = await maybe_future
-            else:
-                max_concurrent, key = maybe_future  # type: ignore
+            max_concurrent, key = await _extract_coroutine_result(
+                self.concurrent_extractor(request), request
+            )
         else:
             max_concurrent, key = self.max_concurrent, request.url.path
 
@@ -186,52 +222,3 @@ class RateLimit:
         if key is None:
             return
         await redis.decr(f"concurrent:{key}")
-
-
-async def check_web_search_rate_limit(
-    redis: Redis, redis_rate_limit_command: str, user_id: str
-):
-    from nilai_api.config import WEB_SEARCH_RATE_LIMIT_HOUR
-
-    if WEB_SEARCH_RATE_LIMIT_HOUR is None:
-        return
-    await RateLimit.check_bucket(
-        redis,
-        redis_rate_limit_command,
-        f"web_search:{user_id}",
-        WEB_SEARCH_RATE_LIMIT_HOUR,
-        HOUR_MS,
-    )
-
-
-async def web_search_rate_limit(
-    request: Request,
-    auth_info: Annotated[AuthenticationInfo, Depends(get_auth_info)],
-):
-    """Dependency that checks the hourly web search limit for a user.
-
-    It parses the incoming request body as a `ChatRequest` and, if `web_search` is
-    enabled, calls `check_web_search_rate_limit` to ensure the user has not
-    exceeded their hourly allowance.
-    """
-
-    try:
-        body = await request.json()
-    except Exception:
-        return
-
-    try:
-        from nilai_common import ChatRequest
-
-        chat_request = ChatRequest(**body)
-    except Exception:
-        return
-
-    if not getattr(chat_request, "web_search", False):
-        return
-
-    await check_web_search_rate_limit(
-        request.state.redis,  # type: ignore[attr-defined]
-        request.state.redis_rate_limit_command,  # type: ignore[attr-defined]
-        auth_info.user.userid,
-    )

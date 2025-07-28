@@ -33,7 +33,9 @@ AUTH_STRATEGY: str = os.getenv("AUTH_STRATEGY", "api_key")
 USER_RATE_LIMIT_MINUTE: int | None = 100
 USER_RATE_LIMIT_HOUR: int | None = 1000
 USER_RATE_LIMIT_DAY: int | None = 10000
+WEB_SEARCH_RATE_LIMIT_MINUTE: int | None = 1
 WEB_SEARCH_RATE_LIMIT_HOUR: int | None = 3
+WEB_SEARCH_RATE_LIMIT_DAY: int | None = 72
 
 if ENVIRONMENT == "mainnet":
     from .mainnet import *  # noqa

@@ -48,6 +48,9 @@ async def test_concurrent_rate_limit(req):
         hour_limit=None,
         minute_limit=None,
         token_rate_limit=None,
+        web_search_day_limit=None,
+        web_search_hour_limit=None,
+        web_search_minute_limit=None,
     )
 
     futures = [consume_generator(rate_limit(req, user_limits)) for _ in range(5)]
@@ -74,6 +77,9 @@ async def test_concurrent_rate_limit(req):
             hour_limit=None,
             minute_limit=None,
             token_rate_limit=None,
+            web_search_day_limit=None,
+            web_search_hour_limit=None,
+            web_search_minute_limit=None,
         ),
         UserRateLimits(
             subscription_holder=random_id(),
@@ -81,6 +87,9 @@ async def test_concurrent_rate_limit(req):
             hour_limit=11,
             minute_limit=None,
             token_rate_limit=None,
+            web_search_day_limit=None,
+            web_search_hour_limit=None,
+            web_search_minute_limit=None,
         ),
         UserRateLimits(
             subscription_holder=random_id(),
@@ -88,6 +97,9 @@ async def test_concurrent_rate_limit(req):
             hour_limit=None,
             minute_limit=12,
             token_rate_limit=None,
+            web_search_day_limit=None,
+            web_search_hour_limit=None,
+            web_search_minute_limit=None,
         ),
         UserRateLimits(
             subscription_holder=random_id(),
@@ -103,6 +115,9 @@ async def test_concurrent_rate_limit(req):
                     )
                 ]
             ),
+            web_search_day_limit=None,
+            web_search_hour_limit=None,
+            web_search_minute_limit=None,
         ),
     ],
 )
@@ -118,27 +133,11 @@ async def test_user_limit(req, user_limits):
 
 
 @pytest.mark.asyncio
-async def test_web_search_rate_limit_hour(redis_client):
-    """Verify that a user can only perform three web-search requests per hour."""
-    from nilai_api.rate_limiting import web_search_rate_limit
-    from nilai_api.auth.common import AuthenticationInfo
-    from nilai_api.db.users import UserData
+async def test_web_search_rate_limits(redis_client):
+    """Verify that a user is rate limited for web-search requests across all time windows."""
 
     # Build a dummy authenticated user
-    user_id = random_id()
-    user = UserData(
-        userid=user_id,
-        name="test",
-        apikey=random_id(),
-        prompt_tokens=0,
-        completion_tokens=0,
-        queries=0,
-        signup_date=datetime.now(timezone.utc),
-        ratelimit_day=None,
-        ratelimit_hour=None,
-        ratelimit_minute=None,
-    )
-    auth_info = AuthenticationInfo(user=user, token_rate_limit=None)
+    apikey = random_id()
 
     # Mock the incoming request with web_search enabled
     mock_request = MagicMock(spec=Request)
@@ -154,10 +153,25 @@ async def test_web_search_rate_limit_hour(redis_client):
 
     mock_request.json = json_body
 
-    # First three requests should succeed
-    for _ in range(3):
-        await web_search_rate_limit(mock_request, auth_info)
+    # Create rate limit with web search enabled
+    async def web_search_extractor(request):
+        return True
 
-    # Fourth request should be rejected
+    rate_limit = RateLimit(web_search_extractor=web_search_extractor)
+    user_limits = UserRateLimits(
+        subscription_holder=apikey,
+        day_limit=None,
+        hour_limit=None,
+        minute_limit=None,
+        token_rate_limit=None,
+        web_search_day_limit=72,
+        web_search_hour_limit=3,
+        web_search_minute_limit=1,
+    )
+
+    # First request should succeed (minute limit: 1, hour limit: 3, day limit: 72)
+    await consume_generator(rate_limit(mock_request, user_limits))
+
+    # Second request should be rejected due to minute limit (1 per minute)
     with pytest.raises(HTTPException):
-        await web_search_rate_limit(mock_request, auth_info)
+        await consume_generator(rate_limit(mock_request, user_limits))

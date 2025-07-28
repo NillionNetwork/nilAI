@@ -14,7 +14,7 @@ from nilai_api.config import MODEL_CONCURRENT_RATE_LIMIT
 from nilai_api.crypto import sign_message
 from nilai_api.db.logs import QueryLogManager
 from nilai_api.db.users import UserManager
-from nilai_api.rate_limiting import RateLimit, web_search_rate_limit
+from nilai_api.rate_limiting import RateLimit
 from nilai_api.state import state
 
 # Internal libraries
@@ -116,6 +116,16 @@ async def chat_completion_concurrent_rate_limit(request: Request) -> Tuple[int, 
     return limit, key
 
 
+async def chat_completion_web_search_rate_limit(request: Request) -> bool:
+    """Extract web_search flag from request body for rate limiting."""
+    body = await request.json()
+    try:
+        chat_request = ChatRequest(**body)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid request body")
+    return getattr(chat_request, "web_search", False)
+
+
 @router.post("/v1/chat/completions", tags=["Chat"], response_model=None)
 async def chat_completion(
     req: ChatRequest = Body(
@@ -128,9 +138,11 @@ async def chat_completion(
         )
     ),
     _rate_limit=Depends(
-        RateLimit(concurrent_extractor=chat_completion_concurrent_rate_limit)
+        RateLimit(
+            concurrent_extractor=chat_completion_concurrent_rate_limit,
+            web_search_extractor=chat_completion_web_search_rate_limit,
+        )
     ),
-    _web_search_rate_limit=Depends(web_search_rate_limit),
     auth_info: AuthenticationInfo = Depends(get_auth_info),
 ) -> Union[SignedChatCompletion, StreamingResponse]:
     """
