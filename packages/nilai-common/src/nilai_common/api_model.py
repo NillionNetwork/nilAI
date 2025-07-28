@@ -21,7 +21,7 @@ class Source(BaseModel):
     content: str
 
 
-class EnhancedMessages(BaseModel):
+class WebSearchEnhancedMessages(BaseModel):
     messages: List[Message]
     sources: List[Source]
 

@@ -11,7 +11,7 @@ from nilai_common.api_model import (
     AMDAttestationToken,
     NVAttestationToken,
     Source,
-    EnhancedMessages,
+    WebSearchEnhancedMessages,
     WebSearchContext,
 )
 from nilai_common.config import SETTINGS
@@ -34,6 +34,6 @@ __all__ = [
     "NVAttestationToken",
     "SETTINGS",
     "Source",
-    "EnhancedMessages",
+    "WebSearchEnhancedMessages",
     "WebSearchContext",
 ]

@@ -7,7 +7,7 @@ from fastapi import HTTPException, status
 
 from nilai_common.api_model import Source
 from nilai_common import Message
-from nilai_common.api_model import EnhancedMessages, WebSearchContext
+from nilai_common.api_model import WebSearchEnhancedMessages, WebSearchContext
 
 logger = logging.getLogger(__name__)
 
@@ -76,15 +76,38 @@ async def get_web_search_context(query: str) -> WebSearchContext:
 
 async def enhance_messages_with_web_search(
     messages: List[Message], query: str
-) -> EnhancedMessages:
+) -> WebSearchEnhancedMessages:
+    """Enhance a list of messages with web search context.
+
+    Args:
+        messages: List of conversation messages to enhance
+        query: Search query to retrieve web search results for
+
+    Returns:
+        WebSearchEnhancedMessages containing the original messages with web search
+        context prepended as a system message, along with source information
+    """
     ctx = await get_web_search_context(query)
     enhanced = [Message(role="system", content=ctx.prompt)] + messages
-    return EnhancedMessages(messages=enhanced, sources=ctx.sources)
+    return WebSearchEnhancedMessages(messages=enhanced, sources=ctx.sources)
 
 
 async def generate_search_query_from_llm(
     user_message: str, model_name: str, client
 ) -> str:
+    """Generate a web search query from a user message using an LLM.
+
+    Args:
+        user_message: The user's input message to convert into a search query
+        model_name: The name of the LLM model to use for query generation
+        client: The LLM client instance for making API calls
+
+    Returns:
+        A concise web search query string optimized for information retrieval
+
+    Raises:
+        Exception: If the LLM API call fails or returns an invalid response
+    """
     system_prompt = """You are given a user question. Generate a concise web search query that would help retrieve information to answer the question. If you cannot improve the user's question, simply repeat it as the search query. Do not answer the query. The query must be at least 10 words long. Output only the search query.\n\nExample:\nUser: Who won the Roland Garros Open in 2024? Just reply with the winner's name.\nSearch query: Roland Garros 2024 winner"""
     messages = [
         Message(role="system", content=system_prompt),
@@ -104,18 +127,32 @@ async def generate_search_query_from_llm(
 
 async def handle_web_search(
     req_messages: List[Message], model_name: str, client
-) -> EnhancedMessages:
+) -> WebSearchEnhancedMessages:
+    """Handle web search enhancement for a conversation.
+
+    Extracts the most recent user message, generates an optimized search query
+    using an LLM, and enhances the conversation with web search results.
+
+    Args:
+        req_messages: List of conversation messages to process
+        model_name: Name of the LLM model to use for query generation
+        client: LLM client instance for making API calls
+
+    Returns:
+        WebSearchEnhancedMessages with web search context added, or original
+        messages if no user query is found or search fails
+    """
     user_query = ""
     for message in reversed(req_messages):
         if message.role == "user":
             user_query = message.content
             break
     if not user_query:
-        return EnhancedMessages(messages=req_messages, sources=[])
+        return WebSearchEnhancedMessages(messages=req_messages, sources=[])
     try:
         concise_query = await generate_search_query_from_llm(
             user_query, model_name, client
         )
         return await enhance_messages_with_web_search(req_messages, concise_query)
     except Exception:
-        return EnhancedMessages(messages=req_messages, sources=[])
+        return WebSearchEnhancedMessages(messages=req_messages, sources=[])

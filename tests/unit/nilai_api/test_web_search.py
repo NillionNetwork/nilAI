@@ -7,7 +7,7 @@ from nilai_api.handlers.web_search import (
     handle_web_search,
 )
 from nilai_common import Message
-from nilai_common.api_model import WebSearchContext, EnhancedMessages
+from nilai_common.api_model import WebSearchContext, WebSearchEnhancedMessages
 
 
 def test_perform_web_search_sync_success():
@@ -108,7 +108,7 @@ async def test_handle_web_search():
             "nilai_api.handlers.web_search.generate_search_query_from_llm"
         ) as mock_generate_query,
     ):
-        mock_enhance.return_value = EnhancedMessages(
+        mock_enhance.return_value = WebSearchEnhancedMessages(
             messages=[Message(role="system", content="Enhanced context")] + messages,
             sources=[],
         )
