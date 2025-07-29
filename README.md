@@ -87,7 +87,83 @@ docker compose -f docker-compose.yml \
 up -d
 ```
 
-### 2. Manual Component Deployment
+### 2. Using the Docker Compose Helper Script
+
+For easier management of multiple compose files and image substitutions, use the `docker-composed.sh` script:
+
+#### Basic Usage
+
+```shell
+# Generate a composed configuration for development
+./scripts/docker-composed.sh --dev -o dev-compose.yml
+
+# Generate a composed configuration for production
+./scripts/docker-composed.sh --prod -o prod-compose.yml
+
+# Include specific model configurations
+./scripts/docker-composed.sh --prod \
+  -f docker-compose.llama-3b-gpu.yml \
+  -f docker-compose.llama-8b-gpu.yml \
+  -o production-compose.yml
+```
+
+#### Image Substitution
+
+Replace default images with custom ones (useful for production deployments with specific image versions):
+
+```shell
+# Production example with custom ECR images
+./scripts/docker-composed.sh --prod \
+  -f docker-compose.llama-3b-gpu.yml \
+  --image 'nillion/nilai-api:latest=public.ecr.aws/k5d9x2g2/nilai-api:v0.1.0-rc1' \
+  --image 'nillion/nilai-vllm:latest=public.ecr.aws/k5d9x2g2/nilai-vllm:v0.1.0-rc1' \
+  --image 'nillion/nilai-attestation:latest=public.ecr.aws/k5d9x2g2/nilai-attestation:v0.1.0-rc1' \
+  -o production-compose.yml
+
+# Then deploy with the generated file
+docker compose -f production-compose.yml up -d
+```
+
+#### Script Options
+
+- `--dev`: Include development-specific configurations
+- `--prod`: Include production-specific configurations
+- `-f, --file <filename>`: Include additional compose files from `docker/compose/` directory
+- `-o, --output <filename>`: Specify output filename (default: `output.yml`)
+- `--image <old=new>`: Substitute Docker images (can be used multiple times)
+- `-h, --help`: Show help message
+
+#### Production Deployment Example
+
+For a complete production setup with custom images:
+
+```shell
+# 1. Generate the production compose file
+./scripts/docker-composed.sh --prod \
+  -f docker/compose/docker-compose.llama-3b-gpu.yml \
+  -f docker/compose/docker-compose.llama-8b-gpu.yml \
+  --image 'nillion/nilai-api:latest=public.ecr.aws/k5d9x2g2/nilai-api:v0.2.0-alpha-0' \
+  --image 'nillion/nilai-vllm:latest=public.ecr.aws/k5d9x2g2/nilai-vllm:v0.2.0-alpha-0' \
+  --image 'nillion/nilai-attestation:latest=public.ecr.aws/k5d9x2g2/nilai-attestation:v0.2.0-alpha-0' \
+  -o production-compose.yml
+
+# Or:
+./scripts/docker-composed.sh --prod \
+  -f docker/compose/docker-compose.llama-70b-gpu.yml \
+  --image 'nillion/nilai-api:latest=public.ecr.aws/k5d9x2g2/nilai-api:v0.2.0-alpha-0' \
+  --image 'nillion/nilai-vllm:latest=public.ecr.aws/k5d9x2g2/nilai-vllm:v0.2.0-alpha-0' \
+  --image 'nillion/nilai-attestation:latest=public.ecr.aws/k5d9x2g2/nilai-attestation:v0.2.0-alpha-0' \
+  -o production-compose.yml
+
+
+# 2. Deploy using the generated file
+docker compose -f production-compose.yml up -d
+
+# 3. Monitor logs
+docker compose -f production-compose.yml logs -f
+```
+
+### 3. Manual Component Deployment
 
 #### Components
 

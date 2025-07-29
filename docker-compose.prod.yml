@@ -1,4 +1,24 @@
 services:
+  prometheus:
+    volumes:
+      - ./files/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus/data
+  grafana:
+      volumes:
+      - ./files/grafana/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
+      - ./files/grafana/filesystem.yml:/etc/grafana/provisioning/dashboards/filesystem.yml
+      - ./files/grafana/grafana.ini:/etc/grafana/grafana.ini
+  api:
+    volumes:
+      - ./files/nilai-api/config.yaml:/app/nilai-api/src/nilai_api/config/config.yaml
+  nuc-api:
+    environment:
+      - POSTGRES_DB="nuc-nilai-mainnet2"
+    volumes:
+      - ./files/nilai-api/config.yaml:/app/nilai-api/src/nilai_api/config/config.yaml
+  caddy:
+    volumes:
+      - ./files/caddy/caddyfile:/etc/caddy/Caddyfile
   attestation:
     deploy:
       resources:
