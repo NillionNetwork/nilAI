@@ -12,6 +12,16 @@
 
 set -e
 
+# Detect which docker compose command to use
+if command -v docker-compose >/dev/null 2>&1; then
+    DOCKER_COMPOSE_CMD="docker-compose"
+elif docker compose version >/dev/null 2>&1; then
+    DOCKER_COMPOSE_CMD="docker compose"
+else
+    echo "Error: Neither 'docker-compose' nor 'docker compose' is available"
+    exit 1
+fi
+
 # Initialize variables
 USE_DEV=false
 USE_PROD=false
@@ -131,15 +141,15 @@ for file in "${ADDITIONAL_FILES[@]}"; do
 done
 
 # Display the command that will be executed
-echo "Executing: docker compose ${COMPOSE_FILES[*]} config > $OUTPUT_FILE"
+echo "Executing: $DOCKER_COMPOSE_CMD ${COMPOSE_FILES[*]} config > $OUTPUT_FILE"
 
 # Execute docker compose config with all specified files
 if [[ ${#IMAGE_SUBSTITUTIONS[@]} -eq 0 ]]; then
     # No image substitutions needed
-    docker compose "${COMPOSE_FILES[@]}" config > "$OUTPUT_FILE"
+    $DOCKER_COMPOSE_CMD "${COMPOSE_FILES[@]}" config > "$OUTPUT_FILE"
 else
     # Generate config and apply image substitutions
-    docker compose "${COMPOSE_FILES[@]}" config > "$OUTPUT_FILE.tmp"
+    $DOCKER_COMPOSE_CMD "${COMPOSE_FILES[@]}" config > "$OUTPUT_FILE.tmp"
 
     # Apply image substitutions
     cp "$OUTPUT_FILE.tmp" "$OUTPUT_FILE"
