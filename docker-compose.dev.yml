@@ -2,6 +2,12 @@ services:
   caddy:
     env_file:
       - .env
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
   api:
     platform: linux/amd64 # for macOS to force running on Rosetta 2
     ports:

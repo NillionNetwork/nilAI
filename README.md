@@ -89,19 +89,19 @@ up -d
 
 ### 2. Using the Docker Compose Helper Script
 
-For easier management of multiple compose files and image substitutions, use the `docker-composed.sh` script:
+For easier management of multiple compose files and image substitutions, use the `docker-composer.sh` script:
 
 #### Basic Usage
 
 ```shell
 # Generate a composed configuration for development
-./scripts/docker-composed.sh --dev -o dev-compose.yml
+./scripts/docker-composer.sh --dev -o dev-compose.yml
 
 # Generate a composed configuration for production
-./scripts/docker-composed.sh --prod -o prod-compose.yml
+./scripts/docker-composer.sh --prod -o prod-compose.yml
 
 # Include specific model configurations
-./scripts/docker-composed.sh --prod \
+./scripts/docker-composer.sh --prod \
   -f docker-compose.llama-3b-gpu.yml \
   -f docker-compose.llama-8b-gpu.yml \
   -o production-compose.yml
@@ -113,7 +113,7 @@ Replace default images with custom ones (useful for production deployments with 
 
 ```shell
 # Production example with custom ECR images
-./scripts/docker-composed.sh --prod \
+./scripts/docker-composer.sh --prod \
   -f docker-compose.llama-3b-gpu.yml \
   --image 'nillion/nilai-api:latest=public.ecr.aws/k5d9x2g2/nilai-api:v0.1.0-rc1' \
   --image 'nillion/nilai-vllm:latest=public.ecr.aws/k5d9x2g2/nilai-vllm:v0.1.0-rc1' \
@@ -139,7 +139,7 @@ For a complete production setup with custom images:
 
 ```shell
 # 1. Generate the production compose file
-./scripts/docker-composed.sh --prod \
+./scripts/docker-composer.sh --prod \
   -f docker/compose/docker-compose.llama-3b-gpu.yml \
   -f docker/compose/docker-compose.llama-8b-gpu.yml \
   --image 'nillion/nilai-api:latest=public.ecr.aws/k5d9x2g2/nilai-api:v0.2.0-alpha-0' \
@@ -148,7 +148,7 @@ For a complete production setup with custom images:
   -o production-compose.yml
 
 # Or:
-./scripts/docker-composed.sh --prod \
+./scripts/docker-composer.sh --prod \
   -f docker/compose/docker-compose.llama-70b-gpu.yml \
   --image 'nillion/nilai-api:latest=public.ecr.aws/k5d9x2g2/nilai-api:v0.2.0-alpha-0' \
   --image 'nillion/nilai-vllm:latest=public.ecr.aws/k5d9x2g2/nilai-vllm:v0.2.0-alpha-0' \

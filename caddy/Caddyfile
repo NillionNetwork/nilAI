@@ -16,6 +16,7 @@
 		uri strip_prefix /nuc
 		reverse_proxy nuc-api:8080
 	}
+
 	handle_path /prod/nuc/* {
 		uri strip_prefix /prod/nuc
 		reverse_proxy prod-nilai-nuc-api:8080
