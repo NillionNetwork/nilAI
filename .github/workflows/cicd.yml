@@ -148,11 +148,7 @@ jobs:
 
       - name: Stop Services
         run: |
-          docker-compose -f docker-compose.yml \
-          -f docker-compose.dev.yml \
-          -f docker-compose.prod.yml \
-          -f docker/compose/docker-compose.llama-1b-gpu.ci.yml \
-          down -v
+          docker-compose -f development-compose.yml down -v
 
   stop-runner:
     name: Stop self-hosted EC2 runner

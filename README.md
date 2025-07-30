@@ -150,9 +150,9 @@ For a complete production setup with custom images:
 # Or:
 ./scripts/docker-composer.sh --prod \
   -f docker/compose/docker-compose.llama-70b-gpu.yml \
-  --image 'nillion/nilai-api:latest=public.ecr.aws/k5d9x2g2/nilai-api:v0.2.0-alpha-0' \
-  --image 'nillion/nilai-vllm:latest=public.ecr.aws/k5d9x2g2/nilai-vllm:v0.2.0-alpha-0' \
-  --image 'nillion/nilai-attestation:latest=public.ecr.aws/k5d9x2g2/nilai-attestation:v0.2.0-alpha-0' \
+  --image 'nillion/nilai-api:latest=jcabrero/nillion-nilai-api:latest' \
+  --image 'nillion/nilai-vllm:latest=public.ecr.aws/k5d9x2g2/nilai-vllm:v0.1.0-rc1' \
+  --image 'nillion/nilai-attestation:latest=public.ecr.aws/k5d9x2g2/nilai-attestation:v0.1.0-rc1' \
   -o production-compose.yml
 
 

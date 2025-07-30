@@ -177,3 +177,4 @@ private_key.key
 private_key.key.lock
 
 development-compose.yml
+production-compose.yml

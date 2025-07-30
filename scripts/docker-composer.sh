@@ -29,6 +29,7 @@ ADDITIONAL_FILES=()
 COMPOSE_FILES=()
 OUTPUT_FILE="output.yml"
 IMAGE_SUBSTITUTIONS=()
+MAKE_PORTABLE=true
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -77,8 +78,12 @@ while [[ $# -gt 0 ]]; do
                 exit 1
             fi
             ;;
+        --no-portable)
+            MAKE_PORTABLE=false
+            shift
+            ;;
         -h|--help)
-            echo "Usage: $0 [--dev] [--prod] [-f <additional-compose-file>] [-o <output-file>] [--image <old=new>] ..."
+            echo "Usage: $0 [--dev] [--prod] [-f <additional-compose-file>] [-o <output-file>] [--image <old=new>] [--no-portable] ..."
             echo ""
             echo "Options:"
             echo "  --dev                    Include docker-compose.dev.yml"
@@ -86,6 +91,7 @@ while [[ $# -gt 0 ]]; do
             echo "  -f, --file <filename>    Include additional compose file from docker/compose/ directory"
             echo "  -o, --output <filename>  Output filename (default: output.yml)"
             echo "  --image <old=new>        Substitute Docker image (can be used multiple times)"
+            echo "  --no-portable            Keep absolute paths in bind mounts (default: convert to relative)"
             echo "  -h, --help               Show this help message"
             echo ""
             echo "Examples:"
@@ -144,27 +150,51 @@ done
 echo "Executing: $DOCKER_COMPOSE_CMD ${COMPOSE_FILES[*]} config > $OUTPUT_FILE"
 
 # Execute docker compose config with all specified files
-if [[ ${#IMAGE_SUBSTITUTIONS[@]} -eq 0 ]]; then
-    # No image substitutions needed
+if [[ ${#IMAGE_SUBSTITUTIONS[@]} -eq 0 && "$MAKE_PORTABLE" == false ]]; then
+    # No image substitutions and no path conversion needed
     $DOCKER_COMPOSE_CMD "${COMPOSE_FILES[@]}" config > "$OUTPUT_FILE"
 else
-    # Generate config and apply image substitutions
+    # Generate config and apply modifications
     $DOCKER_COMPOSE_CMD "${COMPOSE_FILES[@]}" config > "$OUTPUT_FILE.tmp"
 
-    # Apply image substitutions
+    # Copy the temp file to output
     cp "$OUTPUT_FILE.tmp" "$OUTPUT_FILE"
-    for substitution in "${IMAGE_SUBSTITUTIONS[@]}"; do
-        # Split the substitution string on the pipe character
-        old_image="${substitution%|*}"
-        new_image="${substitution#*|}"
-        echo "Applying substitution: $old_image -> $new_image"
-        # Use sed to replace the image in the YAML file
-        # Simple substitution - just replace the image name wherever it appears
-        sed -i.bak "s|${old_image}|${new_image}|g" "$OUTPUT_FILE"
-    done
+
+    # Apply image substitutions if any
+    if [[ ${#IMAGE_SUBSTITUTIONS[@]} -gt 0 ]]; then
+        for substitution in "${IMAGE_SUBSTITUTIONS[@]}"; do
+            # Split the substitution string on the pipe character
+            old_image="${substitution%|*}"
+            new_image="${substitution#*|}"
+            echo "Applying substitution: $old_image -> $new_image"
+            # Use sed to replace the image in the YAML file
+            # Simple substitution - just replace the image name wherever it appears
+            sed -i.bak "s|${old_image}|${new_image}|g" "$OUTPUT_FILE"
+        done
+    fi
+
+    # Make paths portable if requested
+    if [[ "$MAKE_PORTABLE" == true ]]; then
+        echo "Converting absolute paths to relative paths for portability..."
+
+        # Get the current working directory to use as reference
+        CURRENT_DIR=$(pwd)
+
+        # Convert absolute paths to relative paths in bind mounts
+        # This handles the "source: /absolute/path" format in YAML
+        sed -i.bak2 "s|source: ${CURRENT_DIR}/|source: ./|g" "$OUTPUT_FILE"
+
+        # Also handle cases where the path might be quoted
+        sed -i.bak3 "s|source: \"${CURRENT_DIR}/|source: \"./|g" "$OUTPUT_FILE"
+        sed -i.bak4 "s|source: '${CURRENT_DIR}/|source: './|g" "$OUTPUT_FILE"
+
+        echo "Converted absolute paths to relative paths"
+    fi
 
     # Clean up temporary files
-    rm -f "$OUTPUT_FILE.tmp" "$OUTPUT_FILE.bak"
+    rm -f "$OUTPUT_FILE.tmp" "$OUTPUT_FILE.bak" "$OUTPUT_FILE.bak2" "$OUTPUT_FILE.bak3" "$OUTPUT_FILE.bak4"
 
-    echo "Image substitutions completed. Output written to $OUTPUT_FILE"
+    if [[ ${#IMAGE_SUBSTITUTIONS[@]} -gt 0 || "$MAKE_PORTABLE" == true ]]; then
+        echo "Modifications completed. Output written to $OUTPUT_FILE"
+    fi
 fi
