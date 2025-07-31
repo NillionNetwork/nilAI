@@ -1,0 +1,37 @@
+# Disable automatic HTTPS and use HTTP only
+{
+        auto_https off
+        default_bind 0.0.0.0
+}
+
+# Use :80 explicitly to force HTTP-only behavior
+:80 {
+        handle_path /grafana/* {
+                uri strip_prefix /grafana
+                reverse_proxy grafana:3000
+        }
+
+        handle_path /nuc/* {
+                uri strip_prefix /nuc
+                reverse_proxy nuc-api:8080
+        }
+
+        handle_path /prod/nuc/* {
+                uri strip_prefix /prod/nuc
+                reverse_proxy prod-nilai-nuc-api:8080
+        }
+
+        handle_path /prod/grafana/* {
+                uri strip_prefix /prod/grafana
+                reverse_proxy prod-grafana:3000
+        }
+
+        handle_path /prod/* {
+                uri strip_prefix /prod/base
+                reverse_proxy prod-nilai-api:8080
+        }
+
+        handle {
+                reverse_proxy api:8080
+        }
+}

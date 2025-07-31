@@ -1,12 +1,11 @@
 import os
-from typing import List
-
+from typing import List, Dict, Any, Optional
+import yaml
 from dotenv import load_dotenv
 
 load_dotenv()
 
 ENVIRONMENT: str = os.getenv("ENVIRONMENT", "testnet")
-
 
 ETCD_HOST: str = os.getenv("ETCD_HOST", "localhost")
 ETCD_PORT: int = int(os.getenv("ETCD_PORT", 2379))
@@ -29,18 +28,39 @@ NILAUTH_TRUSTED_ROOT_ISSUERS: List[str] = os.getenv(
 
 AUTH_STRATEGY: str = os.getenv("AUTH_STRATEGY", "api_key")
 
-# Defined by default but re-defined in testnet.py and mainnet.py
-USER_RATE_LIMIT_MINUTE: int | None = 100
-USER_RATE_LIMIT_HOUR: int | None = 1000
-USER_RATE_LIMIT_DAY: int | None = 10000
-WEB_SEARCH_RATE_LIMIT_MINUTE: int | None = 1
-WEB_SEARCH_RATE_LIMIT_HOUR: int | None = 3
-WEB_SEARCH_RATE_LIMIT_DAY: int | None = 72
+# Default values
+USER_RATE_LIMIT_MINUTE: Optional[int] = 100
+USER_RATE_LIMIT_HOUR: Optional[int] = 1000
+USER_RATE_LIMIT_DAY: Optional[int] = 10000
+WEB_SEARCH_RATE_LIMIT_MINUTE: Optional[int] = 1
+WEB_SEARCH_RATE_LIMIT_HOUR: Optional[int] = 3
+WEB_SEARCH_RATE_LIMIT_DAY: Optional[int] = 72
+MODEL_CONCURRENT_RATE_LIMIT: Dict[str, int] = {}
 
-if ENVIRONMENT == "mainnet":
-    from .mainnet import *  # noqa
-elif ENVIRONMENT == "testnet":
-    from .testnet import *  # noqa
-else:
-    # default to mainnet with no limits
-    from .mainnet import *  # noqa
+
+def load_config_from_yaml(config_path: str) -> Dict[str, Any]:
+    if os.path.exists(config_path):
+        with open(config_path, "r") as f:
+            return yaml.safe_load(f)
+    return {}
+
+
+config_file: str = "config.yaml"
+config_path = os.path.join(os.path.dirname(__file__), config_file)
+
+if not os.path.exists(config_path):
+    config_file = "config.yaml"
+    config_path = os.path.join(os.path.dirname(__file__), config_file)
+
+config_data = load_config_from_yaml(config_path)
+
+# Overwrite with values from yaml
+if config_data:
+    USER_RATE_LIMIT_MINUTE = config_data.get(
+        "user_rate_limit_minute", USER_RATE_LIMIT_MINUTE
+    )
+    USER_RATE_LIMIT_HOUR = config_data.get("user_rate_limit_hour", USER_RATE_LIMIT_HOUR)
+    USER_RATE_LIMIT_DAY = config_data.get("user_rate_limit_day", USER_RATE_LIMIT_DAY)
+    MODEL_CONCURRENT_RATE_LIMIT = config_data.get(
+        "model_concurrent_rate_limit", MODEL_CONCURRENT_RATE_LIMIT
+    )

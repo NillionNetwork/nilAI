@@ -1,5 +1,6 @@
 services:
   etcd:
+    container_name: etcd
     image: 'bitnami/etcd:latest'
     environment:
       - ALLOW_NONE_AUTHENTICATION=yes
@@ -11,12 +12,9 @@ services:
       timeout: 5s
       retries: 3
       start_period: 5s
-    networks:
-      - backend_net
   redis:
+    container_name: redis
     image: 'redis:latest'
-    networks:
-      - frontend_net
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -24,54 +22,13 @@ services:
       timeout: 10s
       retries: 3
       start_period: 5s
-  postgres:
-    image: postgres:16
-    container_name: postgres
-    restart: always
-    env_file:
-      - .env
-    networks:
-      - frontend_net
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD", "sh", "-c", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB} -h localhost"]
-      interval: 30s
-      retries: 5
-      start_period: 10s
-      timeout: 10s
 
-  nuc-postgres:
-    image: postgres:16
-    container_name: nuc-postgres
-    restart: always
-    env_file:
-      - .env
-    environment:
-      - POSTGRES_HOST=nuc-postgres
-    networks:
-      - frontend_net
-    volumes:
-      - nuc_postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD", "sh", "-c", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB} -h localhost"]
-      interval: 30s
-      retries: 5
-      start_period: 10s
-      timeout: 10s
   prometheus:
     container_name: prometheus
     image: prom/prometheus:v3.1.0
     restart: unless-stopped
-    networks:
-      - frontend_net
     user: "$UID:$GID"
-    volumes:
-      - ${PWD}/prometheus/config/prometheus.yml:/etc/prometheus/prometheus.yml
-      - ${PWD}/prometheus/data:/prometheus/data
     command: "--config.file=/etc/prometheus/prometheus.yml --storage.tsdb.retention.time=30d --web.enable-admin-api"
-    ports:
-      - "127.0.0.1:9090:9090"
     healthcheck:
       test: ["CMD", "wget", "http://localhost:9090/-/healthy", "-O", "/dev/null", "-o", "/dev/null"]
       interval: 30s
@@ -84,8 +41,6 @@ services:
     image: quay.io/prometheus/node-exporter:v1.8.2
     command:
       - '--path.rootfs=/host'
-    networks:
-      - frontend_net
     pid: host
     restart: unless-stopped
     volumes:
@@ -101,19 +56,9 @@ services:
     container_name: grafana
     image: 'grafana/grafana:11.5.1'
     restart: unless-stopped
-    networks:
-      - frontend_net
-      - proxy_net
     user: "$UID:$GID"
     depends_on:
       - prometheus
-    volumes:
-      - ${PWD}/grafana/runtime-data:/var/lib/grafana
-      - ${PWD}/grafana/datasources/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
-      - ${PWD}/grafana/dashboards/filesystem.yml:/etc/grafana/provisioning/dashboards/filesystem.yml
-      - ${PWD}/grafana/config/grafana.ini:/etc/grafana/grafana.ini
-    env_file:
-      - .env
     environment:
       - GF_USERS_ALLOW_SIGN_UP=false
     healthcheck:
@@ -127,20 +72,10 @@ services:
     container_name: nilai-api
     image: nillion/nilai-api:latest
     privileged: true
-    volumes:
-      - ./nilai-api/src/nilai_api/config/:/app/nilai-api/src/nilai_api/config/
     depends_on:
       etcd:
         condition: service_healthy
-      postgres:
-        condition: service_healthy
     restart: unless-stopped
-    networks:
-      - frontend_net
-      - backend_net
-      - proxy_net
-    env_file:
-      - .env
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/v1/health"]
       interval: 30s
@@ -151,25 +86,14 @@ services:
     container_name: nilai-nuc-api
     image: nillion/nilai-api:latest
     privileged: true
-    volumes:
-      - ./nilai-api/src/nilai_api/config/:/app/nilai-api/src/nilai_api/config/
     depends_on:
       etcd:
-        condition: service_healthy
-      nuc-postgres:
         condition: service_healthy
       api:
         condition: service_healthy
     restart: unless-stopped
-    networks:
-      - frontend_net
-      - backend_net
-      - proxy_net
-    env_file:
-      - .env
     environment:
       - AUTH_STRATEGY=nuc # Overwrite the default strategy
-      - POSTGRES_HOST=nuc-postgres
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/v1/health"]
       interval: 30s
@@ -179,10 +103,6 @@ services:
   attestation:
     image: nillion/nilai-attestation:latest
     restart: unless-stopped
-    networks:
-      - backend_net
-    env_file:
-      - .env
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
@@ -194,40 +114,12 @@ services:
     image: caddy:latest
     container_name: caddy
     restart: unless-stopped
-    networks:
-      - proxy_net
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    env_file:
-      - .env
     volumes:
-      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
-      - ./caddy/caddy_data:/data
-      - ./caddy/caddy_config:/config
-networks:
-  # *  This is the network that is used for the "api" related services
-  ## * API, user management (postgres), caching (redis) and monitoring (prometheus, grafana)
-  ## * This network is used to connect the api, nuc-api, postgres, redis, prometheus, grafana and node-exporter
-  ## * Because they are unique to the deployment the name is not specified, the network is not external
-  frontend_net:
-  # * This is the network that is used for the model related services:
-  ## * API, models, and etcd
-  ## * This network is used to connect the api, nuc-api, models, and etcd
-  ## * This network is meant to be external, so the name is specified
-  ## * Other API instances will use this network
-  backend_net:
-    name: backend_net
-  # * This network is meant to connect from the outside world to the API
-  ## * This connects the API and Caddy
-  ## * This network is created by the main nilAI instance
-  ## * This requires each API instance to have a unique container name
-  ## * This network is meant to be external, so the name is specified
-  ## * Other API instances will use this network
-  proxy_net:
-    name: proxy_net
+      - caddy_data:/data
+      - caddy_config:/config
 
 volumes:
-  postgres_data:
-  nuc_postgres_data:
+  hugging_face_models:
+  caddy_data:
+  caddy_config:
+  prometheus_data:
