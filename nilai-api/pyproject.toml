@@ -13,7 +13,6 @@ dependencies = [
     "accelerate>=1.1.1",
     "alembic>=1.14.1",
     "cryptography>=43.0.1",
-    "ddgs>=9.4.1",
     "fastapi[standard]>=0.115.5",
     "gunicorn>=23.0.0",
     "nilai-common",
@@ -35,6 +34,7 @@ dependencies = [
     "nuc-helpers",
     "nuc",
     "pyyaml>=6.0.1",
+    "aiolimiter>=1.1.0",
 ]
 
 

@@ -1,23 +1,140 @@
 import asyncio
 import logging
-from typing import List
+from typing import List, Dict, Any
 
-from ddgs import DDGS
+import httpx
 from fastapi import HTTPException, status
+from aiolimiter import AsyncLimiter
 
-from nilai_common.api_model import Source
+from nilai_api.config import (
+    BRAVE_SEARCH_API,
+    WEB_SEARCH_API_PATH,
+    WEB_SEARCH_COUNT,
+    WEB_SEARCH_LANG,
+    WEB_SEARCH_COUNTRY,
+    WEB_SEARCH_TIMEOUT,
+    WEB_SEARCH_API_MAX_CONCURRENT_REQUESTS,
+    WEB_SEARCH_API_RPS,
+)
+from nilai_common.api_model import (
+    SearchResult,
+    Source,
+    WebSearchEnhancedMessages,
+    WebSearchContext,
+)
 from nilai_common import Message
-from nilai_common.api_model import WebSearchEnhancedMessages, WebSearchContext
 
 logger = logging.getLogger(__name__)
 
+brave_rate_limiter = AsyncLimiter(WEB_SEARCH_API_RPS, 1)
 
-def perform_web_search_sync(query: str) -> WebSearchContext:
-    """Synchronously query Brave and build a contextual prompt.
+_http_client: httpx.AsyncClient | None = None
+_client_lock = asyncio.Lock()
 
-    The function sends *query* to Brave, extracts the first three text results,
-    formats them in a single prompt, and returns that prompt together with the
-    metadata (URL and snippet) of every result.
+
+async def _get_http_client() -> httpx.AsyncClient:
+    """Get or create a shared HTTP client instance to avoid creating it on every request.
+
+    Returns:
+        An AsyncClient configured with timeouts and connection limits
+    """
+    global _http_client
+    async with _client_lock:
+        if _http_client is None:
+            _http_client = httpx.AsyncClient(
+                timeout=WEB_SEARCH_TIMEOUT,
+                limits=httpx.Limits(
+                    max_connections=WEB_SEARCH_API_MAX_CONCURRENT_REQUESTS
+                ),
+            )
+    return _http_client
+
+
+async def _make_brave_api_request(query: str) -> Dict[str, Any]:
+    """Make an API request to the Brave Search API.
+
+    Args:
+        query: The search query string to execute
+
+    Returns:
+        Dict containing the raw API response data
+
+    Raises:
+        HTTPException: If API key is missing or API request fails
+    """
+    if not BRAVE_SEARCH_API:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Missing BRAVE_SEARCH_API key in environment",
+        )
+    q = " ".join(query.split())
+    q = " ".join(q.split()[:50])[:400]
+    params = {
+        "q": q,
+        "summary": 1,
+        "count": WEB_SEARCH_COUNT,
+        "country": WEB_SEARCH_COUNTRY,
+        "lang": WEB_SEARCH_LANG,
+    }
+    headers = {
+        "X-Subscription-Token": BRAVE_SEARCH_API,
+        "Api-Version": "2023-10-11",
+        "Accept": "application/json",
+    }
+    await brave_rate_limiter.acquire()
+    client = await _get_http_client()
+    resp = await client.get(WEB_SEARCH_API_PATH["web"], headers=headers, params=params)
+    if resp.status_code >= 400:
+        logger.error("Brave API error: %s - %s", resp.status_code, resp.text)
+        error = HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Web search failed, service currently unavailable",
+        )
+        error.status_code = 503
+        raise error
+    return resp.json()
+
+
+def _parse_brave_results(data: Dict[str, Any]) -> List[SearchResult]:
+    """Parse raw Brave Search API results into SearchResult objects.
+
+    Args:
+        data: Raw API response data
+
+    Returns:
+        List of SearchResult objects with title, body and URL
+    """
+    web_block = data.get("web", {}) if isinstance(data, dict) else {}
+    raw_results = web_block.get("results", []) if isinstance(web_block, dict) else []
+    results: List[SearchResult] = []
+    for item in raw_results:
+        if not isinstance(item, dict):
+            continue
+        title = item.get("title", "")[:200]
+        body = item.get("description") or item.get("snippet") or item.get("body", "")
+        url = item.get("url") or item.get("link") or item.get("href", "")
+        if title and body and url:
+            results.append(
+                SearchResult(
+                    title=title,
+                    body=str(body)[:500],
+                    url=str(url)[:500],
+                )
+            )
+    return results
+
+
+async def perform_web_search_async(query: str) -> WebSearchContext:
+    """Perform an asynchronous web search using the Brave Search API.
+
+    Args:
+        query: The search query string to execute
+
+    Returns:
+        WebSearchContext containing formatted search results and source information
+
+    Raises:
+        HTTPException: If query is empty, no results found, or API errors occur
     """
     if not query or not query.strip():
         raise HTTPException(
@@ -25,53 +142,23 @@ def perform_web_search_sync(query: str) -> WebSearchContext:
             detail="Web search requested with an empty query",
         )
 
-    try:
-        with DDGS() as ddgs:
-            raw_results = list(
-                ddgs.text(query=query, max_results=3, region="us-en", backend="brave")
-            )
+    data = await _make_brave_api_request(query)
+    results = _parse_brave_results(data)
 
-        if not raw_results:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Web search failed, service currently unavailable",
-            )
-
-        snippets: List[str] = []
-        sources: List[Source] = []
-
-        for result in raw_results:
-            if result.get("title") and result.get("body"):
-                title = result["title"]
-                body = result["body"][:500]
-                snippets.append(f"{title}: {body}")
-                sources.append(
-                    Source(
-                        source=result.get("href", result.get("url", "")), content=body
-                    )
-                )
-
-        prompt = (
-            "You have access to the following current information from web search:\n"
-            + "\n".join(snippets)
+    if not results:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No web results found",
         )
 
-        return WebSearchContext(prompt=prompt, sources=sources)
+    lines = [
+        f"[{idx}] {r.title}\nURL: {r.url}\nSnippet: {r.body}"
+        for idx, r in enumerate(results, start=1)
+    ]
+    prompt = "\n".join(lines)
+    sources = [Source(source=r.url, content=r.body) for r in results]
 
-    except HTTPException:
-        raise
-    except Exception as exc:
-        logger.error("Error performing web search: %s", exc)
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Web search failed, service currently unavailable",
-        ) from exc
-
-
-async def get_web_search_context(query: str) -> WebSearchContext:
-    """Non-blocking wrapper around *perform_web_search_sync*."""
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, perform_web_search_sync, query)
+    return WebSearchContext(prompt=prompt, sources=sources)
 
 
 async def enhance_messages_with_web_search(
@@ -87,28 +174,31 @@ async def enhance_messages_with_web_search(
         WebSearchEnhancedMessages containing the original messages with web search
         context prepended as a system message, along with source information
     """
-    ctx = await get_web_search_context(query)
+    ctx = await perform_web_search_async(query)
     enhanced = [Message(role="system", content=ctx.prompt)] + messages
-    return WebSearchEnhancedMessages(messages=enhanced, sources=ctx.sources)
+    query_source = Source(source="search_query", content=query)
+    return WebSearchEnhancedMessages(
+        messages=enhanced,
+        sources=[query_source] + ctx.sources,
+    )
 
 
 async def generate_search_query_from_llm(
     user_message: str, model_name: str, client
 ) -> str:
-    """Generate a web search query from a user message using an LLM.
+    system_prompt = """
+        You are given a user question. Your task is to generate a concise web search query that will best retrieve information to answer the question. If the user’s question is already optimal, simply repeat it as the query. This is essentially summarization, paraphrasing, and key term extraction.  
 
-    Args:
-        user_message: The user's input message to convert into a search query
-        model_name: The name of the LLM model to use for query generation
-        client: The LLM client instance for making API calls
+    - Do not add guiding elements or assumptions that the user did not explicitly request.  
+    - Do not answer the query.  
+    - The query must contain at least 10 words.  
+    - Output only the search query.  
 
-    Returns:
-        A concise web search query string optimized for information retrieval
+    ### Example
 
-    Raises:
-        Exception: If the LLM API call fails or returns an invalid response
+    **User:** Who won the Roland Garros Open in 2024? Just reply with the winner's name.  
+    **Search query:** Roland Garros 2024 tennis tournament winner men women champion
     """
-    system_prompt = """You are given a user question. Generate a concise web search query that would help retrieve information to answer the question. If you cannot improve the user's question, simply repeat it as the search query. Do not answer the query. The query must be at least 10 words long. Output only the search query.\n\nExample:\nUser: Who won the Roland Garros Open in 2024? Just reply with the winner's name.\nSearch query: Roland Garros 2024 winner"""
     messages = [
         Message(role="system", content=system_prompt),
         Message(role="user", content=user_message),
@@ -118,11 +208,25 @@ async def generate_search_query_from_llm(
         "messages": [m.model_dump() for m in messages],
         "max_tokens": 150,
     }
-    response = await client.chat.completions.create(**req)
-    logger.info(
-        f"For {[m.model_dump() for m in messages]}, Generated search query: {response.choices[0].message.content.strip()}"
-    )
-    return response.choices[0].message.content.strip()
+    try:
+        response = await client.chat.completions.create(**req)
+    except Exception as exc:
+        raise RuntimeError(f"Failed to generate search query: {str(exc)}") from exc
+
+    if not response.choices:
+        raise RuntimeError("LLM returned an empty search query")
+
+    try:
+        content = response.choices[0].message.content.strip()
+    except (AttributeError, IndexError, TypeError) as exc:
+        raise RuntimeError(f"Invalid response structure from LLM: {str(exc)}") from exc
+
+    if not content:
+        raise RuntimeError("LLM returned an empty search query")
+
+    logger.debug("Generated search query: %s", content)
+
+    return content
 
 
 async def handle_web_search(
@@ -155,4 +259,5 @@ async def handle_web_search(
         )
         return await enhance_messages_with_web_search(req_messages, concise_query)
     except Exception:
+        logger.warning("Web search enhancement failed")
         return WebSearchEnhancedMessages(messages=req_messages, sources=[])
