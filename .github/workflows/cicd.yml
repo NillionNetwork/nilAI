@@ -136,7 +136,7 @@ jobs:
          sed -i 's/HF_TOKEN=.*/HF_TOKEN=${{ secrets.HF_TOKEN }}/' .env
 
       - name: Compose docker-compose.yml
-        run: bash ./scripts/docker-composer.sh --dev -f docker/compose/docker-compose.llama-1b-gpu.ci.yml -o development-compose.yml
+        run: python3 ./scripts/docker-composer.py --dev -f docker/compose/docker-compose.llama-1b-gpu.ci.yml -o development-compose.yml
 
       - name: Start Services
         run: |

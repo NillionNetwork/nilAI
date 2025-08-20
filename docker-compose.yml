@@ -71,7 +71,6 @@ services:
   api:
     container_name: nilai-api
     image: nillion/nilai-api:latest
-    privileged: true
     depends_on:
       etcd:
         condition: service_healthy
@@ -85,7 +84,6 @@ services:
   nuc-api:
     container_name: nilai-nuc-api
     image: nillion/nilai-api:latest
-    privileged: true
     depends_on:
       etcd:
         condition: service_healthy
