@@ -33,10 +33,29 @@ datasources:
     type: postgres
     access: proxy
     orgId: 1
-    url: nuc-${POSTGRES_HOST}:${POSTGRES_PORT}
+    url: ${POSTGRES_HOST}:${POSTGRES_PORT}
     isDefault: false
     uid: "eehsf95n2at4wf"
-    database: ${POSTGRES_DB}
+    database: ${POSTGRES_DB_NUC}
+    user: ${POSTGRES_USER}
+    secureJsonData:
+      password: ${POSTGRES_PASSWORD}
+    jsonData:
+      sslmode: 'disable'
+      maxOpenConns: 100
+      maxIdleConns: 100
+      connMaxLifetime: 14400
+      postgresVersion: 1200
+      timescaledb: false
+
+  - name: Testnet PostgreSQL NUC
+    type: postgres
+    access: proxy
+    orgId: 1
+    url: ${POSTGRES_HOST}:${POSTGRES_PORT}
+    isDefault: false
+    uid: "eehsf95n2at4wg"
+    database: ${POSTGRES_DB_TESTNET}
     user: ${POSTGRES_USER}
     secureJsonData:
       password: ${POSTGRES_PASSWORD}
