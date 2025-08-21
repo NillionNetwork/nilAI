@@ -24,6 +24,7 @@ services:
       --model deepseek-ai/DeepSeek-R1-Distill-Qwen-14B
       --gpu-memory-utilization 0.39
       --max-model-len 10000
+      --max_num_batched_tokens 10000
       --tensor-parallel-size 1
       --uvicorn-log-level warning
     environment:

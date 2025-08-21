@@ -24,6 +24,7 @@ services:
       --model cognitivecomputations/Dolphin3.0-Llama3.1-8B
       --gpu-memory-utilization 0.21
       --max-model-len 10000
+      --max_num_batched_tokens 10000
       --tensor-parallel-size 1
       --enable-auto-tool-choice
       --tool-call-parser llama3_json
