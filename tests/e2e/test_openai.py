@@ -330,12 +330,22 @@ def test_function_calling(client, model):
 
             # Validate the first tool call
             first_call = tool_calls[0]
-            assert first_call.function.name == "get_weather", (
-                "Function name should be get_weather"
-            )
+            # Convert to dict to access the data safely
+            first_call_dict = first_call.model_dump()
+
+            # Extract function name and arguments from the tool call
+            if "function" in first_call_dict:
+                function_name = first_call_dict["function"]["name"]
+                function_args = first_call_dict["function"]["arguments"]
+            else:
+                # Fallback for different structure
+                function_name = first_call_dict.get("name", "")
+                function_args = first_call_dict.get("arguments", "")
+
+            assert function_name == "get_weather", "Function name should be get_weather"
 
             # Parse arguments and check for location
-            args = json.loads(first_call.function.arguments)
+            args = json.loads(function_args)
             assert "location" in args, "Arguments should contain location"
             assert "paris" in args["location"].lower(), "Location should be Paris"
 
@@ -363,7 +373,7 @@ def test_function_calling(client, model):
                                 "type": "function",
                                 "function": {
                                     "name": "get_weather",
-                                    "arguments": first_call.function.arguments,
+                                    "arguments": function_args,
                                 },
                             }
                         ],
