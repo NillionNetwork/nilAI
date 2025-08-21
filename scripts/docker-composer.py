@@ -17,6 +17,7 @@ import os
 import subprocess
 import sys
 import shutil
+import yaml
 
 
 def find_docker_compose_command():
@@ -188,12 +189,105 @@ def restore_files_variable(output_file, files_placeholder):
     with open(output_file, "r") as f:
         content = f.read()
 
-    content = content.replace(files_placeholder, "${FILES}")
+    content = content.replace(files_placeholder, "$FILES")
 
     with open(output_file, "w") as f:
         f.write(content)
 
     print("Restored ${FILES} variable")
+
+
+def process_compose_yaml(output_file):
+    """Process the compose YAML file to remove volumes and convert bind mount formats"""
+    print("Processing compose YAML for volume removal and bind mount conversions...")
+
+    with open(output_file, "r") as f:
+        content = f.read()
+
+    try:
+        # Parse YAML
+        compose_data = yaml.safe_load(content)
+
+        # Remove global volumes section entirely
+        if "volumes" in compose_data:
+            print("Removing global volumes section...")
+            del compose_data["volumes"]
+
+        # Process service volume mounts - remove volume mounts, convert bind mounts
+        if "services" in compose_data:
+            for service_name, service_config in compose_data["services"].items():
+                if "volumes" in service_config and isinstance(
+                    service_config["volumes"], list
+                ):
+                    new_volumes = []
+                    for volume in service_config["volumes"]:
+                        if isinstance(volume, dict):
+                            # Handle long-form definitions
+                            if (
+                                volume.get("type") == "bind"
+                                and "source" in volume
+                                and "target" in volume
+                            ):
+                                # Keep bind mounts, convert to short form
+                                source = volume["source"]
+                                target = volume["target"]
+                                # Check for read_only flag
+                                if volume.get("read_only"):
+                                    new_volumes.append(f"{source}:{target}:ro")
+                                else:
+                                    new_volumes.append(f"{source}:{target}")
+                            elif volume.get("type") == "volume":
+                                # Remove volume mounts entirely
+                                print(
+                                    f"Removing volume mount from service {service_name}: {volume}"
+                                )
+                                continue
+                            else:
+                                # Keep other types as-is
+                                new_volumes.append(volume)
+                        else:
+                            # Handle string format volumes
+                            volume_str = str(volume)
+                            if ":" in volume_str:
+                                # Check if it's a bind mount (absolute path) or volume mount (volume name)
+                                source_part = volume_str.split(":")[0]
+                                if (
+                                    source_part.startswith("/")
+                                    or source_part.startswith("./")
+                                    or source_part.startswith("${")
+                                ):
+                                    # It's a bind mount (absolute path, relative path, or variable)
+                                    new_volumes.append(volume)
+                                else:
+                                    # It's a volume mount (named volume)
+                                    print(
+                                        f"Removing volume mount from service {service_name}: {volume}"
+                                    )
+                                    continue
+                            else:
+                                # Single name without colon - likely a volume mount
+                                print(
+                                    f"Removing volume mount from service {service_name}: {volume}"
+                                )
+                                continue
+                    if new_volumes:
+                        service_config["volumes"] = new_volumes
+                    else:
+                        service_config.pop("volumes", None)
+
+        # Write back to file with proper YAML formatting
+        with open(output_file, "w") as f:
+            yaml.dump(
+                compose_data, f, default_flow_style=False, indent=2, sort_keys=False
+            )
+
+        print("Completed YAML processing")
+
+    except yaml.YAMLError as e:
+        print(f"Error parsing YAML: {e}")
+        print("Falling back to original content")
+        # If YAML parsing fails, keep original content
+        pass
 
 
 def make_paths_portable(output_file):
@@ -266,6 +360,9 @@ def main():
 
             # Restore FILES variable
             restore_files_variable(args.output, files_placeholder)
+
+            # Process YAML for volume and mount conversions
+            process_compose_yaml(args.output)
         else:
             # Generate config and apply modifications
             temp_file = f"{args.output}.tmp"
@@ -278,6 +375,9 @@ def main():
 
             # Restore FILES variable first
             restore_files_variable(args.output, files_placeholder)
+
+            # Process YAML for volume and mount conversions
+            process_compose_yaml(args.output)
 
             # Apply image substitutions
             apply_image_substitutions(args.output, image_substitutions)

@@ -35,7 +35,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              count: all
+              count: 1
               capabilities: [gpu]
-    volumes:
-      - /dev/sev-guest:/dev/sev-guest # for AMD SEV
+    #volumes:
+    #  - /dev/sev-guest:/dev/sev-guest # for AMD SEV

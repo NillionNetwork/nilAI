@@ -142,10 +142,11 @@ For a complete production setup with custom images:
 python3 ./scripts/docker-composer.py --prod \
   -f docker/compose/docker-compose.llama-3b-gpu.yml \
   -f docker/compose/docker-compose.llama-8b-gpu.yml \
+  -f docker/compose/docker-compose.deepseek-14b-gpu.yml \
   --image 'nillion/nilai-api:latest=public.ecr.aws/k5d9x2g2/nilai-api:v0.2.0-alpha-0' \
   --image 'nillion/nilai-vllm:latest=public.ecr.aws/k5d9x2g2/nilai-vllm:v0.2.0-alpha-0' \
   --image 'nillion/nilai-attestation:latest=public.ecr.aws/k5d9x2g2/nilai-attestation:v0.2.0-alpha-0' \
-  --testnet
+  --testnet \
   -o production-compose.yml
 
 # Or:

@@ -41,10 +41,9 @@ services:
     image: quay.io/prometheus/node-exporter:v1.8.2
     command:
       - '--path.rootfs=/host'
-    pid: host
     restart: unless-stopped
-    volumes:
-      - '/:/host:ro,rslave'
+#    volumes:
+#      - '/:/host:ro,rslave'
     healthcheck:
       test: ["CMD", "wget", "http://localhost:9100/", "-O", "/dev/null", "-o", "/dev/null"]
       interval: 30s
