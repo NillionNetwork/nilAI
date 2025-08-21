@@ -180,10 +180,11 @@ async def test_web_search_rate_limits(redis_client):
 @pytest.mark.asyncio
 async def test_global_web_search_rps_limit(req, redis_client, monkeypatch):
     from nilai_api import rate_limiting as rl
+
     await redis_client[0].delete("global:web_search:rps")
-    monkeypatch.setattr(rl, "WEB_SEARCH_API_RPS", 20)
-    monkeypatch.setattr(rl, "WEB_SEARCH_API_MAX_CONCURRENT_REQUESTS", 20)
-    monkeypatch.setattr(rl, "WEB_SEARCH_COUNT", 1)
+    monkeypatch.setattr(rl.WEB_SEARCH_SETTINGS, "rps", 20)
+    monkeypatch.setattr(rl.WEB_SEARCH_SETTINGS, "max_concurrent_requests", 20)
+    monkeypatch.setattr(rl.WEB_SEARCH_SETTINGS, "count", 1)
 
     rate_limit = RateLimit(web_search_extractor=lambda _: True)
     user_limits = UserRateLimits(
@@ -216,10 +217,11 @@ async def test_global_web_search_rps_limit(req, redis_client, monkeypatch):
 @pytest.mark.asyncio
 async def test_queueing_across_seconds(req, redis_client, monkeypatch):
     from nilai_api import rate_limiting as rl
+
     await redis_client[0].delete("global:web_search:rps")
-    monkeypatch.setattr(rl, "WEB_SEARCH_API_RPS", 20)
-    monkeypatch.setattr(rl, "WEB_SEARCH_API_MAX_CONCURRENT_REQUESTS", 20)
-    monkeypatch.setattr(rl, "WEB_SEARCH_COUNT", 1)
+    monkeypatch.setattr(rl.WEB_SEARCH_SETTINGS, "rps", 20)
+    monkeypatch.setattr(rl.WEB_SEARCH_SETTINGS, "max_concurrent_requests", 20)
+    monkeypatch.setattr(rl.WEB_SEARCH_SETTINGS, "count", 1)
 
     rate_limit = RateLimit(web_search_extractor=lambda _: True)
     user_limits = UserRateLimits(

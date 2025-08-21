@@ -3,11 +3,7 @@ from asyncio import iscoroutine
 from typing import Callable, Tuple, Awaitable, Annotated
 
 from pydantic import BaseModel
-from nilai_api.config import (
-    WEB_SEARCH_API_RPS,
-    WEB_SEARCH_API_MAX_CONCURRENT_REQUESTS,
-    WEB_SEARCH_COUNT,
-)
+from nilai_api.config import WEB_SEARCH_SETTINGS
 
 from fastapi.params import Depends
 from fastapi import status, HTTPException, Request
@@ -160,11 +156,11 @@ class RateLimit:
 
             if web_search_enabled:
                 allowed_rps = min(
-                    WEB_SEARCH_API_RPS,
+                    WEB_SEARCH_SETTINGS.rps,
                     max(
                         1,
-                        WEB_SEARCH_API_MAX_CONCURRENT_REQUESTS
-                        // WEB_SEARCH_COUNT,
+                        WEB_SEARCH_SETTINGS.max_concurrent_requests
+                        // WEB_SEARCH_SETTINGS.count,
                     ),
                 )
                 await self.wait_for_bucket(

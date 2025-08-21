@@ -1,21 +1,12 @@
-import asyncio
 import logging
+from functools import lru_cache
 from typing import List, Dict, Any
 
 import httpx
 from fastapi import HTTPException, status
 from aiolimiter import AsyncLimiter
 
-from nilai_api.config import (
-    BRAVE_SEARCH_API,
-    WEB_SEARCH_API_PATH,
-    WEB_SEARCH_COUNT,
-    WEB_SEARCH_LANG,
-    WEB_SEARCH_COUNTRY,
-    WEB_SEARCH_TIMEOUT,
-    WEB_SEARCH_API_MAX_CONCURRENT_REQUESTS,
-    WEB_SEARCH_API_RPS,
-)
+from nilai_api.config import WEB_SEARCH_SETTINGS
 from nilai_common.api_model import (
     SearchResult,
     Source,
@@ -26,28 +17,34 @@ from nilai_common import Message
 
 logger = logging.getLogger(__name__)
 
-brave_rate_limiter = AsyncLimiter(WEB_SEARCH_API_RPS, 1)
+brave_rate_limiter = AsyncLimiter(WEB_SEARCH_SETTINGS.rps, 1)
 
-_http_client: httpx.AsyncClient | None = None
-_client_lock = asyncio.Lock()
+_BRAVE_API_HEADERS = {
+    "Api-Version": "2023-10-11",
+    "Accept": "application/json",
+}
+
+_BRAVE_API_PARAMS_BASE = {
+    "summary": 1,
+    "count": WEB_SEARCH_SETTINGS.count,
+    "country": WEB_SEARCH_SETTINGS.country,
+    "lang": WEB_SEARCH_SETTINGS.lang,
+}
 
 
-async def _get_http_client() -> httpx.AsyncClient:
+@lru_cache(maxsize=1)
+def _get_http_client() -> httpx.AsyncClient:
     """Get or create a shared HTTP client instance to avoid creating it on every request.
 
     Returns:
         An AsyncClient configured with timeouts and connection limits
     """
-    global _http_client
-    async with _client_lock:
-        if _http_client is None:
-            _http_client = httpx.AsyncClient(
-                timeout=WEB_SEARCH_TIMEOUT,
-                limits=httpx.Limits(
-                    max_connections=WEB_SEARCH_API_MAX_CONCURRENT_REQUESTS
-                ),
-            )
-    return _http_client
+    return httpx.AsyncClient(
+        timeout=WEB_SEARCH_SETTINGS.timeout,
+        limits=httpx.Limits(
+            max_connections=WEB_SEARCH_SETTINGS.max_concurrent_requests
+        ),
+    )
 
 
 async def _make_brave_api_request(query: str) -> Dict[str, Any]:
@@ -62,28 +59,23 @@ async def _make_brave_api_request(query: str) -> Dict[str, Any]:
     Raises:
         HTTPException: If API key is missing or API request fails
     """
-    if not BRAVE_SEARCH_API:
+    if not WEB_SEARCH_SETTINGS.api_key:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Missing BRAVE_SEARCH_API key in environment",
         )
     q = " ".join(query.split())
     q = " ".join(q.split()[:50])[:400]
-    params = {
-        "q": q,
-        "summary": 1,
-        "count": WEB_SEARCH_COUNT,
-        "country": WEB_SEARCH_COUNTRY,
-        "lang": WEB_SEARCH_LANG,
-    }
+    params = {**_BRAVE_API_PARAMS_BASE, "q": q}
     headers = {
-        "X-Subscription-Token": BRAVE_SEARCH_API,
-        "Api-Version": "2023-10-11",
-        "Accept": "application/json",
+        **_BRAVE_API_HEADERS,
+        "X-Subscription-Token": WEB_SEARCH_SETTINGS.api_key,
     }
     await brave_rate_limiter.acquire()
-    client = await _get_http_client()
-    resp = await client.get(WEB_SEARCH_API_PATH["web"], headers=headers, params=params)
+    client = _get_http_client()
+    resp = await client.get(
+        WEB_SEARCH_SETTINGS.api_path, headers=headers, params=params
+    )
     if resp.status_code >= 400:
         logger.error("Brave API error: %s - %s", resp.status_code, resp.text)
         error = HTTPException(
