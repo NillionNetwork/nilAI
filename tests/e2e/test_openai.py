@@ -789,3 +789,110 @@ def test_web_search(client, model):
                 print("All retries failed.")
                 raise last_exception
     pytest.skip("web_search could not be validated due to environment")
+
+
+def test_web_search_global_rps_e2e(client):
+    """Test that web search requests are rate limited to 20 per second globally."""
+    import threading
+    import time
+    import openai
+
+    # Send 40 concurrent requests to exceed the 20 RPS limit
+    responses = []
+    start_time = time.time()
+    
+    def make_request():
+        try:
+            response = client.chat.completions.create(
+                model=test_models[0],
+                messages=[{"role": "user", "content": "What is the latest news?"}],
+                extra_body={"web_search": True},
+                max_tokens=10,
+                temperature=0.0,
+            )
+            responses.append((time.time() - start_time, response))
+        except openai.RateLimitError as e:
+            responses.append((time.time() - start_time, e))
+        except Exception as e:
+            responses.append((time.time() - start_time, e))
+
+    threads = []
+    for _ in range(40):
+        thread = threading.Thread(target=make_request)
+        threads.append(thread)
+        thread.start()
+
+    for thread in threads:
+        thread.join()
+
+    # Verify we got responses (either success or rate limit)
+    assert len(responses) == 40, "All requests should complete"
+    
+    # Separate successful and rate-limited responses
+    successful_responses = [(t, r) for t, r in responses if not isinstance(r, Exception)]
+    rate_limited_responses = [(t, r) for t, r in responses if isinstance(r, openai.RateLimitError)]
+    
+    # Check that at most 20 successful requests completed in the first second
+    first_second_successful = [r for t, r in successful_responses if t < 1.0]
+    assert len(first_second_successful) <= 20, "At most 20 successful requests should complete in first second"
+    
+    # Check that some requests took longer than 1 second (were queued) or were rate limited
+    completion_times = [t for t, r in successful_responses]
+    if completion_times:
+        assert max(completion_times) >= 1.0 or len(rate_limited_responses) > 0, "Some requests should be queued or rate limited"
+
+
+def test_web_search_queueing_next_second_e2e(client):
+    """Test that web search requests are properly queued and processed in batches."""
+    import threading
+    import time
+    import openai
+
+    # Send 25 requests to test queuing behavior
+    responses = []
+    start_time = time.time()
+    
+    def make_request():
+        try:
+            response = client.chat.completions.create(
+                model=test_models[0],
+                messages=[{"role": "user", "content": "What is the weather like?"}],
+                extra_body={"web_search": True},
+                max_tokens=10,
+                temperature=0.0,
+            )
+            responses.append((time.time() - start_time, response))
+        except openai.RateLimitError as e:
+            responses.append((time.time() - start_time, e))
+        except Exception as e:
+            responses.append((time.time() - start_time, e))
+
+    threads = []
+    for _ in range(25):
+        thread = threading.Thread(target=make_request)
+        threads.append(thread)
+        thread.start()
+
+    for thread in threads:
+        thread.join()
+
+    # Verify we got responses
+    assert len(responses) == 25, "All requests should complete"
+    
+    # Separate successful and rate-limited responses
+    successful_responses = [(t, r) for t, r in responses if not isinstance(r, Exception)]
+    rate_limited_responses = [(t, r) for t, r in responses if isinstance(r, openai.RateLimitError)]
+    
+    # Check that at most 20 successful requests completed in the first second
+    first_second_successful = [r for t, r in successful_responses if t < 1.0]
+    assert len(first_second_successful) <= 20, "At most 20 successful requests should complete in first second"
+    
+    # Check that remaining requests were processed in subsequent seconds or rate limited
+    completion_times = [t for t, r in successful_responses]
+    assert any(t >= 1.0 for t in completion_times) or len(rate_limited_responses) > 0, "Some requests should be queued to next second or rate limited"
+    
+    # Verify successful responses are valid
+    for t, response in successful_responses:
+        assert isinstance(response, ChatCompletion), "Response should be a ChatCompletion object"
+        assert len(response.choices) > 0, "Response should contain at least one choice"
+        assert response.choices[0].message.content, "Response should contain content"

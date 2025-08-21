@@ -175,3 +175,76 @@ async def test_web_search_rate_limits(redis_client):
     # Second request should be rejected due to minute limit (1 per minute)
     with pytest.raises(HTTPException):
         await consume_generator(rate_limit(mock_request, user_limits))
+
+
+@pytest.mark.asyncio
+async def test_global_web_search_rps_limit(req, redis_client, monkeypatch):
+    from nilai_api import rate_limiting as rl
+    await redis_client[0].delete("global:web_search:rps")
+    monkeypatch.setattr(rl, "WEB_SEARCH_API_RPS", 20)
+    monkeypatch.setattr(rl, "WEB_SEARCH_API_MAX_CONCURRENT_REQUESTS", 20)
+    monkeypatch.setattr(rl, "WEB_SEARCH_COUNT", 1)
+
+    rate_limit = RateLimit(web_search_extractor=lambda _: True)
+    user_limits = UserRateLimits(
+        subscription_holder=random_id(),
+        day_limit=None,
+        hour_limit=None,
+        minute_limit=None,
+        token_rate_limit=None,
+        web_search_day_limit=None,
+        web_search_hour_limit=None,
+        web_search_minute_limit=None,
+    )
+
+    async def run_guarded(i, times, t0):
+        async for _ in rate_limit(req, user_limits):
+            times[i] = asyncio.get_event_loop().time() - t0
+            await asyncio.sleep(0.01)
+
+    n = 40
+    times = [0.0] * n
+    t0 = asyncio.get_event_loop().time()
+    tasks = [asyncio.create_task(run_guarded(i, times, t0)) for i in range(n)]
+    await asyncio.gather(*tasks)
+
+    within_first_second = [t for t in times if t < 1.0]
+    assert len(within_first_second) <= 20
+    assert max(times) >= 1.0
+
+
+@pytest.mark.asyncio
+async def test_queueing_across_seconds(req, redis_client, monkeypatch):
+    from nilai_api import rate_limiting as rl
+    await redis_client[0].delete("global:web_search:rps")
+    monkeypatch.setattr(rl, "WEB_SEARCH_API_RPS", 20)
+    monkeypatch.setattr(rl, "WEB_SEARCH_API_MAX_CONCURRENT_REQUESTS", 20)
+    monkeypatch.setattr(rl, "WEB_SEARCH_COUNT", 1)
+
+    rate_limit = RateLimit(web_search_extractor=lambda _: True)
+    user_limits = UserRateLimits(
+        subscription_holder=random_id(),
+        day_limit=None,
+        hour_limit=None,
+        minute_limit=None,
+        token_rate_limit=None,
+        web_search_day_limit=None,
+        web_search_hour_limit=None,
+        web_search_minute_limit=None,
+    )
+
+    async def run_guarded(i, times, t0):
+        async for _ in rate_limit(req, user_limits):
+            times[i] = asyncio.get_event_loop().time() - t0
+            await asyncio.sleep(0.01)
+
+    n = 25
+    times = [0.0] * n
+    t0 = asyncio.get_event_loop().time()
+    tasks = [asyncio.create_task(run_guarded(i, times, t0)) for i in range(n)]
+    await asyncio.gather(*tasks)
+
+    first_window = [t for t in times if t < 1.0]
+    second_window = [t for t in times if 1.0 <= t < 2.0]
+    assert len(first_window) <= 20
+    assert len(second_window) >= 1
