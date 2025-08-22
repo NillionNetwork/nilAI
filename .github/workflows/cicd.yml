@@ -196,10 +196,13 @@ jobs:
           docker-compose -f development-compose.yml down -v
 
   push-images:
-    name: Push images to ECR
+    name: Push ${{ matrix.component }} to ECR
     needs: [start-runner, build-images, e2e-tests]
     runs-on: ${{ needs.start-runner.outputs.label }}
     if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'release'
+    strategy:
+      matrix:
+        component: [vllm, attestation, api]
     steps:
       - name: Configure AWS credentials for ECR
         uses: aws-actions/configure-aws-credentials@v4
@@ -219,21 +222,17 @@ jobs:
           IMAGE_TAG="${{ github.event_name == 'release' && github.ref_name || github.sha }}"
           echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
 
-      - name: Push images to ECR
+      - name: Push ${{ matrix.component }} to ECR
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REGISTRY_ALIAS: k5d9x2g2
           IMAGE_TAG: ${{ steps.image-tags.outputs.image_tag }}
         run: |
-          echo "Pushing images to ECR..."
-          docker push ${ECR_REGISTRY}/${ECR_REGISTRY_ALIAS}/nilai-vllm:${IMAGE_TAG}
-          docker push ${ECR_REGISTRY}/${ECR_REGISTRY_ALIAS}/nilai-attestation:${IMAGE_TAG}
-          docker push ${ECR_REGISTRY}/${ECR_REGISTRY_ALIAS}/nilai-api:${IMAGE_TAG}
+          echo "Pushing ${{ matrix.component }} image to ECR..."
+          docker push ${ECR_REGISTRY}/${ECR_REGISTRY_ALIAS}/nilai-${{ matrix.component }}:${IMAGE_TAG}
 
-          echo "## Pushed Images" >> $GITHUB_STEP_SUMMARY
-          echo "- vllm: \`${ECR_REGISTRY}/${ECR_REGISTRY_ALIAS}/nilai-vllm:${IMAGE_TAG}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- attestation: \`${ECR_REGISTRY}/${ECR_REGISTRY_ALIAS}/nilai-attestation:${IMAGE_TAG}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- api: \`${ECR_REGISTRY}/${ECR_REGISTRY_ALIAS}/nilai-api:${IMAGE_TAG}\`" >> $GITHUB_STEP_SUMMARY
+          echo "## Pushed ${{ matrix.component }} Image" >> $GITHUB_STEP_SUMMARY
+          echo "- ${{ matrix.component }}: \`${ECR_REGISTRY}/${ECR_REGISTRY_ALIAS}/nilai-${{ matrix.component }}:${IMAGE_TAG}\`" >> $GITHUB_STEP_SUMMARY
 
   stop-runner:
     name: Stop self-hosted EC2 runner
