@@ -22,7 +22,7 @@ services:
       --model hugging-quants/Meta-Llama-3.1-70B-Instruct-AWQ-INT4
       --gpu-memory-utilization 0.95
       --max-model-len 60000
-      --max_num_batched_tokens 60000
+      --max-num-batched-tokens 60000
       --tensor-parallel-size 1
       --enable-auto-tool-choice
       --tool-call-parser llama3_json
