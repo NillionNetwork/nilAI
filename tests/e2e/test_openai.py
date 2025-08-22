@@ -328,19 +328,11 @@ def test_function_calling(client, model):
 
             assert len(tool_calls) > 0, f"Tool calls array is empty for {model}"
 
-            # Validate the first tool call
             first_call = tool_calls[0]
-            # Convert to dict to access the data safely
             first_call_dict = first_call.model_dump()
 
-            # Extract function name and arguments from the tool call
-            if "function" in first_call_dict:
-                function_name = first_call_dict["function"]["name"]
-                function_args = first_call_dict["function"]["arguments"]
-            else:
-                # Fallback for different structure
-                function_name = first_call_dict.get("name", "")
-                function_args = first_call_dict.get("arguments", "")
+            function_name = first_call_dict["function"]["name"]
+            function_args = first_call_dict["function"]["arguments"]
 
             assert function_name == "get_weather", "Function name should be get_weather"
 
