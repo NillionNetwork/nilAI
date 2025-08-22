@@ -68,7 +68,7 @@ jobs:
         with:
           mode: start
           github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
-          runners-per-machine: 1
+          runners-per-machine: 3
           number-of-machines: 1
           ec2-image-id: ami-0174a246556e8750b
           ec2-instance-type: g4dn.xlarge
