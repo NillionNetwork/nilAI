@@ -1,4 +1,4 @@
-#!  This is used to deploy the nilai-api for the development environment
+#!  This is used to deploy the nilai-api for the testnet production environment
 #!  It include the api, nuc-api, postgres dbs, redis, prometheus, grafana and node-exporter
 #!  It doesn't use caddy (as it is unique for the whole system)
 #!  It doesn't include any models as it is redundant with the main nilAI instance

@@ -21,7 +21,15 @@ import yaml
 
 
 def find_docker_compose_command():
-    """Detect which docker compose command to use - prefer docker compose (v2) over docker-compose (v1)"""
+    """
+    Detect which docker compose command to use - prefer docker compose (v2) over docker-compose (v1).
+
+    Returns:
+        str: The docker compose command to use ("docker compose" or "docker-compose").
+
+    Raises:
+        SystemExit: If neither 'docker compose' nor 'docker-compose' is available, the program exits with code 1.
+    """
     if (
         subprocess.run(
             ["docker", "compose", "version"], capture_output=True, check=False
