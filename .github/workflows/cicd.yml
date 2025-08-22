@@ -87,10 +87,16 @@ jobs:
               {"Key": "Environment", "Value": "production"}
             ]
 
-  e2e-tests:
-    name: E2E Tests
+  build-images:
+    name: Build ${{ matrix.component }} image
     needs: start-runner
     runs-on: ${{ needs.start-runner.outputs.label }}
+    strategy:
+      matrix:
+        component: [vllm, attestation, api]
+        include:
+          - component: api
+            build_args: "--target nilai --platform linux/amd64"
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -99,6 +105,7 @@ jobs:
         with:
           enable-cache: true
           cache-dependency-glob: "**/pyproject.toml"
+
       - name: Install dependencies
         run: |
           apt-get update && apt-get install curl git pkg-config automake file python3.12-dev -y
@@ -122,33 +129,34 @@ jobs:
           IMAGE_TAG="${{ github.event_name == 'release' && github.ref_name || github.sha }}"
           echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
 
-      - name: Build all images in parallel
+      - name: Build ${{ matrix.component }} image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REGISTRY_ALIAS: k5d9x2g2
           IMAGE_TAG: ${{ steps.image-tags.outputs.image_tag }}
         run: |
-          # Start all builds in parallel
-          docker build -t nillion/nilai-vllm:latest -f docker/vllm.Dockerfile . &
-          VLLM_PID=$!
+          echo "Building ${{ matrix.component }} image..."
+          docker build -t nillion/nilai-${{ matrix.component }}:latest -f docker/${{ matrix.component }}.Dockerfile ${{ matrix.build_args || '' }} .
+          docker tag nillion/nilai-${{ matrix.component }}:latest ${ECR_REGISTRY}/${ECR_REGISTRY_ALIAS}/nilai-${{ matrix.component }}:${IMAGE_TAG}
+          echo "✅ ${{ matrix.component }} build completed successfully"
 
-          docker build -t nillion/nilai-attestation:latest -f docker/attestation.Dockerfile . &
-          ATTESTATION_PID=$!
+  e2e-tests:
+    name: E2E Tests
+    needs: [start-runner, build-images]
+    runs-on: ${{ needs.start-runner.outputs.label }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
 
-          docker build -t nillion/nilai-api:latest -f docker/api.Dockerfile --target nilai --platform linux/amd64 . &
-          API_PID=$!
+      - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: "**/pyproject.toml"
 
-          # Wait for all builds to complete
-          wait $VLLM_PID && echo "✅ VLLM build completed" || { echo "❌ VLLM build failed"; exit 1; }
-          wait $ATTESTATION_PID && echo "✅ Attestation build completed" || { echo "❌ Attestation build failed"; exit 1; }
-          wait $API_PID && echo "✅ API build completed" || { echo "❌ API build failed"; exit 1; }
-
-          # Tag all images for ECR
-          docker tag nillion/nilai-vllm:latest ${ECR_REGISTRY}/${ECR_REGISTRY_ALIAS}/nilai-vllm:${IMAGE_TAG}
-          docker tag nillion/nilai-attestation:latest ${ECR_REGISTRY}/${ECR_REGISTRY_ALIAS}/nilai-attestation:${IMAGE_TAG}
-          docker tag nillion/nilai-api:latest ${ECR_REGISTRY}/${ECR_REGISTRY_ALIAS}/nilai-api:${IMAGE_TAG}
-
-          echo "All builds completed successfully"
+      - name: Install dependencies
+        run: |
+          apt-get update && apt-get install curl git pkg-config automake file python3.12-dev -y
+          uv sync
 
       - name: Create .env
         run: |
@@ -187,8 +195,31 @@ jobs:
         run: |
           docker-compose -f development-compose.yml down -v
 
+  push-images:
+    name: Push images to ECR
+    needs: [start-runner, build-images, e2e-tests]
+    runs-on: ${{ needs.start-runner.outputs.label }}
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'release'
+    steps:
+      - name: Configure AWS credentials for ECR
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: "arn:aws:iam::054037142884:role/nilAI-github"
+          aws-region: "us-east-1"
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+        with:
+          registry-type: public
+
+      - name: Set image tags
+        id: image-tags
+        run: |
+          IMAGE_TAG="${{ github.event_name == 'release' && github.ref_name || github.sha }}"
+          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+
       - name: Push images to ECR
-        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'release'
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REGISTRY_ALIAS: k5d9x2g2
@@ -206,7 +237,7 @@ jobs:
 
   stop-runner:
     name: Stop self-hosted EC2 runner
-    needs: [ start-runner, e2e-tests ]
+    needs: [start-runner, build-images, e2e-tests, push-images]
     runs-on: ubuntu-24.04
     if: ${{ always() }}
     steps:
