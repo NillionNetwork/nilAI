@@ -34,6 +34,8 @@ jobs:
 
       - name: Install dependencies
         run: |
+          export ACLOCAL=aclocal
+          export AUTOMAKE=automake
           uv sync
 
       - name: Run Ruff format check
@@ -123,6 +125,8 @@ jobs:
       - name: Install dependencies
         run: |
           apt-get update && apt-get install curl git pkg-config automake file python3.12-dev -y
+          export ACLOCAL=aclocal
+          export AUTOMAKE=automake
           uv sync
 
       - name: Create .env
