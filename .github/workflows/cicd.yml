@@ -101,16 +101,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
-      - uses: astral-sh/setup-uv@v4
-        with:
-          enable-cache: true
-          cache-dependency-glob: "**/pyproject.toml"
-
-      - name: Install dependencies
-        run: |
-          apt-get update && apt-get install curl git pkg-config automake file python3.12-dev -y
-          uv sync
-
       - name: Build ${{ matrix.component }} image
         run: |
           echo "Building ${{ matrix.component }} image..."
