@@ -34,6 +34,8 @@ jobs:
 
       - name: Install dependencies
         run: |
+          export ACLOCAL=aclocal
+          export AUTOMAKE=automake
           uv sync
 
       - name: Run Ruff format check
@@ -68,7 +70,7 @@ jobs:
         with:
           mode: start
           github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
-          runners-per-machine: 1
+          runners-per-machine: 3
           number-of-machines: 1
           ec2-image-id: ami-0174a246556e8750b
           ec2-instance-type: g4dn.xlarge
@@ -87,9 +89,29 @@ jobs:
               {"Key": "Environment", "Value": "production"}
             ]
 
+  build-images:
+    name: Build ${{ matrix.component }} image
+    needs: start-runner
+    runs-on: ${{ needs.start-runner.outputs.label }}
+    strategy:
+      matrix:
+        component: [vllm, attestation, api]
+        include:
+          - component: api
+            build_args: "--target nilai --platform linux/amd64"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Build ${{ matrix.component }} image
+        run: |
+          echo "Building ${{ matrix.component }} image..."
+          docker build -t nillion/nilai-${{ matrix.component }}:latest -f docker/${{ matrix.component }}.Dockerfile ${{ matrix.build_args || '' }} .
+          echo "✅ ${{ matrix.component }} build completed successfully"
+
   e2e-tests:
     name: E2E Tests
-    needs: start-runner
+    needs: [start-runner, build-images]
     runs-on: ${{ needs.start-runner.outputs.label }}
     steps:
       - name: Checkout
@@ -99,19 +121,13 @@ jobs:
         with:
           enable-cache: true
           cache-dependency-glob: "**/pyproject.toml"
+
       - name: Install dependencies
         run: |
           apt-get update && apt-get install curl git pkg-config automake file python3.12-dev -y
+          export ACLOCAL=aclocal
+          export AUTOMAKE=automake
           uv sync
-
-      - name: Build vllm
-        run: docker build -t nillion/nilai-vllm:latest -f docker/vllm.Dockerfile .
-
-      - name: Build attestation
-        run: docker build -t nillion/nilai-attestation:latest -f docker/attestation.Dockerfile .
-
-      - name: Build nilai API
-        run: docker build -t nillion/nilai-api:latest -f docker/api.Dockerfile --target nilai --platform linux/amd64 .
 
       - name: Create .env
         run: |
@@ -150,9 +166,53 @@ jobs:
         run: |
           docker-compose -f development-compose.yml down -v
 
+  push-images:
+    name: Push ${{ matrix.component }} to ECR
+    needs: [start-runner, build-images, e2e-tests]
+    runs-on: ${{ needs.start-runner.outputs.label }}
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'release'
+    strategy:
+      matrix:
+        component: [vllm, attestation, api]
+    steps:
+      - name: Configure AWS credentials for ECR
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: "arn:aws:iam::054037142884:role/nilAI-github"
+          aws-region: "us-east-1"
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+        with:
+          registry-type: public
+
+      - name: Set image tags
+        id: image-tags
+        run: |
+          IMAGE_TAG="${{ github.event_name == 'release' && github.ref_name || github.sha }}"
+          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+
+      - name: Tag and push ${{ matrix.component }} to ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REGISTRY_ALIAS: k5d9x2g2
+          IMAGE_TAG: ${{ steps.image-tags.outputs.image_tag }}
+        run: |
+          echo "Tagging and pushing ${{ matrix.component }} image to ECR..."
+
+          # Tag for ECR
+          docker tag nillion/nilai-${{ matrix.component }}:latest ${ECR_REGISTRY}/${ECR_REGISTRY_ALIAS}/nilai-${{ matrix.component }}:${IMAGE_TAG}
+
+          # Push to ECR
+          docker push ${ECR_REGISTRY}/${ECR_REGISTRY_ALIAS}/nilai-${{ matrix.component }}:${IMAGE_TAG}
+
+          echo "## Pushed ${{ matrix.component }} Image" >> $GITHUB_STEP_SUMMARY
+          echo "- ${{ matrix.component }}: \`${ECR_REGISTRY}/${ECR_REGISTRY_ALIAS}/nilai-${{ matrix.component }}:${IMAGE_TAG}\`" >> $GITHUB_STEP_SUMMARY
+
   stop-runner:
     name: Stop self-hosted EC2 runner
-    needs: [ start-runner, e2e-tests ]
+    needs: [start-runner, build-images, e2e-tests, push-images]
     runs-on: ubuntu-24.04
     if: ${{ always() }}
     steps:
@@ -170,50 +230,3 @@ jobs:
           github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
           label: ${{ needs.start-runner.outputs.label }}
           ec2-instances-ids: ${{ needs.start-runner.outputs.ec2-instances-ids }}
-
-  deploy-images:
-    name: Publish ${{ matrix.component }} to ECR
-    needs: e2e-tests
-    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'release'
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - component: vllm
-            docker_build_extra_args: ""
-          - component: attestation
-            docker_build_extra_args: ""
-          - component: api
-            docker_build_extra_args: "--target nilai --platform linux/amd64"
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: "arn:aws:iam::054037142884:role/nilAI-github"
-          aws-region: "us-east-1"
-
-      - uses: aws-actions/amazon-ecr-login@v2
-        id: login-ecr
-        with:
-          registry-type: public
-
-      - uses: docker/setup-buildx-action@v3
-
-      - name: Build and push ${{ matrix.component }} image
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REGISTRY_ALIAS: k5d9x2g2
-          ECR_REPOSITORY: nilai-${{ matrix.component }}
-          IMAGE_TAG: ${{ github.event_name == 'release' && github.ref_name || github.sha }}
-        run: |
-          ECR_REGISTRY_URL="${ECR_REGISTRY}/${ECR_REGISTRY_ALIAS}/${ECR_REPOSITORY}"
-
-          docker build \
-            --push \
-            -f docker/${{ matrix.component }}.Dockerfile \
-            -t ${ECR_REGISTRY_URL}:${IMAGE_TAG} \
-            ${{ matrix.docker_build_extra_args }} \
-            .
-
-          echo "Pushed ${{ matrix.component }} image: ${ECR_REGISTRY_URL}:${IMAGE_TAG}" >> $GITHUB_STEP_SUMMARY
