@@ -2,6 +2,7 @@ import os
 from typing import List, Dict, Any, Optional
 import yaml
 from dotenv import load_dotenv
+from dataclasses import dataclass
 
 load_dotenv()
 
@@ -27,6 +28,22 @@ NILAUTH_TRUSTED_ROOT_ISSUERS: List[str] = os.getenv(
 ).split(",")
 
 AUTH_STRATEGY: str = os.getenv("AUTH_STRATEGY", "api_key")
+
+
+# Web Search API configuration
+@dataclass
+class WebSearchSettings:
+    api_key: Optional[str] = None
+    api_path: str = "https://api.search.brave.com/res/v1/web/search"
+    count: int = 3
+    lang: str = "en"
+    country: str = "us"
+    timeout: float = 20.0
+    max_concurrent_requests: int = 20
+    rps: int = 20
+
+
+WEB_SEARCH_SETTINGS = WebSearchSettings(api_key=os.getenv("BRAVE_SEARCH_API"))
 
 # Default values
 USER_RATE_LIMIT_MINUTE: Optional[int] = 100

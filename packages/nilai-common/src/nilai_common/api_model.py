@@ -21,6 +21,12 @@ class Source(BaseModel):
     content: str
 
 
+class SearchResult(BaseModel):
+    title: str
+    body: str
+    url: str
+
+
 class WebSearchEnhancedMessages(BaseModel):
     messages: List[Message]
     sources: List[Source]

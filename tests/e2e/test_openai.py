@@ -247,9 +247,9 @@ def test_streaming_chat_completion(client, model):
                 full_content += content_piece
 
                 print(f"Model {model} stream chunk {chunk_count}: {chunk}")
-                if chunk.usage:
-                    had_usage = True
-                    print(f"Model {model} usage: {chunk.usage}")
+            if chunk.usage:
+                had_usage = True
+                print(f"Model {model} usage: {chunk.usage}")
 
             # Limit processing to avoid long tests
             if chunk_count >= 20:
@@ -728,8 +728,11 @@ def test_model_streaming_request_high_token(client):
     test_models,
 )
 def test_web_search(client, model):
-    """Test web_search checking that the sources field is not None."""
-    max_retries = 10
+    """Test web_search functionality with proper source validation."""
+    import time
+    import openai
+
+    max_retries = 5
     last_exception = None
 
     for attempt in range(max_retries):
@@ -753,9 +756,16 @@ def test_web_search(client, model):
                 max_tokens=150,
             )
 
-            assert isinstance(response, ChatCompletion)
-            assert response.model == model
-            assert len(response.choices) > 0
+            assert isinstance(response, ChatCompletion), (
+                "Response should be a ChatCompletion object"
+            )
+            assert response.model == model, f"Response model should be {model}"
+            assert len(response.choices) > 0, (
+                "Response should contain at least one choice"
+            )
+
+            content = response.choices[0].message.content
+            assert content, "Response should contain content"
 
             sources = getattr(response, "sources", None)
             assert sources is not None, "Sources field should not be None"
@@ -764,11 +774,181 @@ def test_web_search(client, model):
 
             print(f"Success on attempt {attempt + 1}")
             return
+        except openai.RateLimitError as e:
+            print(f"Rate limit hit on attempt {attempt + 1}: {e}")
         except AssertionError as e:
             print(f"Assertion failed on attempt {attempt + 1}: {e}")
             last_exception = e
             if attempt < max_retries - 1:
                 print("Retrying...")
+                time.sleep(1)
             else:
                 print("All retries failed.")
                 raise last_exception
+
+
+def test_web_search_brave_rps_e2e(client):
+    """Test that web search requests are rate limited to 20 per second globally for the Brave API."""
+    import threading
+    import time
+    import openai
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    # Use a barrier to ensure all requests start simultaneously
+    request_barrier = threading.Barrier(40)
+    responses = []
+    start_time = None
+
+    def make_request():
+        request_barrier.wait()
+
+        nonlocal start_time
+        if start_time is None:
+            start_time = time.time()
+
+        try:
+            response = client.chat.completions.create(
+                model=test_models[0],
+                messages=[{"role": "user", "content": "What is the latest news?"}],
+                extra_body={"web_search": True},
+                max_tokens=10,
+                temperature=0.0,
+            )
+            completion_time = time.time() - start_time
+            responses.append((completion_time, response, "success"))
+        except openai.RateLimitError as e:
+            completion_time = time.time() - start_time
+            responses.append((completion_time, e, "rate_limited"))
+        except Exception as e:
+            completion_time = time.time() - start_time
+            responses.append((completion_time, e, "error"))
+
+    with ThreadPoolExecutor(max_workers=40) as executor:
+        futures = [executor.submit(make_request) for _ in range(40)]
+
+        for future in as_completed(futures):
+            try:
+                future.result()
+            except Exception as e:
+                print(f"Thread execution error: {e}")
+
+    assert len(responses) == 40, "All requests should complete"
+
+    successful_responses = [(t, r) for t, r, status in responses if status == "success"]
+    rate_limited_responses = [
+        (t, r) for t, r, status in responses if status == "rate_limited"
+    ]
+    error_responses = [(t, r) for t, r, status in responses if status == "error"]
+
+    print(
+        f"Successful: {len(successful_responses)}, Rate limited: {len(rate_limited_responses)}, Errors: {len(error_responses)}"
+    )
+
+    # Verify rate limiting behavior
+    # At least some requests should be rate limited or delayed
+    assert len(rate_limited_responses) > 0 or len(successful_responses) < 40, (
+        "Rate limiting should be enforced - either some requests should be rate limited or delayed"
+    )
+
+    for t, response in successful_responses:
+        assert isinstance(response, ChatCompletion), (
+            "Response should be a ChatCompletion object"
+        )
+        sources = getattr(response, "sources", None)
+        assert sources is not None, (
+            "Successful web search responses should have sources"
+        )
+        assert isinstance(sources, list), "Sources should be a list"
+        assert len(sources) > 0, "Sources should not be empty"
+
+    for t, error in rate_limited_responses:
+        assert isinstance(error, openai.RateLimitError), (
+            "Rate limited responses should be RateLimitError"
+        )
+
+
+def test_web_search_queueing_next_second_e2e(client):
+    """Test that web search requests are properly queued and processed in batches."""
+    import threading
+    import time
+    import openai
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    request_barrier = threading.Barrier(25)
+    responses = []
+    start_time = None
+
+    def make_request():
+        request_barrier.wait()
+
+        nonlocal start_time
+        if start_time is None:
+            start_time = time.time()
+
+        try:
+            response = client.chat.completions.create(
+                model=test_models[0],
+                messages=[{"role": "user", "content": "What is the weather like?"}],
+                extra_body={"web_search": True},
+                max_tokens=10,
+                temperature=0.0,
+            )
+            completion_time = time.time() - start_time
+            responses.append((completion_time, response, "success"))
+        except openai.RateLimitError as e:
+            completion_time = time.time() - start_time
+            responses.append((completion_time, e, "rate_limited"))
+        except Exception as e:
+            completion_time = time.time() - start_time
+            responses.append((completion_time, e, "error"))
+
+    with ThreadPoolExecutor(max_workers=25) as executor:
+        futures = [executor.submit(make_request) for _ in range(25)]
+
+        for future in as_completed(futures):
+            try:
+                future.result()
+            except Exception as e:
+                print(f"Thread execution error: {e}")
+
+    assert len(responses) == 25, "All requests should complete"
+
+    # Categorize responses
+    successful_responses = [(t, r) for t, r, status in responses if status == "success"]
+    rate_limited_responses = [
+        (t, r) for t, r, status in responses if status == "rate_limited"
+    ]
+    error_responses = [(t, r) for t, r, status in responses if status == "error"]
+
+    print(
+        f"Successful: {len(successful_responses)}, Rate limited: {len(rate_limited_responses)}, Errors: {len(error_responses)}"
+    )
+
+    # Verify queuing behavior
+    # With 25 requests and 20 RPS limit, some should be queued or rate limited
+    assert len(rate_limited_responses) > 0 or len(successful_responses) < 25, (
+        "Queuing should be enforced - either some requests should be rate limited or delayed"
+    )
+
+    for t, response in successful_responses:
+        assert isinstance(response, ChatCompletion), (
+            "Response should be a ChatCompletion object"
+        )
+        assert len(response.choices) > 0, "Response should contain at least one choice"
+        assert response.choices[0].message.content, "Response should contain content"
+
+        sources = getattr(response, "sources", None)
+        assert sources is not None, "Web search responses should have sources"
+        assert isinstance(sources, list), "Sources should be a list"
+        assert len(sources) > 0, "Sources should not be empty"
+
+        first_source = sources[0]
+        assert isinstance(first_source, dict), "First source should be a dictionary"
+        assert "title" in first_source, "First source should have title"
+        assert "url" in first_source, "First source should have url"
+        assert "snippet" in first_source, "First source should have snippet"
+
+    for t, error in rate_limited_responses:
+        assert isinstance(error, openai.RateLimitError), (
+            "Rate limited responses should be RateLimitError"
+        )

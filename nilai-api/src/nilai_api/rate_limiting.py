@@ -1,7 +1,9 @@
+import asyncio
 from asyncio import iscoroutine
 from typing import Callable, Tuple, Awaitable, Annotated
 
 from pydantic import BaseModel
+from nilai_api.config import WEB_SEARCH_SETTINGS
 
 from fastapi.params import Depends
 from fastapi import status, HTTPException, Request
@@ -153,6 +155,21 @@ class RateLimit:
             )
 
             if web_search_enabled:
+                allowed_rps = min(
+                    WEB_SEARCH_SETTINGS.rps,
+                    max(
+                        1,
+                        WEB_SEARCH_SETTINGS.max_concurrent_requests
+                        // WEB_SEARCH_SETTINGS.count,
+                    ),
+                )
+                await self.wait_for_bucket(
+                    redis,
+                    redis_rate_limit_command,
+                    "global:web_search:rps",
+                    allowed_rps,
+                    1000,
+                )
                 web_search_limits = [
                     (user_limits.web_search_minute_limit, MINUTE_MS, "minute"),
                     (user_limits.web_search_hour_limit, HOUR_MS, "hour"),
@@ -194,6 +211,24 @@ class RateLimit:
                 detail="Too Many Requests",
                 headers={"Retry-After": str(expire)},
             )
+
+    @staticmethod
+    async def wait_for_bucket(
+        redis: Redis,
+        redis_rate_limit_command: str,
+        key: str,
+        times: int | None,
+        milliseconds: int,
+    ):
+        if times is None:
+            return
+        while True:
+            expire = await redis.evalsha(
+                redis_rate_limit_command, 1, key, str(times), str(milliseconds)
+            )  # type: ignore
+            if int(expire) == 0:
+                return
+            await asyncio.sleep((int(expire) + 50) / 1000)
 
     async def check_concurrent_and_increment(
         self, redis: Redis, request: Request
