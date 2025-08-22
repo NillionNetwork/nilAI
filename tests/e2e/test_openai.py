@@ -328,14 +328,16 @@ def test_function_calling(client, model):
 
             assert len(tool_calls) > 0, f"Tool calls array is empty for {model}"
 
-            # Validate the first tool call
             first_call = tool_calls[0]
-            assert first_call.function.name == "get_weather", (
-                "Function name should be get_weather"
-            )
+            first_call_dict = first_call.model_dump()
+
+            function_name = first_call_dict["function"]["name"]
+            function_args = first_call_dict["function"]["arguments"]
+
+            assert function_name == "get_weather", "Function name should be get_weather"
 
             # Parse arguments and check for location
-            args = json.loads(first_call.function.arguments)
+            args = json.loads(function_args)
             assert "location" in args, "Arguments should contain location"
             assert "paris" in args["location"].lower(), "Location should be Paris"
 
@@ -363,7 +365,7 @@ def test_function_calling(client, model):
                                 "type": "function",
                                 "function": {
                                     "name": "get_weather",
-                                    "arguments": first_call.function.arguments,
+                                    "arguments": function_args,
                                 },
                             }
                         ],
