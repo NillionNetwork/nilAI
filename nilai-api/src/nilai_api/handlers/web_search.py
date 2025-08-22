@@ -4,7 +4,6 @@ from typing import List, Dict, Any
 
 import httpx
 from fastapi import HTTPException, status
-from aiolimiter import AsyncLimiter
 
 from nilai_api.config import WEB_SEARCH_SETTINGS
 from nilai_common.api_model import (
@@ -16,8 +15,6 @@ from nilai_common.api_model import (
 from nilai_common import Message
 
 logger = logging.getLogger(__name__)
-
-brave_rate_limiter = AsyncLimiter(WEB_SEARCH_SETTINGS.rps, 1)
 
 _BRAVE_API_HEADERS = {
     "Api-Version": "2023-10-11",
@@ -71,7 +68,6 @@ async def _make_brave_api_request(query: str) -> Dict[str, Any]:
         **_BRAVE_API_HEADERS,
         "X-Subscription-Token": WEB_SEARCH_SETTINGS.api_key,
     }
-    await brave_rate_limiter.acquire()
     client = _get_http_client()
     resp = await client.get(
         WEB_SEARCH_SETTINGS.api_path, headers=headers, params=params

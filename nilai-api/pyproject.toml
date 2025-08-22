@@ -34,7 +34,6 @@ dependencies = [
     "nuc-helpers",
     "nuc",
     "pyyaml>=6.0.1",
-    "aiolimiter>=1.1.0",
 ]
 
 
