@@ -21,7 +21,7 @@ services:
     env_file:
       - .env.mainnet
     environment:
-      - POSTGRES_DB="nuc-nilai-mainnet2"
+      - POSTGRES_DB=nuc-nilai-mainnet2
     volumes:
       - ./files/nilai-api/config.yaml:/app/nilai-api/src/nilai_api/config/config.yaml
   caddy:
@@ -30,6 +30,8 @@ services:
     volumes:
       - ./files/caddy/caddyfile:/etc/caddy/Caddyfile
   attestation:
+    env_file:
+      - .env.mainnet
     deploy:
       resources:
         reservations:
