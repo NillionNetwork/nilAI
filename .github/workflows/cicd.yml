@@ -111,33 +111,10 @@ jobs:
           apt-get update && apt-get install curl git pkg-config automake file python3.12-dev -y
           uv sync
 
-      - name: Configure AWS credentials for ECR
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: "arn:aws:iam::054037142884:role/nilAI-github"
-          aws-region: "us-east-1"
-
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-        with:
-          registry-type: public
-
-      - name: Set image tags
-        id: image-tags
-        run: |
-          IMAGE_TAG="${{ github.event_name == 'release' && github.ref_name || github.sha }}"
-          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
-
       - name: Build ${{ matrix.component }} image
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REGISTRY_ALIAS: k5d9x2g2
-          IMAGE_TAG: ${{ steps.image-tags.outputs.image_tag }}
         run: |
           echo "Building ${{ matrix.component }} image..."
           docker build -t nillion/nilai-${{ matrix.component }}:latest -f docker/${{ matrix.component }}.Dockerfile ${{ matrix.build_args || '' }} .
-          docker tag nillion/nilai-${{ matrix.component }}:latest ${ECR_REGISTRY}/${ECR_REGISTRY_ALIAS}/nilai-${{ matrix.component }}:${IMAGE_TAG}
           echo "✅ ${{ matrix.component }} build completed successfully"
 
   e2e-tests:
@@ -222,13 +199,18 @@ jobs:
           IMAGE_TAG="${{ github.event_name == 'release' && github.ref_name || github.sha }}"
           echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
 
-      - name: Push ${{ matrix.component }} to ECR
+      - name: Tag and push ${{ matrix.component }} to ECR
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REGISTRY_ALIAS: k5d9x2g2
           IMAGE_TAG: ${{ steps.image-tags.outputs.image_tag }}
         run: |
-          echo "Pushing ${{ matrix.component }} image to ECR..."
+          echo "Tagging and pushing ${{ matrix.component }} image to ECR..."
+
+          # Tag for ECR
+          docker tag nillion/nilai-${{ matrix.component }}:latest ${ECR_REGISTRY}/${ECR_REGISTRY_ALIAS}/nilai-${{ matrix.component }}:${IMAGE_TAG}
+
+          # Push to ECR
           docker push ${ECR_REGISTRY}/${ECR_REGISTRY_ALIAS}/nilai-${{ matrix.component }}:${IMAGE_TAG}
 
           echo "## Pushed ${{ matrix.component }} Image" >> $GITHUB_STEP_SUMMARY
