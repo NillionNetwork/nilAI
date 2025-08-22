@@ -86,7 +86,7 @@ sudo ./launch_vm.sh nilai-llama-70b --cpu 16 --memory 48 --gpu --portfwd '80:80;
 After the VM is running, it can happen that NVIDIA confidential compute support is not configured and model files do not launch:
 
 ```bash
-sudo nvidia-smi conf-compute -srs
+sudo nvidia-smi conf-compute -srs 1
 ```
 
 Then restart the vLLM container to apply the changes:
