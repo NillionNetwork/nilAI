@@ -8,6 +8,7 @@ class HostSettings(BaseModel):
     etcd_host: str = "localhost"
     etcd_port: int = 2379
     tool_support: bool = False
+    multimodal_support: bool = False
     gunicorn_workers: int = 10
     attestation_host: str = "localhost"
     attestation_port: int = 8081
@@ -19,6 +20,7 @@ SETTINGS: HostSettings = HostSettings(
     etcd_host=str(os.getenv("ETCD_HOST", "localhost")),
     etcd_port=int(os.getenv("ETCD_PORT", 2379)),
     tool_support=bool(os.getenv("TOOL_SUPPORT", False)),
+    multimodal_support=bool(os.getenv("MULTIMODAL_SUPPORT", False)),
     gunicorn_workers=int(os.getenv("NILAI_GUNICORN_WORKERS", 10)),
     attestation_host=str(os.getenv("ATTESTATION_HOST", "localhost")),
     attestation_port=int(os.getenv("ATTESTATION_PORT", 8081)),

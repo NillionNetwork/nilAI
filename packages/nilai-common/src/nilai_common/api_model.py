@@ -1,15 +1,27 @@
 import uuid
 
-from typing import Annotated, Iterable, List, Literal, Optional
+from typing import Annotated, Iterable, List, Literal, Optional, Union
 
-from openai.types.chat import ChatCompletion, ChatCompletionMessage
-from openai.types.chat.chat_completion import Choice as OpenaAIChoice
+from openai.types.chat import ChatCompletion
 from openai.types.chat import ChatCompletionToolParam
+from openai.types.chat.chat_completion import Choice as OpenaAIChoice
 from pydantic import BaseModel, Field
 
 
-class Message(ChatCompletionMessage):
-    role: Literal["system", "user", "assistant", "tool"]  # type: ignore
+class ImageUrl(BaseModel):
+    url: str
+    detail: Optional[str] = "auto"
+
+
+class MessageContentItem(BaseModel):
+    type: Literal["text", "image_url"]
+    text: Optional[str] = None
+    image_url: Optional[ImageUrl] = None
+
+
+class Message(BaseModel):
+    role: Literal["system", "user", "assistant", "tool"]
+    content: Union[str, List[MessageContentItem]]
 
 
 class Choice(OpenaAIChoice):
@@ -71,6 +83,7 @@ class ModelMetadata(BaseModel):
     source: str
     supported_features: List[str]
     tool_support: bool
+    multimodal_support: bool = False
 
 
 class ModelEndpoint(BaseModel):

@@ -38,6 +38,7 @@ async def get_metadata(num_retries=30):
                     source=f"https://huggingface.co/{model_name}",  # Model source
                     supported_features=["chat_completion"],  # Capabilities
                     tool_support=SETTINGS.tool_support,  # Tool support
+                    multimodal_support=SETTINGS.multimodal_support,  # Multimodal support
                 )
 
         except Exception as e:
