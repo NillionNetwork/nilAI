@@ -134,6 +134,7 @@ jobs:
          cp .env.ci .env
          # Copy secret into .env replacing the existing HF_TOKEN
          sed -i 's/HF_TOKEN=.*/HF_TOKEN=${{ secrets.HF_TOKEN }}/' .env
+         sed -i 's/BRAVE_SEARCH_API=.*/BRAVE_SEARCH_API=${{ secrets.BRAVE_SEARCH_API }}/' .env
 
       - name: Compose docker-compose.yml
         run: python3 ./scripts/docker-composer.py --dev -f docker/compose/docker-compose.llama-1b-gpu.ci.yml -o development-compose.yml

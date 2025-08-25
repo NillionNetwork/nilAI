@@ -166,7 +166,6 @@ python3 ./scripts/docker-composer.py --prod \
   --image 'nillion/nilai-attestation:latest=public.ecr.aws/k5d9x2g2/nilai-attestation:v0.2.0-alpha0' \
   -o production-compose.yml
 
-
 # 2. Deploy using the generated file
 docker compose -f production-compose.yml up -d
 

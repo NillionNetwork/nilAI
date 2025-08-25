@@ -30,6 +30,8 @@ services:
     volumes:
       - ${FILES}/caddy/caddyfile:/etc/caddy/Caddyfile
   attestation:
+    env_file:
+      - .env.mainnet
     deploy:
       resources:
         reservations:

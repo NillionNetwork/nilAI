@@ -1,89 +1,155 @@
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
+from fastapi import HTTPException
 from nilai_api.handlers.web_search import (
-    perform_web_search_sync,
-    get_web_search_context,
+    perform_web_search_async,
     enhance_messages_with_web_search,
-    handle_web_search,
 )
 from nilai_common import Message
-from nilai_common.api_model import WebSearchContext, WebSearchEnhancedMessages
+from nilai_common.api_model import (
+    WebSearchContext,
+    Source,
+)
 
 
-def test_perform_web_search_sync_success():
-    """Test successful web search with mock response"""
-    mock_search_results = [
-        {
-            "title": "Latest AI Developments",
-            "body": "OpenAI announces GPT-5 with improved capabilities and better performance across various tasks.",
-            "href": "https://example.com/ai1",
-        },
-        {
-            "title": "AI Breakthrough in Robotics",
-            "body": "New neural network architecture improves robot learning efficiency by 40% in recent studies.",
-            "href": "https://example.com/ai2",
-        },
-    ]
-
-    with patch("nilai_api.handlers.web_search.DDGS") as mock_ddgs:
-        mock_instance = MagicMock()
-        mock_ddgs.return_value.__enter__.return_value = mock_instance
-        mock_instance.text.return_value = mock_search_results
-        mock_instance.news.return_value = []
-
-        ctx = perform_web_search_sync("AI developments")
-
-        assert len(ctx.sources) == 2
-        assert "GPT-5" in ctx.prompt
-        assert "40%" in ctx.prompt
-        assert ctx.sources[0].source == "https://example.com/ai1"
-        assert ctx.sources[1].source == "https://example.com/ai2"
-
-
-def test_perform_web_search_sync_no_results():
-    """Test web search with no results"""
-    with patch("nilai_api.handlers.web_search.DDGS") as mock_ddgs:
-        mock_instance = MagicMock()
-        mock_ddgs.return_value.__enter__.return_value = mock_instance
-        mock_instance.text.return_value = []
-        mock_instance.news.return_value = []
-
-        with pytest.raises(Exception):
-            _ = perform_web_search_sync("nonexistent query")
-
-
-def test_perform_web_search_sync_fallback_to_news():
-    """Test web search fallback to news when text search returns no results"""
-    mock_news_results = [
-        {
-            "title": "Breaking AI News",
-            "body": "Major breakthrough in artificial intelligence research announced today.",
-            "href": "https://example.com/news1",
+@pytest.mark.asyncio
+async def test_perform_web_search_async_success():
+    """Test successful web search with proper source validation"""
+    mock_data = {
+        "web": {
+            "results": [
+                {
+                    "title": "Latest AI Developments",
+                    "description": "OpenAI announces GPT-5 with improved capabilities.",
+                    "url": "https://example.com/ai1",
+                },
+                {
+                    "title": "AI Breakthrough in Robotics",
+                    "description": "New neural network architecture improves robot learning.",
+                    "url": "https://example.com/ai2",
+                },
+            ]
         }
-    ]
+    }
 
-    with patch("nilai_api.handlers.web_search.DDGS") as mock_ddgs:
-        mock_instance = MagicMock()
-        mock_ddgs.return_value.__enter__.return_value = mock_instance
-        mock_instance.text.return_value = []
-        mock_instance.news.return_value = mock_news_results
+    with (
+        patch("nilai_api.handlers.web_search.WEB_SEARCH_SETTINGS.api_key", "test-key"),
+        patch(
+            "nilai_api.handlers.web_search._make_brave_api_request",
+            return_value=mock_data,
+        ),
+    ):
+        ctx = await perform_web_search_async("AI developments")
 
-        with pytest.raises(Exception):
-            _ = perform_web_search_sync("AI news")
+        assert ctx.sources is not None
+        assert len(ctx.sources) == 2
+        assert ctx.sources[0].source == "https://example.com/ai1"
+        assert (
+            ctx.sources[0].content
+            == "OpenAI announces GPT-5 with improved capabilities."
+        )
+        assert ctx.sources[1].source == "https://example.com/ai2"
+        assert (
+            ctx.sources[1].content
+            == "New neural network architecture improves robot learning."
+        )
+
+
+@pytest.mark.asyncio
+async def test_perform_web_search_async_no_results():
+    """Test web search with no results returns 404"""
+    mock_data = {"web": {"results": []}}
+
+    with (
+        patch("nilai_api.handlers.web_search.WEB_SEARCH_SETTINGS.api_key", "test-key"),
+        patch(
+            "nilai_api.handlers.web_search._make_brave_api_request",
+            return_value=mock_data,
+        ),
+        pytest.raises(HTTPException) as exc_info,
+    ):
+        await perform_web_search_async("nonexistent query")
+
+    assert exc_info.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_perform_web_search_async_concurrent_queries():
+    """Test multiple concurrent web search queries"""
+    mock_data_1 = {
+        "web": {
+            "results": [
+                {
+                    "title": "AI News",
+                    "description": "Latest developments in artificial intelligence.",
+                    "url": "https://example.com/ai-news",
+                }
+            ]
+        }
+    }
+
+    mock_data_2 = {
+        "web": {
+            "results": [
+                {
+                    "title": "Machine Learning",
+                    "description": "Advances in machine learning algorithms.",
+                    "url": "https://example.com/ml",
+                }
+            ]
+        }
+    }
+
+    with (
+        patch("nilai_api.handlers.web_search.WEB_SEARCH_SETTINGS.api_key", "test-key"),
+        patch(
+            "nilai_api.handlers.web_search._make_brave_api_request",
+            side_effect=[mock_data_1, mock_data_2],
+        ),
+    ):
+        import asyncio
+
+        # Run two concurrent web searches
+        results = await asyncio.gather(
+            perform_web_search_async("AI news"),
+            perform_web_search_async("Machine learning"),
+        )
+
+        # Verify both searches completed successfully
+        assert len(results) == 2
+
+        # Check first result
+        assert results[0].sources is not None
+        assert len(results[0].sources) == 1
+        assert results[0].sources[0].source == "https://example.com/ai-news"
+        assert (
+            results[0].sources[0].content
+            == "Latest developments in artificial intelligence."
+        )
+
+        # Check second result
+        assert results[1].sources is not None
+        assert len(results[1].sources) == 1
+        assert results[1].sources[0].source == "https://example.com/ml"
+        assert (
+            results[1].sources[0].content == "Advances in machine learning algorithms."
+        )
 
 
 @pytest.mark.asyncio
 async def test_enhance_messages_with_web_search():
-    """Test message enhancement with web search results"""
+    """Test message enhancement with web search results and source validation"""
     original_messages = [
         Message(role="system", content="You are a helpful assistant"),
         Message(role="user", content="What is the latest AI news?"),
     ]
 
-    with patch("nilai_api.handlers.web_search.perform_web_search_sync") as mock_search:
+    with patch("nilai_api.handlers.web_search.perform_web_search_async") as mock_search:
         mock_search.return_value = WebSearchContext(
-            prompt="Latest AI Developments: OpenAI announces GPT-5\nAI Breakthrough: New neural network improves efficiency by 40%",
-            sources=[],
+            prompt="[1] Latest AI Developments\nURL: https://example.com\nSnippet: OpenAI announces GPT-5",
+            sources=[
+                Source(source="https://example.com", content="OpenAI announces GPT-5")
+            ],
         )
 
         enhanced = await enhance_messages_with_web_search(original_messages, "AI news")
@@ -91,76 +157,9 @@ async def test_enhance_messages_with_web_search():
         assert len(enhanced.messages) == 3
         assert enhanced.messages[0].role == "system"
         assert "Latest AI Developments" in str(enhanced.messages[0].content)
-        assert enhanced.sources == []
-
-
-@pytest.mark.asyncio
-async def test_handle_web_search():
-    """Test web search handler with user messages"""
-    messages = [
-        Message(role="user", content="Tell me about current events"),
-    ]
-    with (
-        patch(
-            "nilai_api.handlers.web_search.enhance_messages_with_web_search"
-        ) as mock_enhance,
-        patch(
-            "nilai_api.handlers.web_search.generate_search_query_from_llm"
-        ) as mock_generate_query,
-    ):
-        mock_enhance.return_value = WebSearchEnhancedMessages(
-            messages=[Message(role="system", content="Enhanced context")] + messages,
-            sources=[],
-        )
-        mock_generate_query.return_value = "Tell me about current events"
-        dummy_client = MagicMock()
-        enhanced = await handle_web_search(messages, "dummy-model", dummy_client)
-        mock_generate_query.assert_called_once()
-        mock_enhance.assert_called_once_with(messages, "Tell me about current events")
-        assert len(enhanced.messages) == len(messages) + 1
-        assert enhanced.sources == []
-
-
-@pytest.mark.asyncio
-async def test_handle_web_search_no_user_message():
-    """Test web search handler with no user message"""
-    messages = [
-        Message(role="assistant", content="Hello! How can I help you?"),
-    ]
-    dummy_client = MagicMock()
-    enhanced = await handle_web_search(messages, "dummy-model", dummy_client)
-    assert enhanced.messages == messages
-    assert enhanced.sources == []
-
-
-@pytest.mark.asyncio
-async def test_handle_web_search_exception_handling():
-    """Test web search handler exception handling"""
-    messages = [
-        Message(role="system", content="You are a helpful assistant"),
-        Message(role="user", content="What's the weather like?"),
-    ]
-    with (
-        patch(
-            "nilai_api.handlers.web_search.enhance_messages_with_web_search"
-        ) as mock_enhance,
-        patch(
-            "nilai_api.handlers.web_search.generate_search_query_from_llm"
-        ) as mock_generate_query,
-    ):
-        mock_enhance.side_effect = Exception("Search service unavailable")
-        mock_generate_query.return_value = "What's the weather like?"
-        dummy_client = MagicMock()
-        enhanced = await handle_web_search(messages, "dummy-model", dummy_client)
-        mock_generate_query.assert_called_once()
-        assert enhanced.messages == messages
-        assert enhanced.sources == []
-
-
-@pytest.mark.asyncio
-async def test_get_web_search_context_async_wrapper():
-    with patch("nilai_api.handlers.web_search.perform_web_search_sync") as mock_sync:
-        mock_sync.return_value = WebSearchContext(prompt="info", sources=[])
-        ctx = await get_web_search_context("query")
-        assert ctx.prompt == "info"
-        mock_sync.assert_called_once()
+        assert enhanced.sources is not None
+        assert len(enhanced.sources) == 2
+        assert enhanced.sources[0].source == "search_query"
+        assert enhanced.sources[0].content == "AI news"
+        assert enhanced.sources[1].source == "https://example.com"
+        assert enhanced.sources[1].content == "OpenAI announces GPT-5"
