@@ -137,7 +137,99 @@ jobs:
          sed -i 's/BRAVE_SEARCH_API=.*/BRAVE_SEARCH_API=${{ secrets.BRAVE_SEARCH_API }}/' .env
 
       - name: Compose docker-compose.yml
-        run: bash ./scripts/docker-composer.sh --dev -f docker/compose/docker-compose.llama-1b-gpu.ci.yml -o development-compose.yml
+        run: python3 ./scripts/docker-composer.py --dev -f docker/compose/docker-compose.llama-1b-gpu.ci.yml -o development-compose.yml
+
+      - name: GPU stack versions (non-fatal)
+        shell: bash
+        run: |
+          set +e  # never fail this step
+
+          echo "::group::Host & kernel"
+          uname -a || true
+          echo "Kernel: $(uname -r 2>/dev/null || echo unknown)"
+          test -e /var/run/reboot-required && echo "Reboot flag: PRESENT" || echo "Reboot flag: none"
+          echo "::endgroup::"
+
+          echo "::group::NVIDIA driver"
+          if command -v nvidia-smi >/dev/null 2>&1; then
+            nvidia-smi || true
+            echo "Driver version (nvidia-smi): $(nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null | head -n1 || echo unknown)"
+            echo "GPU(s):"; nvidia-smi -L || true
+          else
+            echo "nvidia-smi: not found"
+          fi
+          if [ -r /proc/driver/nvidia/version ]; then
+            echo "--- /proc/driver/nvidia/version ---"
+            cat /proc/driver/nvidia/version || true
+          else
+            echo "/proc/driver/nvidia/version: not present"
+          fi
+          command -v modinfo >/dev/null 2>&1 && { echo "--- modinfo nvidia (head) ---"; modinfo nvidia 2>/dev/null | head -n 20 || true; } || true
+          echo "::endgroup::"
+
+          echo "::group::DKMS status"
+          command -v dkms >/dev/null 2>&1 && dkms status | grep -i nvidia || echo "dkms or nvidia dkms info not present"
+          echo "::endgroup::"
+
+          echo "::group::CUDA toolkit/runtime"
+          if command -v nvcc >/dev/null 2>&1; then
+            nvcc --version || true
+          else
+            echo "nvcc: not found"
+          fi
+          echo "libcudart in ldconfig:"
+          ldconfig -p 2>/dev/null | grep -i libcudart || echo "libcudart not found in ldconfig cache"
+          echo "NCCL packages:"
+          dpkg -l 2>/dev/null | grep -iE '^ii\s+libnccl' || echo "NCCL not installed (Debian/Ubuntu dpkg check)"
+          echo "::endgroup::"
+
+          echo "::group::Container stack"
+          docker --version || echo "docker: not found"
+          docker info 2>/dev/null | grep -iE 'Runtimes|nvidia' || echo "docker info: no nvidia runtime line found"
+          containerd --version 2>/dev/null || echo "containerd: not found"
+          runc --version 2>/dev/null || echo "runc: not found"
+          echo "::endgroup::"
+
+          echo "::group::NVIDIA container runtime/toolkit"
+          # Legacy/runtime binaries
+          if command -v nvidia-container-runtime >/dev/null 2>&1; then
+            nvidia-container-runtime --version || nvidia-container-runtime -v || true
+          else
+            echo "nvidia-container-runtime: not found"
+          fi
+          # Toolkit binaries (newer distros)
+          if command -v nvidia-ctk >/dev/null 2>&1; then
+            nvidia-ctk --version || true
+            nvidia-ctk runtime configure --help >/dev/null 2>&1 || true
+          else
+            echo "nvidia-ctk: not found"
+          fi
+          if command -v nvidia-container-toolkit >/dev/null 2>&1; then
+            nvidia-container-toolkit --version || true
+          else
+            echo "nvidia-container-toolkit: not found"
+          fi
+          echo "libnvidia-container packages:"
+          dpkg -l 2>/dev/null | grep -iE '^ii\s+(libnvidia-container1|libnvidia-container-tools)\s' || echo "libnvidia-container packages not found (dpkg)"
+          # Show runtime config if present
+          if [ -f /etc/nvidia-container-runtime/config.toml ]; then
+            echo "--- /etc/nvidia-container-runtime/config.toml (head) ---"
+            sed -n '1,120p' /etc/nvidia-container-runtime/config.toml || true
+          else
+            echo "/etc/nvidia-container-runtime/config.toml: not present"
+          fi
+          echo "::endgroup::"
+
+          echo "::group::Apt logs (NVIDIA-related entries)"
+          for f in /var/log/apt/history.log /var/log/apt/term.log /var/log/unattended-upgrades/unattended-upgrades.log; do
+            if [[ -f "$f" ]]; then
+              echo "--- scanning $f"
+              grep -H -i -E 'nvidia|cuda|container-toolkit' "$f" || echo "no recent NVIDIA entries"
+            else
+              echo "missing: $f"
+            fi
+          done
+          echo "::endgroup::"
 
       - name: Start Services
         run: |

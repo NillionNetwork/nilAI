@@ -81,27 +81,27 @@ docker build -t nillion/nilai-api:latest -f docker/api.Dockerfile --target nilai
 ```
 To deploy:
 ```shell
-docker compose -f docker-compose.yml \
--f docker-compose.dev.yml \
--f docker/compose/docker-compose.llama-1b-cpu.yml \
-up -d
+
+python3 ./scripts/docker-composer.py --dev -f docker/compose/docker-compose.llama-1b-cpu.yml -o development-compose.yml
+
+docker compose -f development-compose.yml up -d
 ```
 
 ### 2. Using the Docker Compose Helper Script
 
-For easier management of multiple compose files and image substitutions, use the `docker-composer.sh` script:
+For easier management of multiple compose files and image substitutions, use the `docker-composer.py` script:
 
 #### Basic Usage
 
 ```shell
 # Generate a composed configuration for development
-./scripts/docker-composer.sh --dev -o dev-compose.yml
+python3 ./scripts/docker-composer.py --dev -o dev-compose.yml
 
 # Generate a composed configuration for production
-./scripts/docker-composer.sh --prod -o prod-compose.yml
+python3 ./scripts/docker-composer.py --prod -o prod-compose.yml
 
 # Include specific model configurations
-./scripts/docker-composer.sh --prod \
+python3 ./scripts/docker-composer.py --prod \
   -f docker-compose.llama-3b-gpu.yml \
   -f docker-compose.llama-8b-gpu.yml \
   -o production-compose.yml
@@ -113,7 +113,7 @@ Replace default images with custom ones (useful for production deployments with 
 
 ```shell
 # Production example with custom ECR images
-./scripts/docker-composer.sh --prod \
+python3 ./scripts/docker-composer.py --prod \
   -f docker-compose.llama-3b-gpu.yml \
   --image 'nillion/nilai-api:latest=public.ecr.aws/k5d9x2g2/nilai-api:v0.1.0-rc1' \
   --image 'nillion/nilai-vllm:latest=public.ecr.aws/k5d9x2g2/nilai-vllm:v0.1.0-rc1' \
@@ -139,16 +139,27 @@ For a complete production setup with custom images:
 
 ```shell
 # 1. Generate the production compose file
-./scripts/docker-composer.sh --prod \
+python3 ./scripts/docker-composer.py --prod \
   -f docker/compose/docker-compose.llama-3b-gpu.yml \
   -f docker/compose/docker-compose.llama-8b-gpu.yml \
+  -f docker/compose/docker-compose.deepseek-14b-gpu.yml \
   --image 'nillion/nilai-api:latest=public.ecr.aws/k5d9x2g2/nilai-api:v0.2.0-alpha0' \
   --image 'nillion/nilai-vllm:latest=public.ecr.aws/k5d9x2g2/nilai-vllm:v0.2.0-alpha0' \
   --image 'nillion/nilai-attestation:latest=public.ecr.aws/k5d9x2g2/nilai-attestation:v0.2.0-alpha0' \
+  --testnet \
+  -o production-compose.yml
+
+# 1. Generate the production compose file
+python3 ./scripts/docker-composer.py --prod \
+  -f docker/compose/docker-compose.llama-3b-gpu.yml \
+  --image 'nillion/nilai-api:latest=public.ecr.aws/k5d9x2g2/nilai-api:v0.2.0-alpha0' \
+  --image 'nillion/nilai-vllm:latest=public.ecr.aws/k5d9x2g2/nilai-vllm:v0.2.0-alpha0' \
+  --image 'nillion/nilai-attestation:latest=public.ecr.aws/k5d9x2g2/nilai-attestation:v0.2.0-alpha0' \
+  --testnet \
   -o production-compose.yml
 
 # Or:
-./scripts/docker-composer.sh --prod \
+python3 ./scripts/docker-composer.py --prod \
   -f docker/compose/docker-compose.llama-70b-gpu.yml \
   --image 'nillion/nilai-api:latest=public.ecr.aws/k5d9x2g2/nilai-api:v0.2.0-alpha0' \
   --image 'nillion/nilai-vllm:latest=public.ecr.aws/k5d9x2g2/nilai-vllm:v0.2.0-alpha0' \

@@ -3,26 +3,14 @@
 #!  It doesn't use caddy (as it is unique for the whole system)
 #!  It doesn't include any models as it is redundant with the main nilAI instance
 services:
-  api:
-    platform: linux/amd64 # for macOS to force running on Rosetta 2
-    ports:
-      - "8081:8080"
-    volumes:
-      - ./nilai-api/:/app/nilai-api/
-      - ./packages/:/app/packages/
-      - ./nilai-auth/nuc-helpers/:/app/nilai-auth/nuc-helpers/
-    networks:
-      - nilauth
-  nuc-api:
+  testnet-nuc-api:
     platform: linux/amd64 # for macOS to force running on Rosetta 2
     ports:
       - "8089:8080"
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB_TESTNET}
     volumes:
       - ./nilai-api/:/app/nilai-api/
       - ./packages/:/app/packages/
-      - ./nilai-auth/nuc-helpers/:/app/nilai-auth/nuc-helpers/
-    networks:
-      - nilauth
-
-networks:
-  nilauth:

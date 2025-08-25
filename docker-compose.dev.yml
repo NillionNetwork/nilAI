@@ -12,6 +12,10 @@ services:
     platform: linux/amd64 # for macOS to force running on Rosetta 2
     ports:
       - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
     env_file:
       - .env
     volumes:
@@ -24,6 +28,11 @@ services:
       - "8088:8080"
     env_file:
       - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB_NUC}
     volumes:
       - ./nilai-api/:/app/nilai-api/
       - ./packages/:/app/packages/
@@ -49,25 +58,7 @@ services:
       - .env
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD", "sh", "-c", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB} -h localhost"]
-      interval: 30s
-      retries: 5
-      start_period: 10s
-      timeout: 10s
-
-  nuc-postgres:
-    image: postgres:16
-    container_name: nuc-postgres
-    restart: always
-    environment:
-      - POSTGRES_HOST=nuc-postgres
-    ports:
-      - "5433:5432"
-    env_file:
-      - .env
-    volumes:
-      - nuc_postgres_data:/var/lib/postgresql/data
+      - ./scripts/postgres-init.sh:/docker-entrypoint-initdb.d/postgres-init.sh
     healthcheck:
       test: ["CMD", "sh", "-c", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB} -h localhost"]
       interval: 30s
@@ -126,4 +117,3 @@ services:
 
 volumes:
   postgres_data:
-  nuc_postgres_data:

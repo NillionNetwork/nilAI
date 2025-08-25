@@ -1,0 +1,19 @@
+#!  This is a docker compose to deploy another endpoint for the nilai-api for the testnet environment
+#!  This is used to deploy the nilai-api for the testnet environment
+#!  It include the api, nuc-api, postgres dbs, redis, prometheus, grafana and node-exporter
+#!  It doesn't use caddy (as it is unique for the whole system)
+#!  It doesn't include any models as it is redundant with the main nilAI instance
+services:
+  testnet-nuc-api:
+    container_name: testnet-nilai-nuc-api
+    image: nillion/nilai-api:latest
+    depends_on:
+      etcd:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/health"]
+      interval: 30s
+      retries: 3
+      start_period: 15s
+      timeout: 10s

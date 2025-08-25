@@ -1,0 +1,18 @@
+#!  This is used to deploy the nilai-api for the testnet production environment
+#!  It include the api, nuc-api, postgres dbs, redis, prometheus, grafana and node-exporter
+#!  It doesn't use caddy (as it is unique for the whole system)
+#!  It doesn't include any models as it is redundant with the main nilAI instance
+services:
+  testnet-nuc-api:
+    env_file:
+      - .env.testnet
+    environment:
+      - AUTH_STRATEGY=nuc
+      - POSTGRES_DB=${POSTGRES_DB_TESTNET}
+    volumes:
+      - ${FILES}/testnet/nilai-api/config.yaml:/app/nilai-api/src/nilai_api/config/config.yaml
+  grafana:
+      env_file:
+        - .env.mainnet
+      volumes:
+      - ${FILES}/grafana/testnet-nuc-query-data.json:/var/lib/grafana/dashboards/testnet-nuc-query-data.json
