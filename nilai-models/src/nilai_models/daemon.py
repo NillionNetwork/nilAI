@@ -28,7 +28,12 @@ async def get_metadata(num_retries=30):
                 response.raise_for_status()
                 response_data = response.json()
                 model_name = response_data["data"][0]["id"]
-                return ModelMetadata(
+
+                supported_features = ["chat_completion"]
+                if SETTINGS.multimodal_support:
+                    supported_features.append("multimodal")
+
+                metadata = ModelMetadata(
                     id=model_name,  # Unique identifier
                     name=model_name,  # Human-readable name
                     version="1.0",  # Model version
@@ -36,10 +41,12 @@ async def get_metadata(num_retries=30):
                     author="",  # Model creators
                     license="Apache 2.0",  # Usage license
                     source=f"https://huggingface.co/{model_name}",  # Model source
-                    supported_features=["chat_completion"],  # Capabilities
+                    supported_features=supported_features,  # Capabilities
                     tool_support=SETTINGS.tool_support,  # Tool support
                     multimodal_support=SETTINGS.multimodal_support,  # Multimodal support
                 )
+
+                return metadata
 
         except Exception as e:
             if not url:

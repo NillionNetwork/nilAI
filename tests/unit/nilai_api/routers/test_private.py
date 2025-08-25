@@ -208,7 +208,9 @@ def test_chat_completion(mock_user, mock_state, mock_user_manager, mocker, clien
     }
 
 
-def test_chat_completion_with_image_support(mock_user, mock_user_manager, mocker, client):
+def test_chat_completion_with_image_support(
+    mock_user, mock_user_manager, mocker, client
+):
     mocker.patch("openai.api_key", new="test-api-key")
     from openai.types.chat import ChatCompletion
     from nilai_common import ModelMetadata, ModelEndpoint
@@ -217,7 +219,7 @@ def test_chat_completion_with_image_support(mock_user, mock_user_manager, mocker
     data.pop("signature")
     data.pop("sources", None)
     response_data = ChatCompletion(**data)
-    
+
     mock_chat_completions = MagicMock()
     mock_chat_completions.create = mocker.AsyncMock(return_value=response_data)
     mock_chat = MagicMock()
@@ -227,13 +229,13 @@ def test_chat_completion_with_image_support(mock_user, mock_user_manager, mocker
     mocker.patch(
         "nilai_api.routers.private.AsyncOpenAI", return_value=mock_async_openai_instance
     )
-    
+
     multimodal_metadata = ModelMetadata(
-        id="meta-llama/Llama-3.2-1B-Instruct",
-        name="meta-llama/Llama-3.2-1B-Instruct",
+        id="google/gemma-3-4b-it",
+        name="google/gemma-3-4b-it",
         version="1.0",
         description="Multimodal model",
-        author="Meta",
+        author="Google",
         license="Apache 2.0",
         source="https://huggingface.co/meta-llama/Llama-3.2-1B-Instruct",
         supported_features=["chat_completion"],
@@ -241,16 +243,11 @@ def test_chat_completion_with_image_support(mock_user, mock_user_manager, mocker
         multimodal_support=True,
     )
     multimodal_endpoint = ModelEndpoint(
-        url="http://test-model-url", 
-        metadata=multimodal_metadata
+        url="http://test-model-url", metadata=multimodal_metadata
     )
-    
-    mocker.patch.object(
-        state, 
-        "get_model", 
-        return_value=multimodal_endpoint
-    )
-    
+
+    mocker.patch.object(state, "get_model", return_value=multimodal_endpoint)
+
     response = client.post(
         "/v1/chat/completions",
         json={
@@ -258,17 +255,17 @@ def test_chat_completion_with_image_support(mock_user, mock_user_manager, mocker
             "messages": [
                 {"role": "system", "content": "You are a helpful assistant."},
                 {
-                    "role": "user", 
+                    "role": "user",
                     "content": [
                         {"type": "text", "text": "What's in this image?"},
                         {
                             "type": "image_url",
                             "image_url": {
                                 "url": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
-                            }
-                        }
-                    ]
-                }
+                            },
+                        },
+                    ],
+                },
             ],
         },
         headers={"Authorization": "Bearer test-api-key"},
@@ -277,7 +274,9 @@ def test_chat_completion_with_image_support(mock_user, mock_user_manager, mocker
     assert "usage" in response.json()
 
 
-def test_chat_completion_with_image_unsupported_model(mock_user, mock_user_manager, client):
+def test_chat_completion_with_image_unsupported_model(
+    mock_user, mock_user_manager, client
+):
     response = client.post(
         "/v1/chat/completions",
         json={
@@ -285,17 +284,17 @@ def test_chat_completion_with_image_unsupported_model(mock_user, mock_user_manag
             "messages": [
                 {"role": "system", "content": "You are a helpful assistant."},
                 {
-                    "role": "user", 
+                    "role": "user",
                     "content": [
                         {"type": "text", "text": "What's in this image?"},
                         {
                             "type": "image_url",
                             "image_url": {
                                 "url": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
-                            }
-                        }
-                    ]
-                }
+                            },
+                        },
+                    ],
+                },
             ],
         },
         headers={"Authorization": "Bearer test-api-key"},
@@ -312,17 +311,15 @@ def test_chat_completion_with_invalid_image_url(mock_user, mock_user_manager, cl
             "messages": [
                 {"role": "system", "content": "You are a helpful assistant."},
                 {
-                    "role": "user", 
+                    "role": "user",
                     "content": [
                         {"type": "text", "text": "What's in this image?"},
                         {
                             "type": "image_url",
-                            "image_url": {
-                                "url": "https://example.com/image.jpg"
-                            }
-                        }
-                    ]
-                }
+                            "image_url": {"url": "https://example.com/image.jpg"},
+                        },
+                    ],
+                },
             ],
         },
         headers={"Authorization": "Bearer test-api-key"},
