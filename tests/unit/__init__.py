@@ -1,4 +1,4 @@
-from openai.types.chat.chat_completion import ChoiceLogprobs
+from openai.types.chat.chat_completion import ChoiceLogprobs, ChatCompletionMessage
 
 from nilai_common import (
     SignedChatCompletion,
@@ -33,7 +33,7 @@ response: SignedChatCompletion = SignedChatCompletion(
     choices=[
         Choice(
             index=0,
-            message=Message(role="assistant", content="test-content"),
+            message=ChatCompletionMessage(role="assistant", content="test-content"),
             finish_reason="stop",
             logprobs=ChoiceLogprobs(),
         )

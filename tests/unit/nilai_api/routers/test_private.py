@@ -251,7 +251,7 @@ def test_chat_completion_with_image_support(
     response = client.post(
         "/v1/chat/completions",
         json={
-            "model": "meta-llama/Llama-3.2-1B-Instruct",
+            "model": "google/gemma-3-4b-it",
             "messages": [
                 {"role": "system", "content": "You are a helpful assistant."},
                 {
@@ -280,7 +280,7 @@ def test_chat_completion_with_image_unsupported_model(
     response = client.post(
         "/v1/chat/completions",
         json={
-            "model": "meta-llama/Llama-3.2-1B-Instruct",
+            "model": "google/gemma-3-4b-it",
             "messages": [
                 {"role": "system", "content": "You are a helpful assistant."},
                 {
@@ -307,7 +307,7 @@ def test_chat_completion_with_invalid_image_url(mock_user, mock_user_manager, cl
     response = client.post(
         "/v1/chat/completions",
         json={
-            "model": "meta-llama/Llama-3.2-1B-Instruct",
+            "model": "google/gemma-3-4b-it",
             "messages": [
                 {"role": "system", "content": "You are a helpful assistant."},
                 {
