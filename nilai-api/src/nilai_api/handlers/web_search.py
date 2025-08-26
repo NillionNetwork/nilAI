@@ -11,9 +11,9 @@ from nilai_common.api_model import (
     Source,
     WebSearchEnhancedMessages,
     WebSearchContext,
-    MessageContentItem,
+    Message,
+    TextPart,
 )
-from nilai_common import Message
 
 logger = logging.getLogger(__name__)
 
@@ -153,6 +153,16 @@ async def perform_web_search_async(query: str) -> WebSearchContext:
 async def enhance_messages_with_web_search(
     messages: List[Message], query: str
 ) -> WebSearchEnhancedMessages:
+    """Enhance a list of messages with web search context.Collapse commentComment on line L155jcabrero commented on Aug 26, 2025 jcabreroon Aug 26, 2025MemberDeleted docstring?Write a replyResolve commentCode has comments. Press enter to view.
+
+    Args:
+        messages: List of conversation messages to enhance
+        query: Search query to retrieve web search results for
+
+    Returns:
+        WebSearchEnhancedMessages containing the original messages with web search
+        context prepended as a system message, along with source information
+    """
     ctx = await perform_web_search_async(query)
     query_source = Source(source="search_query", content=query)
 
@@ -165,11 +175,11 @@ async def enhance_messages_with_web_search(
 
     last = messages[-1]
     items = (
-        [MessageContentItem(type="text", text=last.content)]
+        [TextPart(type="text", text=last.content)]
         if isinstance(last.content, str)
         else list(last.content)
     )
-    items.append(MessageContentItem(type="text", text=web_search_context))
+    items.append(TextPart(type="text", text=web_search_context))
 
     enhanced_messages = list(messages)
     enhanced_messages[-1] = Message(role="user", content=items)

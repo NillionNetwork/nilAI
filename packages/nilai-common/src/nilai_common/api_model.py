@@ -2,26 +2,29 @@ import uuid
 
 from typing import Annotated, Iterable, List, Literal, Optional, Union
 
-from openai.types.chat import ChatCompletion
+from openai.types.chat import ChatCompletion, ChatCompletionMessage
 from openai.types.chat import ChatCompletionToolParam
 from openai.types.chat.chat_completion import Choice as OpenaAIChoice
 from pydantic import BaseModel, Field
 
 
-class ImageUrl(BaseModel):
+class ImageURL(BaseModel):
     url: str
-    detail: Optional[str] = "auto"
+    detail: Literal["auto", "low", "high"] = "auto"
 
+class ImagePart(BaseModel):
+    type: Literal["image_url"]
+    image_url: ImageURL
 
-class MessageContentItem(BaseModel):
-    type: Literal["text", "image_url"]
-    text: Optional[str] = None
-    image_url: Optional[ImageUrl] = None
+class TextPart(BaseModel):
+    type: Literal["text"]
+    text: str
 
+ContentPart = Union[TextPart, ImagePart]
 
-class Message(BaseModel):
+class Message(ChatCompletionMessage):
     role: Literal["system", "user", "assistant", "tool"]
-    content: Union[str, List[MessageContentItem]]
+    content: Union[str, List[ContentPart]]
 
 
 class Choice(OpenaAIChoice):
