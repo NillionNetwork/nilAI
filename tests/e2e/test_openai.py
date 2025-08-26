@@ -952,3 +952,47 @@ def test_web_search_queueing_next_second_e2e(client):
         assert isinstance(error, openai.RateLimitError), (
             "Rate limited responses should be RateLimitError"
         )
+
+
+def test_multimodal_completion(client):
+    """Test basic multimodal completion with image content."""
+    try:
+        response = client.chat.completions.create(
+            model=test_models[0],
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "What is this image?"},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD//2Q=="
+                            },
+                        },
+                    ],
+                }
+            ],
+            max_tokens=50,
+        )
+
+        assert isinstance(response, ChatCompletion), (
+            "Response should be a ChatCompletion object"
+        )
+        assert len(response.choices) > 0, "Response should contain at least one choice"
+
+        content = response.choices[0].message.content
+        assert content, "Response should contain content"
+
+        print(f"\nMultimodal response: {content[:100]}...")
+
+        assert response.usage, "Response should contain usage data"
+        assert response.usage.prompt_tokens > 0, (
+            "Prompt tokens should be greater than 0"
+        )
+        assert response.usage.completion_tokens > 0, (
+            "Completion tokens should be greater than 0"
+        )
+
+    except Exception as e:
+        pytest.fail(f"Error testing multimodal completion: {str(e)}")
