@@ -15,6 +15,8 @@ from nilai_common.api_model import (
     TextPart,
 )
 
+from .image_support import multimodal_check
+
 logger = logging.getLogger(__name__)
 
 _BRAVE_API_HEADERS = {
@@ -151,7 +153,7 @@ async def perform_web_search_async(query: str) -> WebSearchContext:
 
 
 async def enhance_messages_with_web_search(
-    messages: List[Message], query: str
+    messages: List[Message], query: str, multimodal: bool = False
 ) -> WebSearchEnhancedMessages:
     """Enhance a list of messages with web search context.Collapse commentComment on line L155jcabrero commented on Aug 26, 2025 jcabreroon Aug 26, 2025MemberDeleted docstring?Write a replyResolve commentCode has comments. Press enter to view.
 
@@ -173,16 +175,23 @@ async def enhance_messages_with_web_search(
 
     web_search_context = f"\n\nWeb search results:\n{ctx.prompt}"
 
-    last = messages[-1]
-    items = (
-        [TextPart(type="text", text=last.content)]
-        if isinstance(last.content, str)
-        else list(last.content)
-    )
-    items.append(TextPart(type="text", text=web_search_context))
-
-    enhanced_messages = list(messages)
-    enhanced_messages[-1] = Message(role="user", content=items)
+    if multimodal:
+        sys_idx = next((i for i, m in enumerate(enhanced_messages) if m.role == "system"), None)
+        if sys_idx is not None:
+            existing_message = enhanced_messages[sys_idx]
+            existing_content = existing_message.content
+            if isinstance(existing_content, str):
+                merged_content = f"{web_search_context}\n\n{existing_content}" if existing_content else web_search_context
+            else:
+                text_parts = [p.text for p in existing_content if isinstance(p, TextPart)]
+                merged_content = f"{web_search_context}\n\n" + "\n".join(text_parts) if text_parts else web_search_context
+            enhanced_messages[sys_idx] = Message(role="system", content=merged_content)
+        else:
+            system_ctx_message = Message(role="system", content=web_search_context)
+            enhanced_messages = [system_ctx_message] + list(messages)
+    else:
+        system_ctx_message = Message(role="system", content=web_search_context)
+        enhanced_messages = [system_ctx_message] + list(messages)
 
     return WebSearchEnhancedMessages(
         messages=enhanced_messages, sources=[query_source] + ctx.sources
@@ -255,7 +264,14 @@ async def handle_web_search(
     user_query = ""
     for message in reversed(req_messages):
         if message.role == "user":
-            user_query = message.content
+            if isinstance(message.content, str):
+                user_query = message.content
+            else:
+                parts = []
+                for part in message.content:
+                    if isinstance(part, TextPart):
+                        parts.append(part.text)
+                user_query = "\n".join(parts).strip()
             break
     if not user_query:
         return WebSearchEnhancedMessages(messages=req_messages, sources=[])
@@ -263,7 +279,11 @@ async def handle_web_search(
         concise_query = await generate_search_query_from_llm(
             user_query, model_name, client
         )
-        return await enhance_messages_with_web_search(req_messages, concise_query)
+        
+        is_multimodal = multimodal_check(req_messages).has_multimodal
+        return await enhance_messages_with_web_search(
+            req_messages, concise_query, multimodal=is_multimodal
+        )
     except Exception:
         logger.warning("Web search enhancement failed")
         return WebSearchEnhancedMessages(messages=req_messages, sources=[])
