@@ -1,4 +1,3 @@
-import logging
 from typing import Union, List, Optional
 from openai.types.chat.chat_completion_content_part_text_param import (
     ChatCompletionContentPartTextParam,

@@ -1,6 +1,6 @@
 import logging
 from functools import lru_cache
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 
 import httpx
 from fastapi import HTTPException, status
