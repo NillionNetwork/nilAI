@@ -209,7 +209,7 @@ def test_chat_completion(mock_user, mock_state, mock_user_manager, mocker, clien
 
 
 def test_chat_completion_with_image_support(
-    mock_user, mock_user_manager, mocker, client
+    mock_user, mock_user_manager, mock_state, mocker, client
 ):
     mocker.patch("openai.api_key", new="test-api-key")
     from openai.types.chat import ChatCompletion
@@ -229,7 +229,6 @@ def test_chat_completion_with_image_support(
     mocker.patch(
         "nilai_api.routers.private.AsyncOpenAI", return_value=mock_async_openai_instance
     )
-    mocker.patch("nilai_api.rate_limiting.check_rate_limit", return_value=None)
 
     multimodal_metadata = ModelMetadata(
         id="google/gemma-3-4b-it",
@@ -276,9 +275,8 @@ def test_chat_completion_with_image_support(
 
 
 def test_chat_completion_with_image_unsupported_model(
-    mock_user, mock_user_manager, mocker, client
+    mock_user, mock_user_manager, mock_state, mocker, client
 ):
-    mocker.patch("nilai_api.rate_limiting.check_rate_limit", return_value=None)
     response = client.post(
         "/v1/chat/completions",
         json={
@@ -306,9 +304,27 @@ def test_chat_completion_with_image_unsupported_model(
 
 
 def test_chat_completion_with_invalid_image_url(
-    mock_user, mock_user_manager, mocker, client
+    mock_user, mock_user_manager, mock_state, mocker, client
 ):
-    mocker.patch("nilai_api.rate_limiting.check_rate_limit", return_value=None)
+    from nilai_common import ModelMetadata, ModelEndpoint
+
+    multimodal_metadata = ModelMetadata(
+        id="google/gemma-3-4b-it",
+        name="google/gemma-3-4b-it",
+        version="1.0",
+        description="Multimodal model",
+        author="Google",
+        license="Apache 2.0",
+        source="https://huggingface.co/meta-llama/Llama-3.2-1B-Instruct",
+        supported_features=["chat_completion"],
+        tool_support=False,
+        multimodal_support=True,
+    )
+    multimodal_endpoint = ModelEndpoint(
+        url="http://test-model-url", metadata=multimodal_metadata
+    )
+
+    mocker.patch.object(state, "get_model", return_value=multimodal_endpoint)
     response = client.post(
         "/v1/chat/completions",
         json={
