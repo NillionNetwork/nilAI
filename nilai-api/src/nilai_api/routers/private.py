@@ -110,7 +110,7 @@ async def chat_completion_concurrent_rate_limit(request: Request) -> Tuple[int, 
         raise HTTPException(status_code=400, detail="Invalid request body")
     key = f"chat:{chat_request.model}"
     limit = MODEL_CONCURRENT_RATE_LIMIT.get(
-        chat_request.model, MODEL_CONCURRENT_RATE_LIMIT["default"]
+        chat_request.model, MODEL_CONCURRENT_RATE_LIMIT.get("default", 50)
     )
     return limit, key
 
