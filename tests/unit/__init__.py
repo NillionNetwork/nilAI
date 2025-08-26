@@ -2,7 +2,6 @@ from openai.types.chat.chat_completion import ChoiceLogprobs, ChatCompletionMess
 
 from nilai_common import (
     SignedChatCompletion,
-    Message,
     ModelEndpoint,
     ModelMetadata,
     Usage,
