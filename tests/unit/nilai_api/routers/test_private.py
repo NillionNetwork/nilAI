@@ -8,7 +8,7 @@ from nilai_api.db.users import UserModel
 from nilai_common import AttestationReport
 
 from nilai_api.state import state
-from ... import model_endpoint, model_metadata, response as RESPONSE
+from ... import model_endpoint, model_metadata
 
 
 @pytest.mark.asyncio

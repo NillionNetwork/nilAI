@@ -175,6 +175,8 @@ async def enhance_messages_with_web_search(
 
     web_search_context = f"\n\nWeb search results:\n{ctx.prompt}"
 
+    enhanced_messages = list(messages)
+
     if multimodal:
         sys_idx = next(
             (i for i, m in enumerate(enhanced_messages) if m.role == "system"), None
