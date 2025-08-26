@@ -176,15 +176,27 @@ async def enhance_messages_with_web_search(
     web_search_context = f"\n\nWeb search results:\n{ctx.prompt}"
 
     if multimodal:
-        sys_idx = next((i for i, m in enumerate(enhanced_messages) if m.role == "system"), None)
+        sys_idx = next(
+            (i for i, m in enumerate(enhanced_messages) if m.role == "system"), None
+        )
         if sys_idx is not None:
             existing_message = enhanced_messages[sys_idx]
             existing_content = existing_message.content
             if isinstance(existing_content, str):
-                merged_content = f"{web_search_context}\n\n{existing_content}" if existing_content else web_search_context
+                merged_content = (
+                    f"{web_search_context}\n\n{existing_content}"
+                    if existing_content
+                    else web_search_context
+                )
             else:
-                text_parts = [p.text for p in existing_content if isinstance(p, TextPart)]
-                merged_content = f"{web_search_context}\n\n" + "\n".join(text_parts) if text_parts else web_search_context
+                text_parts = [
+                    p.text for p in existing_content if isinstance(p, TextPart)
+                ]
+                merged_content = (
+                    f"{web_search_context}\n\n" + "\n".join(text_parts)
+                    if text_parts
+                    else web_search_context
+                )
             enhanced_messages[sys_idx] = Message(role="system", content=merged_content)
         else:
             system_ctx_message = Message(role="system", content=web_search_context)
@@ -279,7 +291,7 @@ async def handle_web_search(
         concise_query = await generate_search_query_from_llm(
             user_query, model_name, client
         )
-        
+
         is_multimodal = multimodal_check(req_messages).has_multimodal
         return await enhance_messages_with_web_search(
             req_messages, concise_query, multimodal=is_multimodal

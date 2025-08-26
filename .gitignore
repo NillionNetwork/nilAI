@@ -178,3 +178,4 @@ private_key.key.lock
 
 development-compose.yml
 production-compose.yml
+docker/compose/docker-compose.gemma-4b-gpu.ci.yml
