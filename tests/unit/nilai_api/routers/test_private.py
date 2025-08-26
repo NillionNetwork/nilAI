@@ -305,7 +305,9 @@ def test_chat_completion_with_image_unsupported_model(
     assert "multimodal content" in response.json()["detail"]
 
 
-def test_chat_completion_with_invalid_image_url(mock_user, mock_user_manager, mocker, client):
+def test_chat_completion_with_invalid_image_url(
+    mock_user, mock_user_manager, mocker, client
+):
     mocker.patch("nilai_api.rate_limiting.check_rate_limit", return_value=None)
     response = client.post(
         "/v1/chat/completions",
