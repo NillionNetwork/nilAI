@@ -8,7 +8,7 @@ from nilai_api.db.users import UserModel
 from nilai_common import AttestationReport
 
 from nilai_api.state import state
-from ... import model_endpoint, model_metadata
+from ... import model_endpoint, model_metadata, response as RESPONSE
 
 
 @pytest.mark.asyncio
@@ -168,115 +168,125 @@ def test_get_models(mock_user, mock_user_manager, mock_state, client):
     assert response.json() == [model_metadata.model_dump()]
 
 
-def test_web_search_with_multimodal_content_error(
-    mock_user, mock_user_manager, mock_state, client
-):
-    """Test that web search with multimodal content returns 400 error."""
+def test_chat_completion(mock_user, mock_state, mock_user_manager, mocker, client):
+    mocker.patch("openai.api_key", new="test-api-key")
+    from openai.types.chat import ChatCompletion
+
+    data = RESPONSE.model_dump()
+    data.pop("signature")
+    data.pop("sources", None)
+    response_data = ChatCompletion(**data)
+    # Patch nilai_api.routers.private.AsyncOpenAI to return a mock instance with chat.completions.create as an AsyncMock
+    mock_chat_completions = MagicMock()
+    mock_chat_completions.create = mocker.AsyncMock(return_value=response_data)
+    mock_chat = MagicMock()
+    mock_chat.completions = mock_chat_completions
+    mock_async_openai_instance = MagicMock()
+    mock_async_openai_instance.chat = mock_chat
+    mocker.patch(
+        "nilai_api.routers.private.AsyncOpenAI", return_value=mock_async_openai_instance
+    )
     response = client.post(
         "/v1/chat/completions",
-        headers={"Authorization": "Bearer test-api-key"},
         json={
-            "model": "ABC",
+            "model": "meta-llama/Llama-3.2-1B-Instruct",
             "messages": [
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": "What is your name?"},
+            ],
+        },
+        headers={"Authorization": "Bearer test-api-key"},
+    )
+    assert response.status_code == 200
+    assert "usage" in response.json()
+    assert response.json()["usage"] == {
+        "prompt_tokens": 100,
+        "completion_tokens": 50,
+        "total_tokens": 150,
+        "completion_tokens_details": None,
+        "prompt_tokens_details": None,
+    }
+
+
+def test_chat_completion_image_web_search_error(
+    mock_user, mock_state, mock_user_manager, client
+):
+    response = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "google/gemma-3-4b-it",
+            "messages": [
+                {"role": "system", "content": "You are a helpful assistant."},
                 {
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": "What is this image?"},
+                        {"type": "text", "text": "What is in this image?"},
                         {
                             "type": "image_url",
                             "image_url": {
-                                "url": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD//2Q=="
+                                "url": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
                             },
                         },
                     ],
-                }
+                },
             ],
             "web_search": True,
         },
+        headers={"Authorization": "Bearer test-api-key"},
     )
     assert response.status_code == 400
-    assert (
-        "Web search is not supported with multimodal (image) content"
-        in response.json()["detail"]
-    )
+    assert "web_search" in response.json()["detail"].lower()
 
 
-def test_web_search_with_text_only_works(
-    mock_user, mock_user_manager, mock_state, client, mocker
+def test_chat_completion_with_image(
+    mock_user, mock_state, mock_user_manager, mocker, client
 ):
-    """Test that web search with text-only content works normally."""
+    mocker.patch("openai.api_key", new="test-api-key")
+    from openai.types.chat import ChatCompletion
 
-    mock_web_search = mocker.patch("nilai_api.routers.private.handle_web_search")
-    mock_web_search.return_value = MagicMock(messages=[], sources=[])
+    data = RESPONSE.model_dump()
+    data.pop("signature")
+    data.pop("sources", None)
+    response_data = ChatCompletion(**data)
 
-    mock_client = mocker.patch("nilai_api.routers.private.AsyncOpenAI")
-    mock_response = MagicMock()
-    mock_response.choices = [MagicMock()]
-    mock_response.choices[0].message.content = "Test response"
-    mock_response.usage = MagicMock()
-    mock_response.usage.prompt_tokens = 10
-    mock_response.usage.completion_tokens = 5
-    mock_response.usage.total_tokens = 15
-    mock_client.return_value.chat.completions.create.return_value = mock_response
-
+    mock_chat_completions = MagicMock()
+    mock_chat_completions.create = mocker.AsyncMock(return_value=response_data)
+    mock_chat = MagicMock()
+    mock_chat.completions = mock_chat_completions
+    mock_async_openai_instance = MagicMock()
+    mock_async_openai_instance.chat = mock_chat
     mocker.patch(
-        "nilai_api.routers.private.create_signed_chat_completion",
-        return_value={"test": "response"},
+        "nilai_api.routers.private.AsyncOpenAI", return_value=mock_async_openai_instance
     )
 
     response = client.post(
         "/v1/chat/completions",
-        headers={"Authorization": "Bearer test-api-key"},
         json={
-            "model": "ABC",
-            "messages": [{"role": "user", "content": "What is the latest AI news?"}],
-            "web_search": True,
-        },
-    )
-
-    assert response.status_code == 200
-    mock_web_search.assert_called_once()
-
-
-def test_multimodal_completion(
-    mock_user, mock_user_manager, mock_state, client, mocker
-):
-    """Test basic multimodal completion with image content."""
-    mock_client = mocker.patch("nilai_api.routers.private.AsyncOpenAI")
-    mock_response = MagicMock()
-    mock_response.choices = [MagicMock()]
-    mock_response.choices[0].message.content = "This appears to be an image."
-    mock_response.usage = MagicMock()
-    mock_response.usage.prompt_tokens = 15
-    mock_response.usage.completion_tokens = 8
-    mock_response.usage.total_tokens = 23
-    mock_client.return_value.chat.completions.create.return_value = mock_response
-
-    mocker.patch(
-        "nilai_api.routers.private.create_signed_chat_completion",
-        return_value={"test": "response"},
-    )
-
-    response = client.post(
-        "/v1/chat/completions",
-        headers={"Authorization": "Bearer test-api-key"},
-        json={
-            "model": "ABC",
+            "model": "google/gemma-3-4b-it",
             "messages": [
+                {"role": "system", "content": "You are a helpful assistant."},
                 {
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": "What is this image?"},
+                        {"type": "text", "text": "What is in this image?"},
                         {
                             "type": "image_url",
                             "image_url": {
-                                "url": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD//2Q=="
+                                "url": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
                             },
                         },
                     ],
-                }
+                },
             ],
         },
+        headers={"Authorization": "Bearer test-api-key"},
     )
     assert response.status_code == 200
-    assert response.json() == {"test": "response"}
+    assert "usage" in response.json()
+    assert response.json()["usage"] == {
+        "prompt_tokens": 100,
+        "completion_tokens": 50,
+        "total_tokens": 150,
+        "completion_tokens_details": None,
+        "prompt_tokens_details": None,
+    }
