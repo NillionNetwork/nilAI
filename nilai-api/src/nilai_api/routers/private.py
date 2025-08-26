@@ -6,7 +6,7 @@ from typing import AsyncGenerator, Optional, Union, List, Tuple
 from nilai_api.attestation import get_attestation_report
 from nilai_api.handlers.nilrag import handle_nilrag
 from nilai_api.handlers.web_search import handle_web_search
-from nilai_api.handlers.image_support import multimodal_check
+from nilai_api.utils.content_extractor import has_multimodal_content
 
 from fastapi import APIRouter, Body, Depends, HTTPException, status, Request
 from fastapi.responses import StreamingResponse
@@ -213,15 +213,18 @@ async def chat_completion(
             detail="Model does not support tool usage, remove tools from request",
         )
 
-    multimodal_result = multimodal_check(req.messages)
-    if multimodal_result.has_multimodal:
+    has_multimodal = has_multimodal_content(req.messages)
+    if has_multimodal:
         if not endpoint.metadata.multimodal_support:
             raise HTTPException(
                 status_code=400,
                 detail="Model does not support multimodal content, remove image inputs from request",
             )
-        if multimodal_result.error:
-            raise HTTPException(status_code=400, detail=multimodal_result.error)
+        if req.web_search:
+            raise HTTPException(
+                status_code=400,
+                detail="Web search is not supported with multimodal (image) content. Use text-only input for web search.",
+            )
 
     model_url = endpoint.url + "/v1/"
 
@@ -236,7 +239,8 @@ async def chat_completion(
 
     messages = req.messages
     sources: Optional[List[Source]] = None
-    if req.web_search:
+
+    if req.web_search and not has_multimodal:
         web_search_result = await handle_web_search(messages, model_name, client)
         messages = web_search_result.messages
         sources = web_search_result.sources
