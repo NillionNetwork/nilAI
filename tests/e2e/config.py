@@ -34,6 +34,7 @@ models = {
     ],
     "ci": [
         "meta-llama/Llama-3.2-1B-Instruct",
+        "google/gemma-3-4b-it",
     ],
 }
 

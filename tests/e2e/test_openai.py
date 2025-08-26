@@ -952,3 +952,51 @@ def test_web_search_queueing_next_second_e2e(client):
         assert isinstance(error, openai.RateLimitError), (
             "Rate limited responses should be RateLimitError"
         )
+
+
+def test_multimodal_with_web_search_e2e(client):
+    """Test that multimodal models with web search enabled return sources."""
+    import base64
+    
+    # Base64 encoded image (minimal for testing)
+    base64_image = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/2wBDAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwA/8A"
+    
+    try:
+        response = client.chat.completions.create(
+            model="google/gemma-3-4b-it",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a helpful assistant."
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "What breed of dog is this and what are some interesting facts about this breed? Search the web for additional information."
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": base64_image
+                            }
+                        }
+                    ]
+                }
+            ],
+            max_tokens=100,
+            temperature=0.0,
+            extra_body={"web_search": True},
+        )
+        
+        assert response.choices[0].message.content, "Response should contain content"
+        
+        # Check that sources are returned when web search is enabled
+        sources = getattr(response, "sources", None)
+        assert sources is not None, "Web search responses should have sources"
+        assert isinstance(sources, list), "Sources should be a list"
+        assert len(sources) > 0, "Sources should not be empty"
+                
+    except Exception as e:
+        raise Exception(f"Multimodal with web search test failed: {e}")
