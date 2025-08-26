@@ -27,7 +27,7 @@ ContentPart = Union[TextPart, ImagePart]
 
 
 class Message(ChatCompletionMessage):
-    role: Literal["system", "user", "assistant", "tool"]
+    role: Literal["system", "user", "assistant", "tool"]  # type: ignore
     content: Union[str, List[ContentPart]]
 
 
