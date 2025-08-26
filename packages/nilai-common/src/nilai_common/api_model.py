@@ -12,15 +12,19 @@ class ImageURL(BaseModel):
     url: str
     detail: Literal["auto", "low", "high"] = "auto"
 
+
 class ImagePart(BaseModel):
     type: Literal["image_url"]
     image_url: ImageURL
+
 
 class TextPart(BaseModel):
     type: Literal["text"]
     text: str
 
+
 ContentPart = Union[TextPart, ImagePart]
+
 
 class Message(ChatCompletionMessage):
     role: Literal["system", "user", "assistant", "tool"]
