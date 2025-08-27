@@ -40,7 +40,7 @@ def has_multimodal_content(messages: List[Message]) -> bool:
     """Check if any message contains multimodal content with image_url type."""
     for msg in messages:
         content = getattr(msg, "content", None)
-        if hasattr(content, '__iter__') and not isinstance(content, str):
+        if hasattr(content, "__iter__") and not isinstance(content, str):
             content_list = list(content)
             for part in content_list:
                 if isinstance(part, dict) and part.get("type") == "image_url":
