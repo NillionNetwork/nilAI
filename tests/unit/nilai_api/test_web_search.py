@@ -3,12 +3,6 @@ from unittest.mock import patch
 from fastapi import HTTPException
 from nilai_api.handlers.web_search import (
     perform_web_search_async,
-    enhance_messages_with_web_search,
-)
-from nilai_common import Message
-from nilai_common.api_model import (
-    WebSearchContext,
-    Source,
 )
 
 
