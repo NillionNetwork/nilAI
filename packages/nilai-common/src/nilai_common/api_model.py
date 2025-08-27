@@ -19,14 +19,14 @@ class Message(ChatCompletionMessage):
     content: Optional[
         Union[
             str,
-            List[
+            Iterable[
                 Union[
                     ChatCompletionContentPartTextParam,
                     ChatCompletionContentPartImageParam,
                 ]
             ],
         ]
-    ] = None  # type: ignore[override]
+    ]  # type: ignore[override]
 
 
 class Choice(OpenaAIChoice):

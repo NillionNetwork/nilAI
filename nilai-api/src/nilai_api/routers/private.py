@@ -214,17 +214,11 @@ async def chat_completion(
         )
 
     has_multimodal = has_multimodal_content(req.messages)
-    if has_multimodal:
-        if not endpoint.metadata.multimodal_support:
-            raise HTTPException(
-                status_code=400,
-                detail="Model does not support multimodal content, remove image inputs from request",
-            )
-        if req.web_search:
-            raise HTTPException(
-                status_code=400,
-                detail="Web search is not supported with multimodal (image) content. Use text-only input for web search.",
-            )
+    if has_multimodal and (not endpoint.metadata.multimodal_support or req.web_search):
+        raise HTTPException(
+            status_code=400,
+            detail="Model does not support multimodal content, remove image inputs from request",
+        )
 
     model_url = endpoint.url + "/v1/"
 
@@ -240,7 +234,12 @@ async def chat_completion(
     messages = req.messages
     sources: Optional[List[Source]] = None
 
-    if req.web_search and not has_multimodal:
+    if req.web_search:
+        if has_multimodal:
+            raise HTTPException(
+                status_code=400,
+                detail="Web search is not supported with multimodal (image) content. Use text-only input for web search.",
+            )
         web_search_result = await handle_web_search(messages, model_name, client)
         messages = web_search_result.messages
         sources = web_search_result.sources

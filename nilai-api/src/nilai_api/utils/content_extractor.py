@@ -37,14 +37,11 @@ def extract_text_content(
 
 
 def has_multimodal_content(messages: List[Message]) -> bool:
-    """Check if any message contains multimodal content (image_url parts)."""
-    last_message = messages[-1]
-    last_message_content = last_message.content
-    is_multimodal = isinstance(last_message_content, list) and any(
-        isinstance(item, dict) and item.get("type") == "image_url"
-        for item in last_message_content
+    """Check if any message contains multimodal content (non-string content indicates multimodal)."""
+    return any(
+        isinstance(getattr(msg, "content", None), list)
+        for msg in messages
     )
-    return is_multimodal
 
 
 def get_last_user_query(messages: List[Message]) -> Optional[str]:
