@@ -31,8 +31,8 @@ def extract_text_content(
         return content
     elif isinstance(content, list):
         for part in content:
-            if part.type == "text":
-                return part.text
+            if part["type"] == "text":
+                return part["text"]
     return ""
 
 
@@ -55,10 +55,11 @@ def get_last_user_query(messages: List[Message]) -> Optional[str]:
     for msg in reversed(messages):
         if getattr(msg, "role", None) == "user":
             content = getattr(msg, "content", None)
-            try:
-                text = extract_text_content(content)
-            except Exception:
-                text = None
-            if text:
-                return text.strip()
+            if content is not None:
+                try:
+                    text = extract_text_content(content)
+                except Exception:
+                    text = None
+                if text:
+                    return text.strip()
     return None

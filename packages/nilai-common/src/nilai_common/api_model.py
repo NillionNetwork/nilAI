@@ -26,7 +26,7 @@ class Message(ChatCompletionMessage):
                 ]
             ],
         ]
-    ]  # type: ignore[override]
+    ] = None  # type: ignore[override]
 
 
 class Choice(OpenaAIChoice):

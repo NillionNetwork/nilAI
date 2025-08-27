@@ -1,4 +1,5 @@
-from openai.types.chat.chat_completion import ChoiceLogprobs, ChatCompletionMessage
+from openai.types.chat.chat_completion import ChoiceLogprobs
+from openai.types.chat import ChatCompletionMessage
 
 from nilai_common import (
     SignedChatCompletion,

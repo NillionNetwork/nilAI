@@ -67,8 +67,9 @@ async def handle_nilrag(req: ChatRequest):
         query = None
         for message in req.messages:
             if message.role == "user":
-                query = extract_text_content(message.content)
-                break
+                if message.content is not None:
+                    query = extract_text_content(message.content)
+                    break
 
         if not query:
             raise HTTPException(status_code=400, detail="No user query found")
