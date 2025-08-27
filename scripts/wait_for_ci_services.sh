@@ -4,7 +4,7 @@
 API_HEALTH_STATUS=$(docker inspect --format='{{.State.Health.Status}}' nilai-api 2>/dev/null)
 MODEL_HEALTH_STATUS=$(docker inspect --format='{{.State.Health.Status}}' nilai-llama_1b_gpu 2>/dev/null)
 NUC_API_HEALTH_STATUS=$(docker inspect --format='{{.State.Health.Status}}' nilai-nuc-api 2>/dev/null)
-MAX_ATTEMPTS=20
+MAX_ATTEMPTS=30
 ATTEMPT=1
 
 while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
