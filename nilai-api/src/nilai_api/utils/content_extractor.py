@@ -1,4 +1,4 @@
-from typing import Union, List, Optional
+from typing import Union, List, Optional, Iterable
 from openai.types.chat.chat_completion_content_part_text_param import (
     ChatCompletionContentPartTextParam,
 )
@@ -11,7 +11,7 @@ from nilai_common import Message
 def extract_text_content(
     content: Union[
         str,
-        List[
+        Iterable[
             Union[
                 ChatCompletionContentPartTextParam, ChatCompletionContentPartImageParam
             ]
@@ -22,14 +22,14 @@ def extract_text_content(
     Extract text content from a message content field.
 
     Args:
-        content: Either a string or a list of content parts
+        content: Either a string or an iterable of content parts
 
     Returns:
         str: The extracted text content, or empty string if no text content found
     """
     if isinstance(content, str):
         return content
-    elif isinstance(content, list):
+    elif hasattr(content, "__iter__") and not isinstance(content, str):
         for part in content:
             if part["type"] == "text":
                 return part["text"]
@@ -40,7 +40,11 @@ def has_multimodal_content(messages: List[Message]) -> bool:
     """Check if any message contains multimodal content with image_url type."""
     for msg in messages:
         content = getattr(msg, "content", None)
-        if hasattr(content, "__iter__") and not isinstance(content, str):
+        if (
+            content is not None
+            and hasattr(content, "__iter__")
+            and not isinstance(content, str)
+        ):
             content_list = list(content)
             for part in content_list:
                 if isinstance(part, dict) and part.get("type") == "image_url":

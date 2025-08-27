@@ -172,7 +172,7 @@ async def enhance_messages_with_web_search(
     ctx = await perform_web_search_async(query)
     query_source = Source(source="web_search_query", content=query)
 
-    system_content = (
+    web_search_content = (
         f'You have access to the following web search results for the query: "{query}"\n\n'
         "Use this information to provide accurate and up-to-date answers. "
         "Cite the sources when appropriate.\n\n"
@@ -181,8 +181,26 @@ async def enhance_messages_with_web_search(
         "Please provide a comprehensive answer based on the search results above."
     )
 
-    system_message = Message(role="system", content=system_content)
-    enhanced = list(messages) + [system_message]
+    enhanced = []
+    system_message_added = False
+
+    for msg in messages:
+        if msg.role == "system" and not system_message_added:
+            existing_content = msg.content or ""
+            if isinstance(existing_content, str):
+                combined_content = existing_content + "\n\n" + web_search_content
+            else:
+                parts = list(existing_content)
+                parts.append({"type": "text", "text": "\n\n" + web_search_content})
+                combined_content = parts
+
+            enhanced.append(Message(role="system", content=combined_content))
+            system_message_added = True
+        else:
+            enhanced.append(msg)
+
+    if not system_message_added:
+        enhanced.insert(0, Message(role="system", content=web_search_content))
 
     return WebSearchEnhancedMessages(
         messages=enhanced,

@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 
 class Message(ChatCompletionMessage):
     role: Literal["system", "user", "assistant", "tool"]  # type: ignore
-    content: Optional[
+    content: Optional[  # type: ignore[reportIncompatibleVariableOverride]
         Union[
             str,
             Iterable[
@@ -26,7 +26,7 @@ class Message(ChatCompletionMessage):
                 ]
             ],
         ]
-    ]  # type: ignore[override]
+    ] = None
 
 
 class Choice(OpenaAIChoice):
