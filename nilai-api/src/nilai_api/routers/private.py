@@ -232,21 +232,24 @@ async def chat_completion(
         # Forwarding Streamed Responses
         async def chat_completion_stream_generator() -> AsyncGenerator[str, None]:
             try:
-                response = await client.chat.completions.create(
-                    model=req.model,
-                    messages=messages,  # type: ignore
-                    stream=req.stream,  # type: ignore
-                    top_p=req.top_p,
-                    temperature=req.temperature,
-                    max_tokens=req.max_tokens,
-                    tools=req.tools,  # type: ignore
-                    extra_body={
+                request_kwargs = {
+                    "model": req.model,
+                    "messages": messages,  # type: ignore
+                    "stream": True,  # type: ignore
+                    "top_p": req.top_p,
+                    "temperature": req.temperature,
+                    "max_tokens": req.max_tokens,
+                    "extra_body": {
                         "stream_options": {
                             "include_usage": True,
                             "continuous_usage_stats": True,
                         }
                     },
-                )  # type: ignore
+                }
+                if req.tools:
+                    request_kwargs["tools"] = req.tools  # type: ignore
+
+                response = await client.chat.completions.create(**request_kwargs)  # type: ignore
                 prompt_token_usage: int = 0
                 completion_token_usage: int = 0
                 async for chunk in response:
@@ -284,15 +287,17 @@ async def chat_completion(
             chat_completion_stream_generator(),
             media_type="text/event-stream",  # Ensure client interprets as Server-Sent Events
         )
-    response = await client.chat.completions.create(
-        model=req.model,
-        messages=messages,  # type: ignore
-        stream=req.stream,
-        top_p=req.top_p,
-        temperature=req.temperature,
-        max_tokens=req.max_tokens,
-        tools=req.tools,  # type: ignore
-    )  # type: ignore
+    request_kwargs = {
+        "model": req.model,
+        "messages": messages,  # type: ignore
+        "top_p": req.top_p,
+        "temperature": req.temperature,
+        "max_tokens": req.max_tokens,
+    }
+    if req.tools:
+        request_kwargs["tools"] = req.tools  # type: ignore
+
+    response = await client.chat.completions.create(**request_kwargs)  # type: ignore
 
     model_response = SignedChatCompletion(
         **response.model_dump(),

@@ -1,11 +1,12 @@
 import logging
+from typing import Union
 
 import nilrag
 
 from nilai_common import ChatRequest, Message
 from fastapi import HTTPException, status
 from sentence_transformers import SentenceTransformer
-from typing import Union
+from nilai_api.utils.content_extractor import extract_text_content
 
 logger = logging.getLogger(__name__)
 
@@ -65,11 +66,11 @@ async def handle_nilrag(req: ChatRequest):
         logger.debug("Extracting user query")
         query = None
         for message in req.messages:
-            if message.role == "user":
-                query = message.content
+            if message.role == "user" and message.content is not None:
+                query = extract_text_content(message.content)
                 break
 
-        if query is None:
+        if not query:
             raise HTTPException(status_code=400, detail="No user query found")
 
         # Get number of chunks to include
@@ -92,9 +93,11 @@ async def handle_nilrag(req: ChatRequest):
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail="system message is empty",
                     )
-                message.content += (
-                    relevant_context  # Append the context to the system message
-                )
+
+                if isinstance(message.content, str):
+                    message.content += relevant_context
+                elif isinstance(message.content, list):
+                    message.content.append({"type": "text", "text": relevant_context})
                 break
         else:
             # If no system message exists, add one
