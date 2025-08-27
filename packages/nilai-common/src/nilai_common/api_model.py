@@ -15,15 +15,15 @@ from pydantic import BaseModel, Field
 
 
 class Message(ChatCompletionMessage):
-    role: Literal["system", "user", "assistant", "tool"]
-    content: Union[
+    role: Literal["system", "user", "assistant", "tool"] #type: ignore
+    content: Optional[Union[
         str,
         List[
             Union[
                 ChatCompletionContentPartTextParam, ChatCompletionContentPartImageParam
             ]
         ],
-    ]
+    ]] # type: ignore[override]
 
 
 class Choice(OpenaAIChoice):
