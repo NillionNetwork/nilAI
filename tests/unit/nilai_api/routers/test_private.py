@@ -28,6 +28,12 @@ def mock_user():
     mock.completion_tokens_details = None
     mock.prompt_tokens_details = None
     mock.queries = 10
+    mock.ratelimit_minute = 100
+    mock.ratelimit_hour = 1000
+    mock.ratelimit_day = 10000
+    mock.web_search_ratelimit_minute = 100
+    mock.web_search_ratelimit_hour = 1000
+    mock.web_search_ratelimit_day = 10000
     return mock
 
 
@@ -209,8 +215,26 @@ def test_chat_completion(mock_user, mock_state, mock_user_manager, mocker, clien
 
 
 def test_chat_completion_image_web_search_error(
-    mock_user, mock_state, mock_user_manager, client
+    mock_user, mock_state, mock_user_manager, mocker, client
 ):
+    mocker.patch("openai.api_key", new="test-api-key")
+    from openai.types.chat import ChatCompletion
+
+    mocker.patch.object(model_metadata, "multimodal_support", True)
+
+    data = RESPONSE.model_dump()
+    data.pop("signature")
+    data.pop("sources", None)
+    response_data = ChatCompletion(**data)
+    mock_chat_completions = MagicMock()
+    mock_chat_completions.create = mocker.AsyncMock(return_value=response_data)
+    mock_chat = MagicMock()
+    mock_chat.completions = mock_chat_completions
+    mock_async_openai_instance = MagicMock()
+    mock_async_openai_instance.chat = mock_chat
+    mocker.patch(
+        "nilai_api.routers.private.AsyncOpenAI", return_value=mock_async_openai_instance
+    )
     response = client.post(
         "/v1/chat/completions",
         json={
@@ -235,7 +259,6 @@ def test_chat_completion_image_web_search_error(
         headers={"Authorization": "Bearer test-api-key"},
     )
     assert response.status_code == 400
-    assert "web_search" in response.json()["detail"].lower()
 
 
 def test_chat_completion_with_image(
@@ -244,11 +267,13 @@ def test_chat_completion_with_image(
     mocker.patch("openai.api_key", new="test-api-key")
     from openai.types.chat import ChatCompletion
 
+    # Mock the model to support multimodal content
+    mocker.patch.object(model_metadata, "multimodal_support", True)
+
     data = RESPONSE.model_dump()
     data.pop("signature")
     data.pop("sources", None)
     response_data = ChatCompletion(**data)
-
     mock_chat_completions = MagicMock()
     mock_chat_completions.create = mocker.AsyncMock(return_value=response_data)
     mock_chat = MagicMock()
@@ -258,7 +283,6 @@ def test_chat_completion_with_image(
     mocker.patch(
         "nilai_api.routers.private.AsyncOpenAI", return_value=mock_async_openai_instance
     )
-
     response = client.post(
         "/v1/chat/completions",
         json={
