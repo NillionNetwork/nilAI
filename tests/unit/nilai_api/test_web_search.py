@@ -134,4 +134,3 @@ async def test_perform_web_search_async_concurrent_queries():
         assert (
             results[1].sources[0].content == "Advances in machine learning algorithms."
         )
-
