@@ -45,6 +45,8 @@ class AppState:
         return await self.discovery_service.discover_models()
 
     async def get_model(self, model_id: str) -> Optional[ModelEndpoint]:
+        if model_id is None or len(model_id) == 0:
+            return None
         return await self.discovery_service.get_model(model_id)
 
 

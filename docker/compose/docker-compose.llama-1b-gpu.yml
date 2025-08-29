@@ -7,9 +7,8 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              count: all
+              count: 1
               capabilities: [gpu]
-    ipc: host
     ulimits:
       memlock: -1
       stack: 67108864

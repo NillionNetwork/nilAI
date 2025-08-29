@@ -1,5 +1,5 @@
 services:
-  llama_8b_gpu:
+  gpt_20b_gpu:
     image: nillion/nilai-vllm:latest
     deploy:
       resources:
@@ -19,16 +19,14 @@ services:
       etcd:
         condition: service_healthy
     command: >
-      --model meta-llama/Llama-3.1-8B-Instruct
-      --gpu-memory-utilization 0.21
-      --max-model-len 10000
-      --max-num-batched-tokens 10000
+      --model openai/gpt-oss-20b
+      --gpu-memory-utilization 0.85
+      --max-model-len 100000
+      --max-num-batched-tokens 100000
       --tensor-parallel-size 1
-      --enable-auto-tool-choice
-      --tool-call-parser llama3_json
       --uvicorn-log-level warning
     environment:
-      - SVC_HOST=llama_8b_gpu
+      - SVC_HOST=gpt_20b_gpu
       - SVC_PORT=8000
       - ETCD_HOST=etcd
       - ETCD_PORT=2379

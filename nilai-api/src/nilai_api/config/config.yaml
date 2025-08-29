@@ -7,6 +7,8 @@ model_concurrent_rate_limit:
   cognitivecomputations/Dolphin3.0-Llama3.1-8B: 30
   deepseek-ai/DeepSeek-R1-Distill-Qwen-14B: 5
   hugging-quants/Meta-Llama-3.1-70B-Instruct-AWQ-INT4: 5
+  openai/gpt-oss-20b: 50
+  default: 50
 
 user_rate_limit_minute: null
 user_rate_limit_hour: null
