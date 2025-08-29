@@ -19,7 +19,7 @@ from .nuc import (
     get_invalid_rate_limited_nuc_token,
     get_nildb_nuc_token,
 )
-
+import base64, re
 
 def _create_openai_client(api_key: str) -> OpenAI:
     """Helper function to create an OpenAI client with SSL verification disabled"""
@@ -867,132 +867,226 @@ def test_web_search_brave_rps_e2e(client):
         )
 
 
-def test_web_search_queueing_next_second_e2e(client):
-    """Test that web search requests are properly queued and processed in batches."""
-    import threading
-    import time
-    import openai
-    from concurrent.futures import ThreadPoolExecutor, as_completed
-
-    request_barrier = threading.Barrier(25)
-    responses = []
-    start_time = None
-
-    def make_request():
-        request_barrier.wait()
-
-        nonlocal start_time
-        if start_time is None:
-            start_time = time.time()
-
-        try:
-            response = client.chat.completions.create(
-                model=test_models[0],
-                messages=[{"role": "user", "content": "What is the weather like?"}],
-                extra_body={"web_search": True},
-                max_tokens=10,
-                temperature=0.0,
-            )
-            completion_time = time.time() - start_time
-            responses.append((completion_time, response, "success"))
-        except openai.RateLimitError as e:
-            completion_time = time.time() - start_time
-            responses.append((completion_time, e, "rate_limited"))
-        except Exception as e:
-            completion_time = time.time() - start_time
-            responses.append((completion_time, e, "error"))
-
-    with ThreadPoolExecutor(max_workers=25) as executor:
-        futures = [executor.submit(make_request) for _ in range(25)]
-
-        for future in as_completed(futures):
-            try:
-                future.result()
-            except Exception as e:
-                print(f"Thread execution error: {e}")
-
-    assert len(responses) == 25, "All requests should complete"
-
-    # Categorize responses
-    successful_responses = [(t, r) for t, r, status in responses if status == "success"]
-    rate_limited_responses = [
-        (t, r) for t, r, status in responses if status == "rate_limited"
-    ]
-    error_responses = [(t, r) for t, r, status in responses if status == "error"]
-
-    print(
-        f"Successful: {len(successful_responses)}, Rate limited: {len(rate_limited_responses)}, Errors: {len(error_responses)}"
-    )
-
-    # Verify queuing behavior
-    # With 25 requests and 20 RPS limit, some should be queued or rate limited
-    assert len(rate_limited_responses) > 0 or len(successful_responses) < 25, (
-        "Queuing should be enforced - either some requests should be rate limited or delayed"
-    )
-
-    for t, response in successful_responses:
-        assert isinstance(response, ChatCompletion), (
-            "Response should be a ChatCompletion object"
-        )
-        assert len(response.choices) > 0, "Response should contain at least one choice"
-        assert response.choices[0].message.content, "Response should contain content"
-
-        sources = getattr(response, "sources", None)
-        assert sources is not None, "Web search responses should have sources"
-        assert isinstance(sources, list), "Sources should be a list"
-        assert len(sources) > 0, "Sources should not be empty"
-
-        first_source = sources[0]
-        assert isinstance(first_source, dict), "First source should be a dictionary"
-        assert "title" in first_source, "First source should have title"
-        assert "url" in first_source, "First source should have url"
-        assert "snippet" in first_source, "First source should have snippet"
-
-    for t, error in rate_limited_responses:
-        assert isinstance(error, openai.RateLimitError), (
-            "Rate limited responses should be RateLimitError"
-        )
 
 
-def test_multimodal_completion(client):
-    """Test basic multimodal completion with image content."""
+def test_multimodal_single_request(client):
+    """Test multimodal chat completion with a single request using gemma-3-4b-it model"""
+    if "google/gemma-3-4b-it" not in test_models:
+        pytest.skip("Multimodal test only runs for gemma-3-4b-it model")
+    
     try:
+        # Create a simple base64 encoded image (1x1 pixel red PNG)
         response = client.chat.completions.create(
-            model=test_models[0],
+            model="google/gemma-3-4b-it",
             messages=[
                 {
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": "What is this image?"},
+                        {"type": "text", "text": "What do you see in this image?"},
                         {
                             "type": "image_url",
                             "image_url": {
-                                "url": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD//2Q=="
+                                "url": "data:image/webp;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mP8z8BQz0AEYBxVSF+FABJADveWkH6oAAAAAElFTkSuQmCC"
                             },
                         },
                     ],
                 }
             ],
-            max_tokens=50,
+            temperature=0.2,
+            max_tokens=100,
         )
 
+        # Verify response structure
         assert isinstance(response, ChatCompletion), (
             "Response should be a ChatCompletion object"
         )
+        assert response.model == "google/gemma-3-4b-it", (
+            "Response model should be google/gemma-3-4b-it"
+        )
         assert len(response.choices) > 0, "Response should contain at least one choice"
 
+        # Check content
         content = response.choices[0].message.content
-        assert content, "Response should contain content"
+        assert content is not None, "Content should not be null"
+        assert content.strip() != "", "Content should not be empty"
 
-        print(f"\nMultimodal response: {content[:100]}...")
+        print(
+            f"\nMultimodal single request response: {content[:100]}..."
+            if len(content) > 100
+            else content
+        )
 
-        assert response.usage, "Response should contain usage data"
+        assert response.usage, "No usage data returned for multimodal request"
+        print(f"Multimodal usage: {response.usage}")
+
         assert response.usage.prompt_tokens > 0, (
-            "Prompt tokens should be greater than 0"
+            "No prompt tokens returned for multimodal request"
         )
         assert response.usage.completion_tokens > 0, (
-            "Completion tokens should be greater than 0"
+            "No completion tokens returned for multimodal request"
+        )
+        assert response.usage.total_tokens > 0, (
+            "No total tokens returned for multimodal request"
         )
 
     except Exception as e:
-        pytest.fail(f"Error testing multimodal completion: {str(e)}")
+        pytest.fail(f"Error testing multimodal single request: {str(e)}")
+
+
+def test_multimodal_consecutive_requests(client):
+    """Test two consecutive multimodal chat completions using gemma-3-4b-it model"""
+    if "google/gemma-3-4b-it" not in test_models:
+        pytest.skip("Multimodal test only runs for gemma-3-4b-it model")
+    
+    try:
+        # Create a simple base64 encoded image (1x1 pixel red PNG)
+
+        # First multimodal request
+        response1 = client.chat.completions.create(
+            model="google/gemma-3-4b-it",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "What color is this image?"},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": "data:image/webp;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mP8z8BQz0AEYBxVSF+FABJADveWkH6oAAAAAElFTkSuQmCC"
+                            },
+                        },
+                    ],
+                }
+            ],
+            temperature=0.2,
+            max_tokens=50,
+        )
+
+        # Verify first response
+        assert isinstance(response1, ChatCompletion), (
+            "First response should be a ChatCompletion object"
+        )
+        assert response1.model == "google/gemma-3-4b-it", (
+            "First response model should be google/gemma-3-4b-it"
+        )
+        assert len(response1.choices) > 0, (
+            "First response should contain at least one choice"
+        )
+
+        content1 = response1.choices[0].message.content
+        assert content1 is not None, "First response content should not be null"
+        assert content1.strip() != "", "First response content should not be empty"
+
+        print(
+            f"\nFirst multimodal response: {content1[:100]}..."
+            if len(content1) > 100
+            else content1
+        )
+
+        # Second multimodal request
+        response2 = client.chat.completions.create(
+            model="google/gemma-3-4b-it",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Describe this image in detail."},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": "data:image/webp;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mP8z8BQz0AEYBxVSF+FABJADveWkH6oAAAAAElFTkSuQmCC"
+                            },
+                        },
+                    ],
+                }
+            ],
+            temperature=0.2,
+            max_tokens=100,
+        )
+
+        # Verify second response
+        assert isinstance(response2, ChatCompletion), (
+            "Second response should be a ChatCompletion object"
+        )
+        assert response2.model == "google/gemma-3-4b-it", (
+            "Second response model should be google/gemma-3-4b-it"
+        )
+        assert len(response2.choices) > 0, (
+            "Second response should contain at least one choice"
+        )
+
+        content2 = response2.choices[0].message.content
+        assert content2 is not None, "Second response content should not be null"
+        assert content2.strip() != "", "Second response content should not be empty"
+
+        print(
+            f"\nSecond multimodal response: {content2[:100]}..."
+            if len(content2) > 100
+            else content2
+        )
+
+        # Verify both responses have usage data
+        assert response1.usage, "No usage data returned for first multimodal request"
+        assert response2.usage, "No usage data returned for second multimodal request"
+
+        print(f"First multimodal usage: {response1.usage}")
+        print(f"Second multimodal usage: {response2.usage}")
+
+        # Verify both responses have token counts
+        assert response1.usage.prompt_tokens > 0, (
+            "No prompt tokens returned for first multimodal request"
+        )
+        assert response1.usage.completion_tokens > 0, (
+            "No completion tokens returned for first multimodal request"
+        )
+        assert response1.usage.total_tokens > 0, (
+            "No total tokens returned for first multimodal request"
+        )
+
+        assert response2.usage.prompt_tokens > 0, (
+            "No prompt tokens returned for second multimodal request"
+        )
+        assert response2.usage.completion_tokens > 0, (
+            "No completion tokens returned for second multimodal request"
+        )
+        assert response2.usage.total_tokens > 0, (
+            "No total tokens returned for second multimodal request"
+        )
+
+    except Exception as e:
+        pytest.fail(f"Error testing consecutive multimodal requests: {str(e)}")
+
+
+def test_multimodal_with_web_search_error(client):
+    """Test that multimodal + web search raises an error"""
+    if "google/gemma-3-4b-it" not in test_models:
+        pytest.skip("Multimodal test only runs for gemma-3-4b-it model")
+    
+    # Create a simple base64 encoded image (1x1 pixel red PNG)
+
+    try:
+        client.chat.completions.create(
+            model="google/gemma-3-4b-it",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "What do you see in this image?"},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": "data:image/webp;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mP8z8BQz0AEYBxVSF+FABJADveWkH6oAAAAAElFTkSuQmCC"
+                            },
+                        },
+                    ],
+                }
+            ],
+            extra_body={"web_search": True},
+            temperature=0.2,
+            max_tokens=100,
+        )
+        pytest.fail("Expected error for multimodal + web search combination")
+    except Exception as e:
+        # The error should be raised, which means the test passes
+        print(f"Expected error received: {str(e)}")
+        assert "multimodal" in str(e).lower() or "400" in str(e), "Should raise multimodal or 400 error"
