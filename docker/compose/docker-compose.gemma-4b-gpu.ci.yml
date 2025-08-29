@@ -22,7 +22,6 @@ services:
     command: >
       --model google/gemma-3-4b-it
       --model-impl vllm
-      --dtype float16
       --tensor-parallel-size 1
       --max-model-len 1024
       --max-num-batched-tokens 1024
