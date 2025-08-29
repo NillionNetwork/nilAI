@@ -21,9 +21,10 @@ services:
         condition: service_healthy
     command: >
       --model google/gemma-3-4b-it
-      --gpu-memory-utilization 0.5
-      --max-model-len 30000
-      --max-num-batched-tokens 30000
+      --model-impl vllm
+      --disable-sliding-window
+      --max-model-len 8192
+      --max-num-batched-tokens 8192
       --tensor-parallel-size 1
       --enable-auto-tool-choice
       --tool-call-parser llama3_json
@@ -36,6 +37,8 @@ services:
       - TOOL_SUPPORT=true
       - MULTIMODAL_SUPPORT=true
       - CUDA_LAUNCH_BLOCKING=1
+      - VLLM_USE_V1=1
+      - VLLM_ALLOW_LONG_MAX_MODEL_LEN=1
     volumes:
       - hugging_face_models:/root/.cache/huggingface
     healthcheck:
