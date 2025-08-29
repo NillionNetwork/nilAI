@@ -25,7 +25,6 @@ services:
       --dtype float16
       --tensor-parallel-size 1
       --max-model-len 1024
-      --sliding-window 1024
       --max-num-batched-tokens 1024
       --max-num-seqs 8
       --gpu-memory-utilization 0.82
