@@ -31,10 +31,6 @@ from nilai_common import (
     Usage,
 )
 
-from openai.types.chat import (
-    ChatCompletionSystemMessageParam,
-    ChatCompletionUserMessageParam,
-)
 
 from openai import AsyncOpenAI
 
