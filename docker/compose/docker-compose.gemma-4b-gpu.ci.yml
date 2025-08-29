@@ -37,7 +37,6 @@ services:
       - TOOL_SUPPORT=true
       - MULTIMODAL_SUPPORT=true
       - CUDA_LAUNCH_BLOCKING=1
-      - VLLM_USE_V1=1
       - VLLM_ALLOW_LONG_MAX_MODEL_LEN=1
     volumes:
       - hugging_face_models:/root/.cache/huggingface
