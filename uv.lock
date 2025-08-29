@@ -290,6 +290,20 @@ wheels = [
 ]
 
 [[package]]
+name = "blindfold"
+version = "0.1.0rc0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "bcl" },
+    { name = "lagrange" },
+    { name = "pailliers" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/0c/1e/53d07fa342006e4f468148e76b8905245d3aca7124db41a82ed3f21d5cc1/blindfold-0.1.0rc0.tar.gz", hash = "sha256:b0e309b6427873dc81d2c397ee71664a0a071e932e29ad879825b9fc8e7e9786", size = 20370, upload-time = "2025-06-24T01:58:33.887Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3a/c6/a161c9592167ac0ad0a60586638bbc9dd65e229873980e08d391f37625f8/blindfold-0.1.0rc0-py3-none-any.whl", hash = "sha256:249d87fc6cea556bb6c96f171d6d3352381b7b1988adec7a3334ee2f6e43716e", size = 14425, upload-time = "2025-06-24T01:58:32.614Z" },
+]
+
+[[package]]
 name = "certifi"
 version = "2025.1.31"
 source = { registry = "https://pypi.org/simple" }
@@ -1143,6 +1157,15 @@ wheels = [
 ]
 
 [[package]]
+name = "lagrange"
+version = "3.0.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/07/9d/4b6470fd6769b0943fbda9b30e2068bb8d9940be2977b1e80a184d527fa6/lagrange-3.0.1.tar.gz", hash = "sha256:272f352a676679ee318b0b302054f667f23afb73d10063cd3926c612527e09f1", size = 6894, upload-time = "2025-01-01T01:33:14.999Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3e/d8/f1c3ff60a8b3e114cfb3e9eed75140d2a3e1e766791cfe2f210a5c736d61/lagrange-3.0.1-py3-none-any.whl", hash = "sha256:d473913d901f0c257456c505e4a94450f2e4a2f147460a68ad0cfb9ea33a6d0a", size = 6905, upload-time = "2025-01-01T01:33:11.031Z" },
+]
+
+[[package]]
 name = "mako"
 version = "1.3.9"
 source = { registry = "https://pypi.org/simple" }
@@ -1368,6 +1391,7 @@ dependencies = [
     { name = "python-dotenv" },
     { name = "pyyaml" },
     { name = "redis" },
+    { name = "secretvaults" },
     { name = "sqlalchemy" },
     { name = "uvicorn" },
     { name = "verifier" },
@@ -1388,7 +1412,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.27.2" },
     { name = "nilai-common", editable = "packages/nilai-common" },
     { name = "nilrag", specifier = ">=0.1.11" },
-    { name = "nuc", git = "https://github.com/NillionNetwork/nuc-py.git?rev=4922b5e9354e611cc31322d681eb29da05be584e" },
+    { name = "nuc", specifier = ">=0.1.0" },
     { name = "nuc-helpers", editable = "nilai-auth/nuc-helpers" },
     { name = "openai", specifier = ">=1.59.9" },
     { name = "pg8000", specifier = ">=1.31.2" },
@@ -1396,6 +1420,7 @@ requires-dist = [
     { name = "python-dotenv", specifier = ">=1.0.1" },
     { name = "pyyaml", specifier = ">=6.0.1" },
     { name = "redis", specifier = ">=5.2.1" },
+    { name = "secretvaults", specifier = ">=0.2.1" },
     { name = "sqlalchemy", specifier = ">=2.0.36" },
     { name = "uvicorn", specifier = ">=0.32.1" },
     { name = "verifier" },
@@ -1512,12 +1537,16 @@ wheels = [
 
 [[package]]
 name = "nuc"
-version = "0.0.0a0"
-source = { git = "https://github.com/NillionNetwork/nuc-py.git?rev=4922b5e9354e611cc31322d681eb29da05be584e#4922b5e9354e611cc31322d681eb29da05be584e" }
+version = "0.1.0"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cosmpy" },
     { name = "requests" },
     { name = "secp256k1" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e9/58/acfdbdd6dc8e8575a1bc2ade9eedf7d33d99ac428573df5a46a4f4b76949/nuc-0.1.0.tar.gz", hash = "sha256:6a715bf07a8adf2901b68c9597ba44ae28506c3fb0fa03530c092bc0f8ba22f0", size = 29586, upload-time = "2025-07-01T14:46:55.774Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/80/ba/a99b12ee5132976d974fe65f9dbeaaafe4183a8558859c72bd271f87e25c/nuc-0.1.0-py3-none-any.whl", hash = "sha256:6845133866f2d41592be74ca2a41295d09d7a6d89886a5a1181dceefd4fe5a65", size = 22513, upload-time = "2025-07-01T14:46:54.685Z" },
 ]
 
 [[package]]
@@ -1536,7 +1565,7 @@ dependencies = [
 requires-dist = [
     { name = "cosmpy", specifier = "==0.9.2" },
     { name = "httpx", specifier = ">=0.28.1" },
-    { name = "nuc", git = "https://github.com/NillionNetwork/nuc-py.git?rev=4922b5e9354e611cc31322d681eb29da05be584e" },
+    { name = "nuc", specifier = ">=0.1.0" },
     { name = "pydantic", specifier = ">=2.11.2" },
     { name = "secp256k1", specifier = ">=0.14.0" },
 ]
@@ -2115,11 +2144,11 @@ wheels = [
 
 [[package]]
 name = "python-dotenv"
-version = "1.1.0"
+version = "1.1.1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/88/2c/7bb1416c5620485aa793f2de31d3df393d3686aa8a8506d11e10e13c5baf/python_dotenv-1.1.0.tar.gz", hash = "sha256:41f90bc6f5f177fb41f53e87666db362025010eb28f60a01c9143bfa33a2b2d5", size = 39920, upload-time = "2025-03-25T10:14:56.835Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f6/b0/4bc07ccd3572a2f9df7e6782f52b0c6c90dcbb803ac4a167702d7d0dfe1e/python_dotenv-1.1.1.tar.gz", hash = "sha256:a8a6399716257f45be6a007360200409fce5cda2661e3dec71d23dc15f6189ab", size = 41978, upload-time = "2025-06-24T04:21:07.341Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/1e/18/98a99ad95133c6a6e2005fe89faedf294a748bd5dc803008059409ac9b1e/python_dotenv-1.1.0-py3-none-any.whl", hash = "sha256:d7c01d9e2293916c18baf562d95698754b0dbbb5e74d457c45d4f6561fb9d55d", size = 20256, upload-time = "2025-03-25T10:14:55.034Z" },
+    { url = "https://files.pythonhosted.org/packages/5f/ed/539768cf28c661b5b068d66d96a2f155c4971a5d55684a514c1a0e0dec2f/python_dotenv-1.1.1-py3-none-any.whl", hash = "sha256:31f23644fe2602f88ff55e1f5c79ba497e01224ee7737937930c448e4d0e24dc", size = 20556, upload-time = "2025-06-24T04:21:06.073Z" },
 ]
 
 [[package]]
@@ -2485,6 +2514,23 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/9b/41/bb668a6e4192303542d2d90c3b38d564af3c17c61bd7d4039af4f29405fe/secp256k1-0.14.0.tar.gz", hash = "sha256:82c06712d69ef945220c8b53c1a0d424c2ff6a1f64aee609030df79ad8383397", size = 2420607, upload-time = "2021-11-06T01:36:10.707Z" }
 
 [[package]]
+name = "secretvaults"
+version = "0.2.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "aiohttp" },
+    { name = "blindfold" },
+    { name = "nuc" },
+    { name = "pydantic" },
+    { name = "python-dotenv" },
+    { name = "structlog" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/85/cb/a2577091e6cd8caed0d313e39600b4f6851be66ffa3ef36fac8932dd0d7b/secretvaults-0.2.1.tar.gz", hash = "sha256:819167ac4a992185fcbd3454d0f735a2fec0918a573911e6da628fb03e853e39", size = 28241, upload-time = "2025-08-18T14:30:28.527Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/dc/1c/2ffc9365baace0e9f64d0280074704657249c0093c8ed04974e9f458dfe9/secretvaults-0.2.1-py3-none-any.whl", hash = "sha256:d3fbc844f3439ab393a63722886234e1731bdd2170213233f2a0fd9d04031bd2", size = 35438, upload-time = "2025-08-18T14:30:27.013Z" },
+]
+
+[[package]]
 name = "sentence-transformers"
 version = "4.0.2"
 source = { registry = "https://pypi.org/simple" }
@@ -2578,6 +2624,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/04/1b/52b27f2e13ceedc79a908e29eac426a63465a1a01248e5f24aa36a62aeb3/starlette-0.46.1.tar.gz", hash = "sha256:3c88d58ee4bd1bb807c0d1acb381838afc7752f9ddaec81bbe4383611d833230", size = 2580102, upload-time = "2025-03-08T10:55:34.504Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a0/4b/528ccf7a982216885a1ff4908e886b8fb5f19862d1962f56a3fce2435a70/starlette-0.46.1-py3-none-any.whl", hash = "sha256:77c74ed9d2720138b25875133f3a2dae6d854af2ec37dceb56aef370c1d8a227", size = 71995, upload-time = "2025-03-08T10:55:32.662Z" },
+]
+
+[[package]]
+name = "structlog"
+version = "25.4.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/79/b9/6e672db4fec07349e7a8a8172c1a6ae235c58679ca29c3f86a61b5e59ff3/structlog-25.4.0.tar.gz", hash = "sha256:186cd1b0a8ae762e29417095664adf1d6a31702160a46dacb7796ea82f7409e4", size = 1369138, upload-time = "2025-06-02T08:21:12.971Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a0/4a/97ee6973e3a73c74c8120d59829c3861ea52210667ec3e7a16045c62b64d/structlog-25.4.0-py3-none-any.whl", hash = "sha256:fe809ff5c27e557d14e613f45ca441aabda051d119ee5a0102aaba6ce40eed2c", size = 68720, upload-time = "2025-06-02T08:21:11.43Z" },
 ]
 
 [[package]]
