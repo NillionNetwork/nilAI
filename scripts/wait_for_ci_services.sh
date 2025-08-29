@@ -15,8 +15,17 @@ while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
         echo "=== nilai-api is unhealthy, printing logs ==="
         docker logs nilai-api --tail 50
     fi
-
     
+    if [ "$MODEL_HEALTH_STATUS" = "unhealthy" ]; then
+        echo "=== nilai-gemma_4b_gpu is unhealthy, printing logs ==="
+        docker logs nilai-gemma_4b_gpu --tail 50
+    fi
+    
+    if [ "$NUC_API_HEALTH_STATUS" = "unhealthy" ]; then
+        echo "=== nilai-nuc-api is unhealthy, printing logs ==="
+        docker logs nilai-nuc-api --tail 50
+    fi
+
     sleep 30
     API_HEALTH_STATUS=$(docker inspect --format='{{.State.Health.Status}}' nilai-api 2>/dev/null)
     MODEL_HEALTH_STATUS=$(docker inspect --format='{{.State.Health.Status}}' nilai-gemma_4b_gpu 2>/dev/null)
@@ -31,17 +40,23 @@ done
 echo "API_HEALTH_STATUS: $API_HEALTH_STATUS"
 if [ "$API_HEALTH_STATUS" != "healthy" ]; then
     echo "Error: nilai-api failed to become healthy after $MAX_ATTEMPTS attempts"
+    echo "=== Final logs for nilai-api ==="
+    docker logs nilai-api --tail 100
     exit 1
 fi
 
 echo "MODEL_HEALTH_STATUS: $MODEL_HEALTH_STATUS"
 if [ "$MODEL_HEALTH_STATUS" != "healthy" ]; then
-    echo "Error: nilai-llama_1b_gpu failed to become healthy after $MAX_ATTEMPTS attempts"
+    echo "Error: nilai-gemma_4b_gpu failed to become healthy after $MAX_ATTEMPTS attempts"
+    echo "=== Final logs for nilai-gemma_4b_gpu ==="
+    docker logs nilai-gemma_4b_gpu --tail 100
     exit 1
 fi
 
 echo "NUC_API_HEALTH_STATUS: $NUC_API_HEALTH_STATUS"
 if [ "$NUC_API_HEALTH_STATUS" != "healthy" ]; then
     echo "Error: nilai-nuc-api failed to become healthy after $MAX_ATTEMPTS attempts"
+    echo "=== Final logs for nilai-nuc-api ==="
+    docker logs nilai-nuc-api --tail 100
     exit 1
 fi
