@@ -9,6 +9,14 @@ ATTEMPT=1
 
 while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
     echo "Waiting for nilai to become healthy... API:[$API_HEALTH_STATUS] MODEL:[$MODEL_HEALTH_STATUS] NUC_API:[$NUC_API_HEALTH_STATUS] (Attempt $ATTEMPT/$MAX_ATTEMPTS)"
+    
+    # Check if any service is unhealthy and print logs
+    if [ "$API_HEALTH_STATUS" = "unhealthy" ]; then
+        echo "=== nilai-api is unhealthy, printing logs ==="
+        docker logs nilai-api --tail 50
+    fi
+
+    
     sleep 30
     API_HEALTH_STATUS=$(docker inspect --format='{{.State.Health.Status}}' nilai-api 2>/dev/null)
     MODEL_HEALTH_STATUS=$(docker inspect --format='{{.State.Health.Status}}' nilai-gemma_4b_gpu 2>/dev/null)
