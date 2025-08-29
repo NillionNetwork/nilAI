@@ -7,9 +7,9 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              count: all
+              count: 1
               capabilities: [gpu]
-    ipc: host
+
     ulimits:
       memlock: -1
       stack: 67108864
@@ -21,14 +21,13 @@ services:
         condition: service_healthy
     command: >
       --model google/gemma-3-4b-it
-      --gpu-memory-utilization 0.7
-      --max-model-len 8192
-      --max-num-batched-tokens 8192
+      --gpu-memory-utilization 0.5
+      --max-model-len 30000
+      --max-num-batched-tokens 30000
       --tensor-parallel-size 1
       --enable-auto-tool-choice
       --tool-call-parser llama3_json
       --uvicorn-log-level warning
-      --dtype half
     environment:
       - SVC_HOST=gemma_4b_gpu
       - SVC_PORT=8000
@@ -36,8 +35,6 @@ services:
       - ETCD_PORT=2379
       - TOOL_SUPPORT=true
       - MULTIMODAL_SUPPORT=true
-      - VLLM_USE_V1=1
-      - VLLM_ALLOW_LONG_MAX_MODEL_LEN=1
       - CUDA_LAUNCH_BLOCKING=1
     volumes:
       - hugging_face_models:/root/.cache/huggingface
