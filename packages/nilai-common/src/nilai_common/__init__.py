@@ -4,7 +4,6 @@ from nilai_common.api_model import (
     SignedChatCompletion,
     Choice,
     HealthCheckResponse,
-    Message,
     ModelEndpoint,
     ModelMetadata,
     Nonce,
@@ -20,7 +19,6 @@ from nilai_common.discovery import ModelServiceDiscovery
 from openai.types.completion_usage import CompletionUsage as Usage
 
 __all__ = [
-    "Message",
     "ChatRequest",
     "SignedChatCompletion",
     "Choice",

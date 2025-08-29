@@ -19,7 +19,7 @@ from .nuc import (
     get_invalid_rate_limited_nuc_token,
     get_nildb_nuc_token,
 )
-import base64, re
+
 
 def _create_openai_client(api_key: str) -> OpenAI:
     """Helper function to create an OpenAI client with SSL verification disabled"""
@@ -867,13 +867,11 @@ def test_web_search_brave_rps_e2e(client):
         )
 
 
-
-
 def test_multimodal_single_request(client):
     """Test multimodal chat completion with a single request using gemma-3-4b-it model"""
     if "google/gemma-3-4b-it" not in test_models:
         pytest.skip("Multimodal test only runs for gemma-3-4b-it model")
-    
+
     try:
         # Create a simple base64 encoded image (1x1 pixel red PNG)
         response = client.chat.completions.create(
@@ -937,7 +935,7 @@ def test_multimodal_consecutive_requests(client):
     """Test two consecutive multimodal chat completions using gemma-3-4b-it model"""
     if "google/gemma-3-4b-it" not in test_models:
         pytest.skip("Multimodal test only runs for gemma-3-4b-it model")
-    
+
     try:
         # Create a simple base64 encoded image (1x1 pixel red PNG)
 
@@ -1061,7 +1059,7 @@ def test_multimodal_with_web_search_error(client):
     """Test that multimodal + web search raises an error"""
     if "google/gemma-3-4b-it" not in test_models:
         pytest.skip("Multimodal test only runs for gemma-3-4b-it model")
-    
+
     # Create a simple base64 encoded image (1x1 pixel red PNG)
 
     try:
@@ -1089,4 +1087,6 @@ def test_multimodal_with_web_search_error(client):
     except Exception as e:
         # The error should be raised, which means the test passes
         print(f"Expected error received: {str(e)}")
-        assert "multimodal" in str(e).lower() or "400" in str(e), "Should raise multimodal or 400 error"
+        assert "multimodal" in str(e).lower() or "400" in str(e), (
+            "Should raise multimodal or 400 error"
+        )
