@@ -1,32 +1,11 @@
 import uuid
 
-from typing import Annotated, Iterable, List, Literal, Optional, Union
+from typing import Annotated, Iterable, List, Optional
 
-from openai.types.chat import ChatCompletion, ChatCompletionMessage
+from openai.types.chat import ChatCompletion, ChatCompletionMessageParam
 from openai.types.chat import ChatCompletionToolParam
 from openai.types.chat.chat_completion import Choice as OpenaAIChoice
-from openai.types.chat.chat_completion_content_part_image_param import (
-    ChatCompletionContentPartImageParam,
-)
-from openai.types.chat.chat_completion_content_part_text_param import (
-    ChatCompletionContentPartTextParam,
-)
-from pydantic import BaseModel, Field
-
-
-class Message(ChatCompletionMessage):
-    role: Literal["system", "user", "assistant", "tool"]  # type: ignore
-    content: Optional[  # type: ignore[reportIncompatibleVariableOverride]
-        Union[
-            str,
-            Iterable[
-                Union[
-                    ChatCompletionContentPartTextParam,
-                    ChatCompletionContentPartImageParam,
-                ]
-            ],
-        ]
-    ] = None
+from pydantic import BaseModel, Field, SkipValidation
 
 
 class Choice(OpenaAIChoice):
@@ -45,7 +24,7 @@ class SearchResult(BaseModel):
 
 
 class WebSearchEnhancedMessages(BaseModel):
-    messages: List[Message]
+    messages: List[ChatCompletionMessageParam]
     sources: List[Source]
 
 
@@ -58,7 +37,9 @@ class WebSearchContext(BaseModel):
 
 class ChatRequest(BaseModel):
     model: str
-    messages: List[Message] = Field(..., min_length=1)
+    messages: SkipValidation[List[ChatCompletionMessageParam]] = Field(
+        ..., min_length=1
+    )
     temperature: Optional[float] = Field(default=0.2, ge=0.0, le=5.0)
     top_p: Optional[float] = Field(default=0.95, ge=0.0, le=1.0)
     max_tokens: Optional[int] = Field(default=2048, ge=1, le=100000)

@@ -3,7 +3,7 @@ from typing import Union
 
 import nilrag
 
-from nilai_common import ChatRequest, Message
+from nilai_common import ChatRequest
 from fastapi import HTTPException, status
 from sentence_transformers import SentenceTransformer
 from nilai_api.utils.content_extractor import extract_text_content
@@ -66,8 +66,8 @@ async def handle_nilrag(req: ChatRequest):
         logger.debug("Extracting user query")
         query = None
         for message in req.messages:
-            if message.role == "user" and message.content is not None:
-                query = extract_text_content(message.content)
+            if message.get("role") == "user" and message.get("content") is not None:
+                query = extract_text_content(message.get("content"))  # type: ignore
                 break
 
         if not query:
@@ -87,21 +87,22 @@ async def handle_nilrag(req: ChatRequest):
 
         # Step 4: Update system message
         for message in req.messages:
-            if message.role == "system":
-                if message.content is None:
+            if message.get("role") == "system":
+                content = message.get("content")
+                if content is None:
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail="system message is empty",
                     )
 
-                if isinstance(message.content, str):
-                    message.content += relevant_context
-                elif isinstance(message.content, list):
-                    message.content.append({"type": "text", "text": relevant_context})
+                if isinstance(content, str):
+                    message["content"] = content + relevant_context
+                elif isinstance(content, list):
+                    content.append({"type": "text", "text": relevant_context})
                 break
         else:
             # If no system message exists, add one
-            req.messages.insert(0, Message(role="system", content=relevant_context))
+            req.messages.insert(0, {"role": "system", "content": relevant_context})
 
         logger.debug(f"System message updated with relevant context:\n {req.messages}")
 

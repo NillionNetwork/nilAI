@@ -258,6 +258,7 @@ def test_chat_completion_image_web_search_error(
         },
         headers={"Authorization": "Bearer test-api-key"},
     )
+    print(response)
     assert response.status_code == 400
 
 
