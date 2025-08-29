@@ -19,6 +19,15 @@ from nilai_api.db.users import UserManager
 from nilai_api.rate_limiting import RateLimit
 from nilai_api.state import state
 
+from nilai_api.handlers.nildb.api_model import (
+    PromptDelegationRequest,
+    PromptDelegationToken,
+)
+from nilai_api.handlers.nildb.handler import (
+    get_nildb_delegation_token,
+    get_prompt_from_nildb,
+)
+
 # Internal libraries
 from nilai_common import (
     AttestationReport,
@@ -38,6 +47,26 @@ from openai import AsyncOpenAI
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+@router.get("/delegation")
+async def get_prompt_store_delegation(
+    prompt_delegation_request: PromptDelegationRequest,
+    auth_info: AuthenticationInfo = Depends(get_auth_info),
+) -> PromptDelegationToken:
+    if not auth_info.user.is_subscription_owner:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Prompt storage is reserved to subscription owners",
+        )
+
+    try:
+        return await get_nildb_delegation_token(prompt_delegation_request.used_id)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Server unable to produce delegation tokens: {str(e)}",
+        )
 
 
 @router.get("/v1/usage", tags=["Usage"])
@@ -241,6 +270,16 @@ async def chat_completion(
     )
 
     client = AsyncOpenAI(base_url=model_url, api_key="<not-needed>")
+
+    if auth_info.prompt_document:
+        try:
+            nildb_prompt: str = await get_prompt_from_nildb(auth_info.prompt_document)
+            req.messages.insert(0, Message(role="system", content=nildb_prompt))
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Unable to extract prompt from nilDB: {str(e)}",
+            )
 
     if req.nilrag:
         logger.info(f"[chat] nilrag start request_id={request_id}")
