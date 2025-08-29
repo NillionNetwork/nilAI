@@ -30,7 +30,7 @@ services:
       --gpu-memory-utilization 0.82
       --swap-space 8
       --uvicorn-log-level warning
-      --dtype bfloat16
+      --dtype=half
     environment:
       - SVC_HOST=gemma_4b_gpu
       - SVC_PORT=8000
