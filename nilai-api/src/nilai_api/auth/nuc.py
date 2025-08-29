@@ -12,6 +12,7 @@ from nilai_api.auth.common import AuthenticationError
 from nilai_common.logger import setup_logger
 
 from nuc_helpers.usage import TokenRateLimits
+from nuc_helpers.nildb_document import PromptDocument
 
 logger = setup_logger(__name__)
 
@@ -120,3 +121,8 @@ def get_token_rate_limit(nuc_token: str) -> Optional[TokenRateLimits]:
             raise AuthenticationError("Token has expired")
 
     return token_rate_limits
+
+
+def get_token_prompt_document(nuc_token: str) -> Optional[PromptDocument]:
+    prompt_document = PromptDocument.from_token(nuc_token)
+    return prompt_document

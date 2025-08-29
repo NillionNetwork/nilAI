@@ -1,11 +1,16 @@
-from typing import Callable, Awaitable
+from typing import Callable, Awaitable, Optional
 from datetime import datetime, timezone
 
 from nilai_api.db.users import UserManager, UserModel, UserData
 from nilai_api.auth.jwt import validate_jwt
-from nilai_api.auth.nuc import validate_nuc, get_token_rate_limit
+from nilai_api.auth.nuc import (
+    validate_nuc,
+    get_token_rate_limit,
+    get_token_prompt_document,
+)
 from nilai_api.config import DOCS_TOKEN
 from nilai_api.auth.common import (
+    PromptDocument,
     TokenRateLimits,
     AuthenticationInfo,
     AuthenticationError,
@@ -55,6 +60,7 @@ def allow_token(
                 return AuthenticationInfo(
                     user=UserData.from_sqlalchemy(user_model),
                     token_rate_limit=None,
+                    prompt_document=None,
                 )
             return await function(token)
 
@@ -65,10 +71,12 @@ def allow_token(
 
 @allow_token(DOCS_TOKEN)
 async def api_key_strategy(api_key: str) -> AuthenticationInfo:
-    user_model: UserModel | None = await UserManager.check_api_key(api_key)
+    user_model: Optional[UserModel] = await UserManager.check_api_key(api_key)
     if user_model:
         return AuthenticationInfo(
-            user=UserData.from_sqlalchemy(user_model), token_rate_limit=None
+            user=UserData.from_sqlalchemy(user_model),
+            token_rate_limit=None,
+            prompt_document=None,
         )
     raise AuthenticationError("Missing or invalid API key")
 
@@ -76,10 +84,14 @@ async def api_key_strategy(api_key: str) -> AuthenticationInfo:
 @allow_token(DOCS_TOKEN)
 async def jwt_strategy(jwt_creds: str) -> AuthenticationInfo:
     result = validate_jwt(jwt_creds)
-    user_model: UserModel | None = await UserManager.check_api_key(result.user_address)
+    user_model: Optional[UserModel] = await UserManager.check_api_key(
+        result.user_address
+    )
     if user_model:
         return AuthenticationInfo(
-            user=UserData.from_sqlalchemy(user_model), token_rate_limit=None
+            user=UserData.from_sqlalchemy(user_model),
+            token_rate_limit=None,
+            prompt_document=None,
         )
     else:
         user_model = UserModel(
@@ -89,7 +101,9 @@ async def jwt_strategy(jwt_creds: str) -> AuthenticationInfo:
         )
         await UserManager.insert_user_model(user_model)
         return AuthenticationInfo(
-            user=UserData.from_sqlalchemy(user_model), token_rate_limit=None
+            user=UserData.from_sqlalchemy(user_model),
+            token_rate_limit=None,
+            prompt_document=None,
         )
 
 
@@ -99,12 +113,15 @@ async def nuc_strategy(nuc_token) -> AuthenticationInfo:
     Validate a NUC token and return the user model
     """
     subscription_holder, user = validate_nuc(nuc_token)
-    token_rate_limits: TokenRateLimits | None = get_token_rate_limit(nuc_token)
-    user_model: UserModel | None = await UserManager.check_user(user)
+    token_rate_limits: Optional[TokenRateLimits] = get_token_rate_limit(nuc_token)
+    prompt_document: Optional[PromptDocument] = get_token_prompt_document(nuc_token)
+
+    user_model: Optional[UserModel] = await UserManager.check_user(user)
     if user_model:
         return AuthenticationInfo(
             user=UserData.from_sqlalchemy(user_model),
             token_rate_limit=token_rate_limits,
+            prompt_document=prompt_document,
         )
 
     user_model = UserModel(
@@ -114,7 +131,9 @@ async def nuc_strategy(nuc_token) -> AuthenticationInfo:
     )
     await UserManager.insert_user_model(user_model)
     return AuthenticationInfo(
-        user=UserData.from_sqlalchemy(user_model), token_rate_limit=token_rate_limits
+        user=UserData.from_sqlalchemy(user_model),
+        token_rate_limit=token_rate_limits,
+        prompt_document=prompt_document,
     )
 
 
