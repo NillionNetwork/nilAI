@@ -37,7 +37,8 @@ services:
         "--uvicorn-log-level", "warning",
 
         "--limit-mm-per-prompt", "{\"image\":1,\"video\":0}",
-        "--skip-mm-profiling"
+        "--skip-mm-profiling",
+        "--enforce-eager"
       ]
 
     environment:
