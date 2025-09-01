@@ -32,7 +32,7 @@ models = {
         "meta-llama/Llama-3.2-1B-Instruct",
         "meta-llama/Llama-3.1-8B-Instruct",
     ],
-    "ci": ["google/gemma-3-4b-it"],
+    "ci": ["Qwen/Qwen2-VL-2B-Instruct-AWQ"],
 }
 
 if ENVIRONMENT not in models:

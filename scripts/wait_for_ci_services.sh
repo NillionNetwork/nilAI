@@ -2,7 +2,7 @@
 
 # Wait for the services to be ready
 API_HEALTH_STATUS=$(docker inspect --format='{{.State.Health.Status}}' nilai-api 2>/dev/null)
-MODEL_HEALTH_STATUS=$(docker inspect --format='{{.State.Health.Status}}' nilai-gemma_4b_gpu 2>/dev/null)
+MODEL_HEALTH_STATUS=$(docker inspect --format='{{.State.Health.Status}}' nilai-qwen2vl_2b_gpu 2>/dev/null)
 NUC_API_HEALTH_STATUS=$(docker inspect --format='{{.State.Health.Status}}' nilai-nuc-api 2>/dev/null)
 MAX_ATTEMPTS=30
 ATTEMPT=1
@@ -17,8 +17,8 @@ while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
     fi
     
     if [ "$MODEL_HEALTH_STATUS" = "unhealthy" ]; then
-        echo "=== nilai-gemma_4b_gpu is unhealthy, printing logs ==="
-        docker logs nilai-gemma_4b_gpu --tail 50
+        echo "=== nilai-qwen2vl_2b_gpu is unhealthy, printing logs ==="
+        docker logs nilai-qwen2vl_2b_gpu --tail 50
     fi
     
     if [ "$NUC_API_HEALTH_STATUS" = "unhealthy" ]; then
@@ -28,7 +28,7 @@ while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
 
     sleep 30
     API_HEALTH_STATUS=$(docker inspect --format='{{.State.Health.Status}}' nilai-api 2>/dev/null)
-    MODEL_HEALTH_STATUS=$(docker inspect --format='{{.State.Health.Status}}' nilai-gemma_4b_gpu 2>/dev/null)
+    MODEL_HEALTH_STATUS=$(docker inspect --format='{{.State.Health.Status}}' nilai-qwen2vl_2b_gpu 2>/dev/null)
     NUC_API_HEALTH_STATUS=$(docker inspect --format='{{.State.Health.Status}}' nilai-nuc-api 2>/dev/null)
     if [ "$API_HEALTH_STATUS" = "healthy" ] && [ "$MODEL_HEALTH_STATUS" = "healthy" ] && [ "$NUC_API_HEALTH_STATUS" = "healthy" ]; then
         break
@@ -47,9 +47,9 @@ fi
 
 echo "MODEL_HEALTH_STATUS: $MODEL_HEALTH_STATUS"
 if [ "$MODEL_HEALTH_STATUS" != "healthy" ]; then
-    echo "Error: nilai-gemma_4b_gpu failed to become healthy after $MAX_ATTEMPTS attempts"
-    echo "=== Final logs for nilai-gemma_4b_gpu ==="
-    docker logs nilai-gemma_4b_gpu --tail 100
+    echo "Error: nilai-qwen2vl_2b_gpu failed to become healthy after $MAX_ATTEMPTS attempts"
+    echo "=== Final logs for nilai-qwen2vl_2b_gpu ==="
+    docker logs nilai-qwen2vl_2b_gpu --tail 100
     exit 1
 fi
 

@@ -868,14 +868,14 @@ def test_web_search_brave_rps_e2e(client):
 
 
 def test_multimodal_single_request(client):
-    """Test multimodal chat completion with a single request using gemma-3-4b-it model"""
-    if "google/gemma-3-4b-it" not in test_models:
-        pytest.skip("Multimodal test only runs for gemma-3-4b-it model")
+    """Test multimodal chat completion with a single request using Qwen/Qwen2-VL-2B-Instruct-AWQ model"""
+    if "Qwen/Qwen2-VL-2B-Instruct-AWQ" not in test_models:
+        pytest.skip("Multimodal test only runs for Qwen/Qwen2-VL-2B-Instruct-AWQ model")
 
     try:
         # Create a simple base64 encoded image (1x1 pixel red PNG)
         response = client.chat.completions.create(
-            model="google/gemma-3-4b-it",
+            model="Qwen/Qwen2-VL-2B-Instruct-AWQ",
             messages=[
                 {
                     "role": "user",
@@ -898,8 +898,8 @@ def test_multimodal_single_request(client):
         assert isinstance(response, ChatCompletion), (
             "Response should be a ChatCompletion object"
         )
-        assert response.model == "google/gemma-3-4b-it", (
-            "Response model should be google/gemma-3-4b-it"
+        assert response.model == "Qwen/Qwen2-VL-2B-Instruct-AWQ", (
+            "Response model should be Qwen/Qwen2-VL-2B-Instruct-AWQ"
         )
         assert len(response.choices) > 0, "Response should contain at least one choice"
 
@@ -932,9 +932,9 @@ def test_multimodal_single_request(client):
 
 
 def test_multimodal_consecutive_requests(client):
-    """Test two consecutive multimodal chat completions using gemma-3-4b-it model"""
-    if "google/gemma-3-4b-it" not in test_models:
-        pytest.skip("Multimodal test only runs for gemma-3-4b-it model")
+    """Test two consecutive multimodal chat completions using Qwen/Qwen2-VL-2B-Instruct-AWQ model"""
+    if "Qwen/Qwen2-VL-2B-Instruct-AWQ" not in test_models:
+        pytest.skip("Multimodal test only runs for Qwen/Qwen2-VL-2B-Instruct-AWQ model")
 
     try:
         # Create a simple base64 encoded image (1x1 pixel red PNG)
@@ -1057,8 +1057,8 @@ def test_multimodal_consecutive_requests(client):
 
 def test_multimodal_with_web_search_error(client):
     """Test that multimodal + web search raises an error"""
-    if "google/gemma-3-4b-it" not in test_models:
-        pytest.skip("Multimodal test only runs for gemma-3-4b-it model")
+    if "Qwen/Qwen2-VL-2B-Instruct-AWQ" not in test_models:
+        pytest.skip("Multimodal test only runs for Qwen/Qwen2-VL-2B-Instruct-AWQ model")
 
     # Create a simple base64 encoded image (1x1 pixel red PNG)
 

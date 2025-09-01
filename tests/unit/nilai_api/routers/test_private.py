@@ -238,7 +238,7 @@ def test_chat_completion_image_web_search_error(
     response = client.post(
         "/v1/chat/completions",
         json={
-            "model": "google/gemma-3-4b-it",
+            "model": "Qwen/Qwen2-VL-2B-Instruct-AWQ",
             "messages": [
                 {"role": "system", "content": "You are a helpful assistant."},
                 {
@@ -287,7 +287,7 @@ def test_chat_completion_with_image(
     response = client.post(
         "/v1/chat/completions",
         json={
-            "model": "google/gemma-3-4b-it",
+            "model": "Qwen/Qwen2-VL-2B-Instruct-AWQ",
             "messages": [
                 {"role": "system", "content": "You are a helpful assistant."},
                 {
