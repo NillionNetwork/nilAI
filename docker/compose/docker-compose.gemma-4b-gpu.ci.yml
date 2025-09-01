@@ -24,9 +24,9 @@ services:
       --model-impl vllm
       --tensor-parallel-size 1
       --max-model-len 1024
-      --max-num-batched-tokens 1024
-      --max-num-seqs 8
-      --gpu-memory-utilization 0.82
+      --max-num-batched-tokens 256
+      --max-num-seqs 4
+      --gpu-memory-utilization 0.70
       --swap-space 8
       --uvicorn-log-level warning
     environment:
