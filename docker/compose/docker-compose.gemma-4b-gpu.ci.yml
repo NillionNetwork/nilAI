@@ -20,19 +20,21 @@ services:
     depends_on:
       etcd:
         condition: service_healthy
-    command: >
-      --model Qwen/Qwen2-VL-2B-Instruct-AWQ
-      --model-impl vllm
-      --tensor-parallel-size 1
-      --trust-remote-code
-      --quantization awq
-      --max-model-len 1024
-      --max-num-batched-tokens 1024
-      --max-num-seqs 1
-      --gpu-memory-utilization 0.80
-      --swap-space 8
-      --uvicorn-log-level warning
-      --limit-mm-per-prompt '{"image": 1, "video": 0}'
+    command:
+    [
+      "--model", "Qwen/Qwen2-VL-2B-Instruct-AWQ",
+      "--model-impl", "vllm",
+      "--tensor-parallel-size", "1",
+      "--trust-remote-code",
+      "--quantization", "awq",
+      "--max-model-len", "1024",
+      "--max-num-batched-tokens", "1024",
+      "--max-num-seqs", "1",
+      "--gpu-memory-utilization", "0.80",
+      "--swap-space", "8",
+      "--uvicorn-log-level", "warning",
+      "--limit-mm-per-prompt", "{\"image\":1,\"video\":0}"
+    ]
     environment:
       - SVC_HOST=qwen2vl_2b_gpu
       - SVC_PORT=8000
