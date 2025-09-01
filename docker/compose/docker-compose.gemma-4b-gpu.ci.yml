@@ -25,13 +25,15 @@ services:
       --model-impl vllm
       --tensor-parallel-size 1
       --trust-remote-code
-      --max-model-len 2450
-      --max-num-batched-tokens 2450
-      --max-num-seqs 2
+      --quantization awq
+      --max-model-len 1024
+      --max-num-batched-tokens 1024
+      --max-num-seqs 1
       --gpu-memory-utilization 0.80
       --swap-space 8
       --uvicorn-log-level warning
-      --quantization awq
+      --limit-mm-per-prompt image=1,video=0
+      --image-input-shape 896,896
     environment:
       - SVC_HOST=qwen2vl_2b_gpu
       - SVC_PORT=8000
