@@ -29,6 +29,7 @@ services:
       --gpu-memory-utilization 0.70
       --swap-space 8
       --uvicorn-log-level warning
+      --quantization bitsandbytes
     environment:
       - SVC_HOST=gemma_4b_gpu
       - SVC_PORT=8000
