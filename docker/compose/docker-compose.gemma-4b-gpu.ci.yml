@@ -1,7 +1,7 @@
 version: "3.8"
 
 services:
-  qwen2vl_2b_gpu:
+  c:
     image: nillion/nilai-vllm:latest
     container_name: nilai-qwen2vl_2b_gpu
     deploy:
@@ -25,8 +25,8 @@ services:
       --model-impl vllm
       --tensor-parallel-size 1
       --trust-remote-code
-      --max-model-len 768
-      --max-num-batched-tokens 768
+      --max-model-len 2450
+      --max-num-batched-tokens 2450
       --max-num-seqs 2
       --gpu-memory-utilization 0.80
       --swap-space 8
