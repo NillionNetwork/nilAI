@@ -6,6 +6,7 @@ import httpx
 
 from nilai_common import (  # Model service discovery and host settings
     SETTINGS,
+    MODEL_SETTINGS,
     ModelServiceDiscovery,
     ModelEndpoint,
     ModelMetadata,
@@ -14,7 +15,7 @@ from nilai_common import (  # Model service discovery and host settings
 logger = logging.getLogger(__name__)
 
 
-async def get_metadata(num_retries=30):
+async def get_metadata():
     """Fetch model metadata from model
     service and return as ModelMetadata object"""
     current_retries = 0
@@ -46,9 +47,13 @@ async def get_metadata(num_retries=30):
             else:
                 logger.warning(f"Failed to fetch model metadata from {url}: {e}")
             current_retries += 1
-            if current_retries >= num_retries:
+            if (
+                MODEL_SETTINGS.num_retries
+                != -1  # If num_retries == -1 then we do infinite number of retries
+                and current_retries >= MODEL_SETTINGS.num_retries
+            ):
                 raise e
-            await asyncio.sleep(10)
+            await asyncio.sleep(MODEL_SETTINGS.timeout)
 
 
 async def run_service(discovery_service, model_endpoint):
