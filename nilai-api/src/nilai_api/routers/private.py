@@ -1,6 +1,8 @@
 # Fast API and serving
 import asyncio
 import logging
+import time
+import uuid
 from base64 import b64encode
 from typing import AsyncGenerator, Optional, Union, List, Tuple
 from nilai_api.attestation import get_attestation_report
@@ -21,14 +23,17 @@ from nilai_api.state import state
 from nilai_common import (
     AttestationReport,
     ChatRequest,
-    Message,
     ModelMetadata,
+    MessageAdapter,
     SignedChatCompletion,
     Nonce,
     Source,
     Usage,
 )
+
+
 from openai import AsyncOpenAI
+
 
 logger = logging.getLogger(__name__)
 
@@ -131,8 +136,10 @@ async def chat_completion(
         ChatRequest(
             model="meta-llama/Llama-3.2-1B-Instruct",
             messages=[
-                Message(role="system", content="You are a helpful assistant."),
-                Message(role="user", content="What is your name?"),
+                MessageAdapter.new_message(
+                    role="system", content="You are a helpful assistant."
+                ),
+                MessageAdapter.new_message(role="user", content="What is your name?"),
             ],
         )
     ),
@@ -191,13 +198,21 @@ async def chat_completion(
         model="meta-llama/Llama-3.2-1B-Instruct",
         messages=[
             {"role": "system", "content": "You are a helpful assistant"},
-            {"role": "user", "content": "What's the latest news about AI?"}
+            {"role": "user", "content": "What is your name?"}
         ],
     )
     response = await chat_completion(request, user)
     """
 
+    if len(req.messages) == 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Request contained 0 messages",
+        )
     model_name = req.model
+    request_id = str(uuid.uuid4())
+    t_start = time.monotonic()
+    logger.info(f"[chat] call start request_id={req.messages}")
     endpoint = await state.get_model(model_name)
     if endpoint is None:
         raise HTTPException(
@@ -210,43 +225,70 @@ async def chat_completion(
             status_code=400,
             detail="Model does not support tool usage, remove tools from request",
         )
+
+    has_multimodal = req.has_multimodal_content()
+    logger.info(f"[chat] has_multimodal: {has_multimodal}")
+    if has_multimodal and (not endpoint.metadata.multimodal_support or req.web_search):
+        raise HTTPException(
+            status_code=400,
+            detail="Model does not support multimodal content, remove image inputs from request",
+        )
+
     model_url = endpoint.url + "/v1/"
 
     logger.info(
-        f"Chat completion request for model {model_name} from user {auth_info.user.userid} on url: {model_url}"
+        f"[chat] start request_id={request_id} user={auth_info.user.userid} model={model_name} stream={req.stream} web_search={bool(req.web_search)} tools={bool(req.tools)} multimodal={has_multimodal} url={model_url}"
     )
 
     client = AsyncOpenAI(base_url=model_url, api_key="<not-needed>")
 
     if req.nilrag:
+        logger.info(f"[chat] nilrag start request_id={request_id}")
+        t_nilrag = time.monotonic()
         await handle_nilrag(req)
+        logger.info(
+            f"[chat] nilrag done request_id={request_id} duration_ms={(time.monotonic() - t_nilrag) * 1000:.0f}"
+        )
 
     messages = req.messages
     sources: Optional[List[Source]] = None
+
     if req.web_search:
-        web_search_result = await handle_web_search(messages, model_name, client)
+        logger.info(f"[chat] web_search start request_id={request_id}")
+        t_ws = time.monotonic()
+        web_search_result = await handle_web_search(req, model_name, client)
         messages = web_search_result.messages
         sources = web_search_result.sources
+        logger.info(
+            f"[chat] web_search done request_id={request_id} sources={len(sources) if sources else 0} duration_ms={(time.monotonic() - t_ws) * 1000:.0f}"
+        )
+        logger.info(f"[chat] web_search messages: {messages}")
 
     if req.stream:
         # Forwarding Streamed Responses
         async def chat_completion_stream_generator() -> AsyncGenerator[str, None]:
             try:
-                response = await client.chat.completions.create(
-                    model=req.model,
-                    messages=messages,  # type: ignore
-                    stream=req.stream,  # type: ignore
-                    top_p=req.top_p,
-                    temperature=req.temperature,
-                    max_tokens=req.max_tokens,
-                    tools=req.tools,  # type: ignore
-                    extra_body={
+                logger.info(f"[chat] stream start request_id={request_id}")
+                t_call = time.monotonic()
+                current_messages = messages
+                request_kwargs = {
+                    "model": req.model,
+                    "messages": current_messages,  # type: ignore
+                    "stream": True,  # type: ignore
+                    "top_p": req.top_p,
+                    "temperature": req.temperature,
+                    "max_tokens": req.max_tokens,
+                    "extra_body": {
                         "stream_options": {
                             "include_usage": True,
                             "continuous_usage_stats": True,
                         }
                     },
-                )  # type: ignore
+                }
+                if req.tools:
+                    request_kwargs["tools"] = req.tools  # type: ignore
+
+                response = await client.chat.completions.create(**request_kwargs)  # type: ignore
                 prompt_token_usage: int = 0
                 completion_token_usage: int = 0
                 async for chunk in response:
@@ -274,9 +316,12 @@ async def chat_completion(
                     prompt_tokens=prompt_token_usage,
                     completion_tokens=completion_token_usage,
                 )
+                logger.info(
+                    f"[chat] stream done request_id={request_id} prompt_tokens={prompt_token_usage} completion_tokens={completion_token_usage} duration_ms={(time.monotonic() - t_call) * 1000:.0f} total_ms={(time.monotonic() - t_start) * 1000:.0f}"
+                )
 
             except Exception as e:
-                logger.error(f"Error streaming response: {e}")
+                logger.error(f"[chat] stream error request_id={request_id} error={e}")
                 return
 
         # Return the streaming response
@@ -284,20 +329,31 @@ async def chat_completion(
             chat_completion_stream_generator(),
             media_type="text/event-stream",  # Ensure client interprets as Server-Sent Events
         )
-    response = await client.chat.completions.create(
-        model=req.model,
-        messages=messages,  # type: ignore
-        stream=req.stream,
-        top_p=req.top_p,
-        temperature=req.temperature,
-        max_tokens=req.max_tokens,
-        tools=req.tools,  # type: ignore
-    )  # type: ignore
-
+    current_messages = messages
+    request_kwargs = {
+        "model": req.model,
+        "messages": current_messages,  # type: ignore
+        "top_p": req.top_p,
+        "temperature": req.temperature,
+        "max_tokens": req.max_tokens,
+    }
+    if req.tools:
+        request_kwargs["tools"] = req.tools  # type: ignore
+    logger.info(f"[chat] call start request_id={request_id}")
+    logger.info(f"[chat] call message: {current_messages}")
+    t_call = time.monotonic()
+    response = await client.chat.completions.create(**request_kwargs)  # type: ignore
+    logger.info(
+        f"[chat] call done request_id={request_id} duration_ms={(time.monotonic() - t_call) * 1000:.0f}"
+    )
+    logger.info(f"[chat] call response: {response}")
     model_response = SignedChatCompletion(
         **response.model_dump(),
         signature="",
         sources=sources,
+    )
+    logger.info(
+        f"[chat] model_response request_id={request_id} duration_ms={(time.monotonic() - t_call) * 1000:.0f}"
     )
 
     if model_response.usage is None:
@@ -324,4 +380,7 @@ async def chat_completion(
     signature = sign_message(state.private_key, response_json)
     model_response.signature = b64encode(signature).decode()
 
+    logger.info(
+        f"[chat] done request_id={request_id} prompt_tokens={model_response.usage.prompt_tokens} completion_tokens={model_response.usage.completion_tokens} total_ms={(time.monotonic() - t_start) * 1000:.0f}"
+    )
     return model_response

@@ -1,17 +1,41 @@
+from __future__ import annotations
+
 import uuid
+from typing import (
+    Annotated,
+    Iterable,
+    List,
+    Optional,
+    Any,
+    cast,
+    TypeAlias,
+    Literal,
+    Union,
+)
 
-from typing import Annotated, Iterable, List, Literal, Optional
-
-from openai.types.chat import ChatCompletion, ChatCompletionMessage
+from openai.types.chat import (
+    ChatCompletion,
+    ChatCompletionMessageParam,
+    ChatCompletionToolParam,
+    ChatCompletionMessage,
+)
+from openai.types.chat.chat_completion_content_part_text_param import (
+    ChatCompletionContentPartTextParam,
+)
+from openai.types.chat.chat_completion_content_part_image_param import (
+    ChatCompletionContentPartImageParam,
+)
 from openai.types.chat.chat_completion import Choice as OpenaAIChoice
-from openai.types.chat import ChatCompletionToolParam
 from pydantic import BaseModel, Field
 
 
-class Message(ChatCompletionMessage):
-    role: Literal["system", "user", "assistant", "tool"]  # type: ignore
+# ---------- Aliases from the OpenAI SDK ----------
+ImageContent: TypeAlias = ChatCompletionContentPartImageParam
+TextContent: TypeAlias = ChatCompletionContentPartTextParam
+Message: TypeAlias = ChatCompletionMessageParam  # SDK union of message shapes
 
 
+# ---------- Models you already had ----------
 class Choice(OpenaAIChoice):
     pass
 
@@ -27,6 +51,105 @@ class SearchResult(BaseModel):
     url: str
 
 
+# ---------- Helpers ----------
+def _extract_text_from_content(content: Any) -> Optional[str]:
+    """
+    - If content is a str -> return it (stripped) if non-empty.
+    - If content is a list of content parts -> concatenate 'text' parts.
+    - Else -> None.
+    """
+    if isinstance(content, str):
+        s = content.strip()
+        return s or None
+    if isinstance(content, list):
+        parts: List[str] = []
+        for part in content:
+            if isinstance(part, dict) and part.get("type") == "text":
+                t = part.get("text")
+                if isinstance(t, str) and t.strip():
+                    parts.append(t.strip())
+        if parts:
+            return "\n".join(parts)
+    return None
+
+
+# ---------- Adapter over the raw SDK message ----------
+class MessageAdapter(BaseModel):
+    """Thin wrapper around an OpenAI ChatCompletionMessageParam with convenience methods."""
+
+    raw: Message
+
+    @property
+    def role(self) -> str:
+        return cast(str, self.raw.get("role"))
+
+    @role.setter
+    def role(
+        self,
+        value: Literal["developer", "user", "system", "assistant", "tool", "function"],
+    ) -> None:
+        if not isinstance(value, str):
+            raise TypeError("role must be a string")
+        # Update the underlying SDK message dict
+        # Cast to Any to bypass TypedDict restrictions
+        cast(Any, self.raw)["role"] = value
+
+    @property
+    def content(self) -> Any:
+        return self.raw.get("content")
+
+    @content.setter
+    def content(self, value: Any) -> None:
+        # Update the underlying SDK message dict
+        # Cast to Any to bypass TypedDict restrictions
+        cast(Any, self.raw)["content"] = value
+
+    @staticmethod
+    def new_message(
+        role: Literal["developer", "user", "system", "assistant", "tool", "function"],
+        content: Union[str, List[Any]],
+    ) -> Message:
+        message: Message = cast(Message, {"role": role, "content": content})
+        return message
+
+    @staticmethod
+    def new_completion_message(content: str) -> ChatCompletionMessage:
+        message: ChatCompletionMessage = cast(
+            ChatCompletionMessage, {"role": "assistant", "content": content}
+        )
+        return message
+
+    def is_text_part(self) -> bool:
+        return _extract_text_from_content(self.content) is not None
+
+    def is_multimodal_part(self) -> bool:
+        c = self.content
+        if c is None:  # tool calling message
+            return False
+        if isinstance(c, str):
+            return False
+
+        for part in c:
+            if isinstance(part, dict) and part.get("type") in (
+                "image_url",
+                "input_image",
+            ):
+                return True
+        return False
+
+    def extract_text(self) -> Optional[str]:
+        return _extract_text_from_content(self.content)
+
+    def to_openai_param(self) -> Message:
+        # Return the original dict for API calls.
+        return self.raw
+
+
+def adapt_messages(msgs: List[Message]) -> List[MessageAdapter]:
+    return [MessageAdapter(raw=m) for m in msgs]
+
+
+# ---------- Your additional containers ----------
 class WebSearchEnhancedMessages(BaseModel):
     messages: List[Message]
     sources: List[Source]
@@ -39,6 +162,7 @@ class WebSearchContext(BaseModel):
     sources: List[Source]
 
 
+# ---------- Request/response models ----------
 class ChatRequest(BaseModel):
     model: str
     messages: List[Message] = Field(..., min_length=1)
@@ -52,6 +176,36 @@ class ChatRequest(BaseModel):
         default=False,
         description="Enable web search to enhance context with current information",
     )
+
+    def model_post_init(self, __context) -> None:
+        # Process messages after model initialization
+        for i, msg in enumerate(self.messages):
+            content = msg.get("content")
+            if (
+                content is not None
+                and hasattr(content, "__iter__")
+                and hasattr(content, "__next__")
+            ):
+                # Convert iterator to list in place
+                cast(Any, msg)["content"] = list(content)
+
+    @property
+    def adapted_messages(self) -> List[MessageAdapter]:
+        return adapt_messages(self.messages)
+
+    def get_last_user_query(self) -> Optional[str]:
+        """
+        Returns the latest non-empty user text (plain or from content parts),
+        or None if not found.
+        """
+        for m in reversed(self.adapted_messages):
+            if m.role == "user" and m.is_text_part():
+                return m.extract_text()
+        return None
+
+    def has_multimodal_content(self) -> bool:
+        """True if any message contains an image content part."""
+        return any([m.is_multimodal_part() for m in self.adapted_messages])
 
 
 class SignedChatCompletion(ChatCompletion):
@@ -71,6 +225,7 @@ class ModelMetadata(BaseModel):
     source: str
     supported_features: List[str]
     tool_support: bool
+    multimodal_support: bool = False
 
 
 class ModelEndpoint(BaseModel):
@@ -83,6 +238,7 @@ class HealthCheckResponse(BaseModel):
     uptime: str
 
 
+# ---------- Attestation ----------
 Nonce = Annotated[
     str,
     Field(

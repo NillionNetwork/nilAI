@@ -2,11 +2,11 @@ from openai.types.chat.chat_completion import ChoiceLogprobs
 
 from nilai_common import (
     SignedChatCompletion,
-    Message,
     ModelEndpoint,
     ModelMetadata,
     Usage,
     Choice,
+    MessageAdapter,
 )
 
 model_metadata: ModelMetadata = ModelMetadata(
@@ -33,7 +33,7 @@ response: SignedChatCompletion = SignedChatCompletion(
     choices=[
         Choice(
             index=0,
-            message=Message(role="assistant", content="test-content"),
+            message=MessageAdapter.new_completion_message(content="test-content"),
             finish_reason="stop",
             logprobs=ChoiceLogprobs(),
         )
