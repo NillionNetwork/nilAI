@@ -6,14 +6,15 @@ import httpx
 from fastapi import HTTPException, status
 
 from nilai_api.config import WEB_SEARCH_SETTINGS
-from nilai_api.utils.content_extractor import get_last_user_query
 from nilai_common.api_model import (
+    ChatRequest,
+    Message,
+    MessageAdapter,
     SearchResult,
     Source,
     WebSearchEnhancedMessages,
     WebSearchContext,
 )
-from openai.types.chat import ChatCompletionMessageParam
 
 logger = logging.getLogger(__name__)
 
@@ -182,7 +183,7 @@ def _get_role_and_content(msg):
 
 
 async def enhance_messages_with_web_search(
-    messages: List[ChatCompletionMessageParam], query: str
+    messages: List[Message], query: str
 ) -> WebSearchEnhancedMessages:
     """Enhance a list of messages with web search context.Collapse commentComment on line L155jcabrero commented on Aug 26, 2025 jcabreroon Aug 26, 2025MemberDeleted docstring?Write a replyResolve commentCode has comments. Press enter to view.
 
@@ -206,31 +207,37 @@ async def enhance_messages_with_web_search(
         "Please provide a comprehensive answer based on the search results above."
     )
 
-    enhanced: List[ChatCompletionMessageParam] = []
+    enhanced: List[Message] = []
     system_message_added = False
 
     for msg in messages:
-        role, content = _get_role_and_content(msg)
+        adapted_message = MessageAdapter(raw=msg)
 
-        if role == "system" and not system_message_added:
-            if isinstance(content, str):
-                combined_content = content + "\n\n" + web_search_content
-            elif isinstance(content, list):
+        if adapted_message.role == "system" and not system_message_added:
+            if isinstance(adapted_message.content, str):
+                combined_content_str = (
+                    adapted_message.content + "\n\n" + web_search_content
+                )
+            elif isinstance(adapted_message.content, list):
                 # content is likely a list of parts (for multimodal); append a text part
-                parts = list(content)
+                parts = list(adapted_message.content)
                 parts.append({"type": "text", "text": "\n\n" + web_search_content})
-                combined_content = parts
+                combined_content_str = parts
             else:
-                combined_content = web_search_content
-
-            enhanced.append({"role": "system", "content": combined_content})  # type: ignore
+                combined_content_str = web_search_content
+            enhanced.append(
+                MessageAdapter.new_message(role="system", content=combined_content_str)
+            )
             system_message_added = True
         else:
             # Re-append in dict form
-            enhanced.append({"role": role or "user", "content": content})  # type: ignore
+
+            enhanced.append(adapted_message.to_openai_param())
 
     if not system_message_added:
-        enhanced.insert(0, {"role": "system", "content": web_search_content})
+        enhanced.insert(
+            0, MessageAdapter.new_message(role="system", content=web_search_content)
+        )
 
     return WebSearchEnhancedMessages(
         messages=enhanced,
@@ -292,7 +299,7 @@ async def generate_search_query_from_llm(
 
 
 async def handle_web_search(
-    req_messages: List[ChatCompletionMessageParam], model_name: str, client
+    req_messages: ChatRequest, model_name: str, client
 ) -> WebSearchEnhancedMessages:
     """Handle web search enhancement for a conversation.
 
@@ -310,24 +317,28 @@ async def handle_web_search(
     """
     logger.info("Handle web search start")
     logger.debug(
-        "Handle web search messages_in=%d model=%s", len(req_messages), model_name
+        "Handle web search messages_in=%d model=%s",
+        len(req_messages.messages),
+        model_name,
     )
-    user_query = get_last_user_query(req_messages)
+    user_query = req_messages.get_last_user_query()
     if not user_query:
         logger.info("No user query found")
-        return WebSearchEnhancedMessages(messages=req_messages, sources=[])
+        return WebSearchEnhancedMessages(messages=req_messages.messages, sources=[])
 
     try:
         concise_query = await generate_search_query_from_llm(
             user_query, model_name, client
         )
         logger.info("Enhancing messages with web search context")
-        return await enhance_messages_with_web_search(req_messages, concise_query)
+        return await enhance_messages_with_web_search(
+            req_messages.messages, concise_query
+        )
 
     except HTTPException:
         logger.exception("Web search provider error")
-        return WebSearchEnhancedMessages(messages=req_messages, sources=[])
+        return WebSearchEnhancedMessages(messages=req_messages.messages, sources=[])
 
     except Exception:
         logger.exception("Unexpected error during web search handling")
-        return WebSearchEnhancedMessages(messages=req_messages, sources=[])
+        return WebSearchEnhancedMessages(messages=req_messages.messages, sources=[])

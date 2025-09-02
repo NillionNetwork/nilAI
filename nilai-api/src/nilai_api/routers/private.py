@@ -8,7 +8,6 @@ from typing import AsyncGenerator, Optional, Union, List, Tuple
 from nilai_api.attestation import get_attestation_report
 from nilai_api.handlers.nilrag import handle_nilrag
 from nilai_api.handlers.web_search import handle_web_search
-from nilai_api.utils.content_extractor import has_multimodal_content
 
 from fastapi import APIRouter, Body, Depends, HTTPException, status, Request
 from fastapi.responses import StreamingResponse
@@ -25,6 +24,7 @@ from nilai_common import (
     AttestationReport,
     ChatRequest,
     ModelMetadata,
+    MessageAdapter,
     SignedChatCompletion,
     Nonce,
     Source,
@@ -136,8 +136,10 @@ async def chat_completion(
         ChatRequest(
             model="meta-llama/Llama-3.2-1B-Instruct",
             messages=[
-                {"role": "system", "content": "You are a helpful assistant."},
-                {"role": "user", "content": "What is your name?"},
+                MessageAdapter.new_message(
+                    role="system", content="You are a helpful assistant."
+                ),
+                MessageAdapter.new_message(role="user", content="What is your name?"),
             ],
         )
     ),
@@ -196,12 +198,17 @@ async def chat_completion(
         model="meta-llama/Llama-3.2-1B-Instruct",
         messages=[
             {"role": "system", "content": "You are a helpful assistant"},
-            {"role": "user", "content": "What's the latest news about AI?"}
+            {"role": "user", "content": "What is your name?"}
         ],
     )
     response = await chat_completion(request, user)
     """
 
+    if len(req.messages) == 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Request contained 0 messages",
+        )
     model_name = req.model
     request_id = str(uuid.uuid4())
     t_start = time.monotonic()
@@ -219,7 +226,7 @@ async def chat_completion(
             detail="Model does not support tool usage, remove tools from request",
         )
 
-    has_multimodal = has_multimodal_content(req.messages)
+    has_multimodal = req.has_multimodal_content()
     logger.info(f"[chat] has_multimodal: {has_multimodal}")
     if has_multimodal and (not endpoint.metadata.multimodal_support or req.web_search):
         raise HTTPException(
@@ -249,7 +256,7 @@ async def chat_completion(
     if req.web_search:
         logger.info(f"[chat] web_search start request_id={request_id}")
         t_ws = time.monotonic()
-        web_search_result = await handle_web_search(messages, model_name, client)
+        web_search_result = await handle_web_search(req, model_name, client)
         messages = web_search_result.messages
         sources = web_search_result.sources
         logger.info(

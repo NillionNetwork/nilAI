@@ -20,19 +20,18 @@ services:
         condition: service_healthy
     command: >
       --model google/gemma-3-27b-it
-      --gpu-memory-utilization 0.95
+      --gpu-memory-utilization 0.79
       --max-model-len 60000
-      --max-num-batched-tokens 60000
-      --tensor-parallel-size 1
-      --enable-auto-tool-choice
-      --tool-call-parser llama3_json
+      --max-num-batched-tokens 8192
+      --dtype bfloat16
+      --kv-cache-dtype fp8
       --uvicorn-log-level warning
     environment:
       - SVC_HOST=gemma_27b_gpu
       - SVC_PORT=8000
       - ETCD_HOST=etcd
       - ETCD_PORT=2379
-      - TOOL_SUPPORT=true
+      - TOOL_SUPPORT=false
       - MULTIMODAL_SUPPORT=true
     volumes:
       - hugging_face_models:/root/.cache/huggingface

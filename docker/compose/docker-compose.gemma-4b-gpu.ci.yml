@@ -1,9 +1,7 @@
-version: "3.8"
-
 services:
-  c:
+  gemma_4b_gpu:
     image: nillion/nilai-vllm:latest
-    container_name: nilai-qwen2vl_2b_gpu
+    container_name: nilai-gemma_4b_gpu
     deploy:
       resources:
         reservations:
@@ -11,6 +9,7 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
+
     ulimits:
       memlock: -1
       stack: 67108864
@@ -20,37 +19,22 @@ services:
     depends_on:
       etcd:
         condition: service_healthy
-    command:
-      [
-        "--model", "Qwen/Qwen2-VL-2B-Instruct-AWQ",
-        "--model-impl", "vllm",
-        "--tensor-parallel-size", "1",
-        "--trust-remote-code",
-        "--quantization", "awq",
+    command: >
+      --model google/gemma-3-4b-it
+      --max-model-len 30000
+      --max-num-batched-tokens 8192
 
-        "--max-model-len", "1280",
-        "--max-num-batched-tokens", "1280",
-        "--max-num-seqs", "1",
-
-        "--gpu-memory-utilization", "0.75",
-        "--swap-space", "8",
-        "--uvicorn-log-level", "warning",
-
-        "--limit-mm-per-prompt", "{\"image\":1,\"video\":0}",
-        "--skip-mm-profiling",
-        "--enforce-eager"
-      ]
-
+      --uvicorn-log-level warning
     environment:
-      SVC_HOST: qwen2vl_2b_gpu
-      SVC_PORT: "8000"
-      ETCD_HOST: etcd
-      ETCD_PORT: "2379"
-      TOOL_SUPPORT: "true"
-      MULTIMODAL_SUPPORT: "true"
-      CUDA_LAUNCH_BLOCKING: "1"
-      VLLM_ALLOW_LONG_MAX_MODEL_LEN: "1"
-      PYTORCH_CUDA_ALLOC_CONF: "expandable_segments:True"
+      - SVC_HOST=gemma_4b_gpu
+      - SVC_PORT=8000
+      - ETCD_HOST=etcd
+      - ETCD_PORT=2379
+      - TOOL_SUPPORT=false
+      - MULTIMODAL_SUPPORT=true
+      - CUDA_LAUNCH_BLOCKING=1
+      - VLLM_ALLOW_LONG_MAX_MODEL_LEN=1
+      - PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
     volumes:
       - hugging_face_models:/root/.cache/huggingface
     healthcheck:
@@ -59,6 +43,5 @@ services:
       retries: 3
       start_period: 60s
       timeout: 10s
-
 volumes:
   hugging_face_models:
