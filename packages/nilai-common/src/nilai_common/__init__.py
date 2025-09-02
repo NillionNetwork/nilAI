@@ -16,7 +16,7 @@ from nilai_common.api_model import (
     Message,
     MessageAdapter,
 )
-from nilai_common.config import SETTINGS
+from nilai_common.config import SETTINGS, MODEL_SETTINGS
 from nilai_common.discovery import ModelServiceDiscovery
 from openai.types.completion_usage import CompletionUsage as Usage
 
@@ -36,6 +36,7 @@ __all__ = [
     "AMDAttestationToken",
     "NVAttestationToken",
     "SETTINGS",
+    "MODEL_SETTINGS",
     "SearchResult",
     "Source",
     "WebSearchEnhancedMessages",
