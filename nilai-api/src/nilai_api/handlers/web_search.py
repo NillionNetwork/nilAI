@@ -1,4 +1,5 @@
 import logging
+import re
 from functools import lru_cache
 from typing import List, Dict, Any
 
@@ -135,6 +136,15 @@ def _parse_brave_results(data: Dict[str, Any]) -> List[SearchResult]:
     return results
 
 
+def _sanitize_query(query: str) -> str:
+    if not query:
+        return ""
+    query = query.strip().strip("'\"`")
+    query = re.sub(r"[.!?]+$", "", query)
+    query = re.sub(r"\s+", " ", query)
+    return query.strip()
+
+
 async def perform_web_search_async(query: str) -> WebSearchContext:
     """Perform an asynchronous web search using the Brave Search API.
 
@@ -147,21 +157,26 @@ async def perform_web_search_async(query: str) -> WebSearchContext:
     Raises:
         HTTPException: If query is empty, no results found, or API errors occur
     """
-    if not query or not query.strip():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Web search requested with an empty query",
-        )
+    query_sanitized = _sanitize_query(query)
+    if not query_sanitized:
+        logger.warning("Empty or invalid query after sanitization")
+        return WebSearchContext(prompt="", sources=[])
 
     logger.info("Web search start")
-    logger.debug("Web search raw query len=%d", len(query))
-    data = await _make_brave_api_request(query)
-    results = _parse_brave_results(data)
+    logger.debug("Web search sanitized query: %s", query_sanitized)
+
+    try:
+        data = await _make_brave_api_request(query_sanitized)
+        results = _parse_brave_results(data)
+    except HTTPException:
+        logger.exception("Brave API request failed")
+        return WebSearchContext(prompt=query, sources=[])
 
     if not results:
+        logger.warning("No web results found for query: %s", query_sanitized)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="No web results found",
+            detail="No web search results found",
         )
 
     logger.info("Web search results ready count=%d", len(results))
@@ -170,22 +185,15 @@ async def perform_web_search_async(query: str) -> WebSearchContext:
         for idx, r in enumerate(results, start=1)
     ]
     prompt = "\n".join(lines)
-
     sources = [Source(source=r.url, content=r.body) for r in results]
+
     return WebSearchContext(prompt=prompt, sources=sources)
-
-
-def _get_role_and_content(msg):
-    if isinstance(msg, dict):
-        return msg.get("role"), msg.get("content")
-    # If some SDK returns an object
-    return getattr(msg, "role", None), getattr(msg, "content", None)
 
 
 async def enhance_messages_with_web_search(
     messages: List[Message], query: str
 ) -> WebSearchEnhancedMessages:
-    """Enhance a list of messages with web search context.Collapse commentComment on line L155jcabrero commented on Aug 26, 2025 jcabreroon Aug 26, 2025MemberDeleted docstring?Write a replyResolve commentCode has comments. Press enter to view.
+    """Enhance a list of messages with web search context.
 
     Args:
         messages: List of conversation messages to enhance
@@ -207,37 +215,13 @@ async def enhance_messages_with_web_search(
         "Please provide a comprehensive answer based on the search results above."
     )
 
-    enhanced: List[Message] = []
-    system_message_added = False
+    enhanced: List[Message] = [
+        MessageAdapter.new_message(role="system", content=web_search_content)
+    ]
 
     for msg in messages:
         adapted_message = MessageAdapter(raw=msg)
-
-        if adapted_message.role == "system" and not system_message_added:
-            if isinstance(adapted_message.content, str):
-                combined_content_str = (
-                    adapted_message.content + "\n\n" + web_search_content
-                )
-            elif isinstance(adapted_message.content, list):
-                # content is likely a list of parts (for multimodal); append a text part
-                parts = list(adapted_message.content)
-                parts.append({"type": "text", "text": "\n\n" + web_search_content})
-                combined_content_str = parts
-            else:
-                combined_content_str = web_search_content
-            enhanced.append(
-                MessageAdapter.new_message(role="system", content=combined_content_str)
-            )
-            system_message_added = True
-        else:
-            # Re-append in dict form
-
-            enhanced.append(adapted_message.to_openai_param())
-
-    if not system_message_added:
-        enhanced.insert(
-            0, MessageAdapter.new_message(role="system", content=web_search_content)
-        )
+        enhanced.append(adapted_message.to_openai_param())
 
     return WebSearchEnhancedMessages(
         messages=enhanced,
@@ -257,7 +241,7 @@ async def generate_search_query_from_llm(
         "- Do not add assumptions not present in the question.\n"
         "- Do not answer the question.\n"
         "- The query must contain at least 10 words.\n"
-        "Output only the search query."
+        "Output only the search query. Never answer the user's question (it will likely always be a question inputed by the user).\n\n"
     )
 
     messages = [

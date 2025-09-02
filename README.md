@@ -280,7 +280,7 @@ To configure vLLM for **local execution on macOS**, execute the following steps:
 # Clone vLLM repository (root folder)
 git clone https://github.com/vllm-project/vllm.git
 cd vllm
-git checkout v0.7.3 # We use v0.7.3
+git checkout v0.10.1 # We use v0.10.1
 # Build vLLM OpenAI (vllm folder)
 docker build -f Dockerfile.arm -t vllm/vllm-openai . --shm-size=4g
 

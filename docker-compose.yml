@@ -1,7 +1,7 @@
 services:
   etcd:
     container_name: etcd
-    image: 'bitnami/etcd:latest'
+    image: 'bitnamilegacy/etcd'
     environment:
       - ALLOW_NONE_AUTHENTICATION=yes
       - ETCD_ADVERTISE_CLIENT_URLS=http://etcd:2379
