@@ -1,4 +1,3 @@
-import asyncio
 from asyncio import iscoroutine
 from typing import Callable, Tuple, Awaitable, Annotated
 
@@ -8,6 +7,7 @@ from nilai_api.config import WEB_SEARCH_SETTINGS
 from fastapi.params import Depends
 from fastapi import status, HTTPException, Request
 from redis.asyncio import from_url, Redis
+
 
 from nilai_api.auth import get_auth_info, AuthenticationInfo, TokenRateLimits
 
@@ -139,7 +139,6 @@ class RateLimit:
             # The value is the usage limit
             # The expiration is the time remaining in validity of the token
             # We use the time remaining to check if the token rate limit is exceeded
-
             for limit in user_limits.token_rate_limit.limits:
                 await self.check_bucket(
                     redis,
@@ -163,10 +162,10 @@ class RateLimit:
                         // WEB_SEARCH_SETTINGS.count,
                     ),
                 )
-                await self.wait_for_bucket(
+                await self.check_bucket(
                     redis,
                     redis_rate_limit_command,
-                    "global:web_search:rps",
+                    f"web_search_rps:{user_limits.subscription_holder}",
                     allowed_rps,
                     1000,
                 )
@@ -211,24 +210,6 @@ class RateLimit:
                 detail="Too Many Requests",
                 headers={"Retry-After": str(expire)},
             )
-
-    @staticmethod
-    async def wait_for_bucket(
-        redis: Redis,
-        redis_rate_limit_command: str,
-        key: str,
-        times: int | None,
-        milliseconds: int,
-    ):
-        if times is None:
-            return
-        while True:
-            expire = await redis.evalsha(
-                redis_rate_limit_command, 1, key, str(times), str(milliseconds)
-            )  # type: ignore
-            if int(expire) == 0:
-                return
-            await asyncio.sleep((int(expire) + 50) / 1000)
 
     async def check_concurrent_and_increment(
         self, redis: Redis, request: Request

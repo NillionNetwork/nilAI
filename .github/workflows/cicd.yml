@@ -137,7 +137,7 @@ jobs:
          sed -i 's/BRAVE_SEARCH_API=.*/BRAVE_SEARCH_API=${{ secrets.BRAVE_SEARCH_API }}/' .env
 
       - name: Compose docker-compose.yml
-        run: python3 ./scripts/docker-composer.py --dev -f docker/compose/docker-compose.llama-1b-gpu.ci.yml -o development-compose.yml
+        run: python3 ./scripts/docker-composer.py --dev -f docker/compose/docker-compose.llama-1b-cpu.ci.yml -o development-compose.yml
 
       - name: GPU stack versions (non-fatal)
         shell: bash
