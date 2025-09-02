@@ -6,13 +6,14 @@ import httpx
 from fastapi import HTTPException, status
 
 from nilai_api.config import WEB_SEARCH_SETTINGS
-from nilai_api.utils.content_extractor import get_last_user_query
 from nilai_common.api_model import (
+    ChatRequest,
+    Message,
+    MessageAdapter,
     SearchResult,
     Source,
     WebSearchEnhancedMessages,
     WebSearchContext,
-    Message,
 )
 
 logger = logging.getLogger(__name__)
@@ -73,6 +74,14 @@ async def _make_brave_api_request(query: str) -> Dict[str, Any]:
     }
 
     client = _get_http_client()
+    logger.info("Brave API request start")
+    logger.debug(
+        "Brave API params assembled q_len=%d country=%s lang=%s count=%s",
+        len(q),
+        params.get("country"),
+        params.get("lang"),
+        params.get("count"),
+    )
     resp = await client.get(
         WEB_SEARCH_SETTINGS.api_path, headers=headers, params=params
     )
@@ -85,7 +94,13 @@ async def _make_brave_api_request(query: str) -> Dict[str, Any]:
         )
 
     try:
-        return resp.json()
+        data = resp.json()
+        logger.info("Brave API request success")
+        logger.debug(
+            "Brave API response keys=%s",
+            list(data.keys()) if isinstance(data, dict) else type(data).__name__,
+        )
+        return data
     except Exception:
         logger.exception("Failed to parse Brave API JSON")
         raise HTTPException(
@@ -116,6 +131,7 @@ def _parse_brave_results(data: Dict[str, Any]) -> List[SearchResult]:
 
         if title and body and url:
             results.append(SearchResult(title=title, body=body, url=url))
+    logger.debug("Parsed brave results count=%d", len(results))
     return results
 
 
@@ -137,6 +153,8 @@ async def perform_web_search_async(query: str) -> WebSearchContext:
             detail="Web search requested with an empty query",
         )
 
+    logger.info("Web search start")
+    logger.debug("Web search raw query len=%d", len(query))
     data = await _make_brave_api_request(query)
     results = _parse_brave_results(data)
 
@@ -146,6 +164,7 @@ async def perform_web_search_async(query: str) -> WebSearchContext:
             detail="No web results found",
         )
 
+    logger.info("Web search results ready count=%d", len(results))
     lines = [
         f"[{idx}] {r.title}\nURL: {r.url}\nSnippet: {r.body}"
         for idx, r in enumerate(results, start=1)
@@ -154,6 +173,13 @@ async def perform_web_search_async(query: str) -> WebSearchContext:
 
     sources = [Source(source=r.url, content=r.body) for r in results]
     return WebSearchContext(prompt=prompt, sources=sources)
+
+
+def _get_role_and_content(msg):
+    if isinstance(msg, dict):
+        return msg.get("role"), msg.get("content")
+    # If some SDK returns an object
+    return getattr(msg, "role", None), getattr(msg, "content", None)
 
 
 async def enhance_messages_with_web_search(
@@ -181,26 +207,37 @@ async def enhance_messages_with_web_search(
         "Please provide a comprehensive answer based on the search results above."
     )
 
-    enhanced = []
+    enhanced: List[Message] = []
     system_message_added = False
 
     for msg in messages:
-        if msg.role == "system" and not system_message_added:
-            existing_content = msg.content or ""
-            if isinstance(existing_content, str):
-                combined_content = existing_content + "\n\n" + web_search_content
-            else:
-                parts = list(existing_content)
-                parts.append({"type": "text", "text": "\n\n" + web_search_content})
-                combined_content = parts
+        adapted_message = MessageAdapter(raw=msg)
 
-            enhanced.append(Message(role="system", content=combined_content))
+        if adapted_message.role == "system" and not system_message_added:
+            if isinstance(adapted_message.content, str):
+                combined_content_str = (
+                    adapted_message.content + "\n\n" + web_search_content
+                )
+            elif isinstance(adapted_message.content, list):
+                # content is likely a list of parts (for multimodal); append a text part
+                parts = list(adapted_message.content)
+                parts.append({"type": "text", "text": "\n\n" + web_search_content})
+                combined_content_str = parts
+            else:
+                combined_content_str = web_search_content
+            enhanced.append(
+                MessageAdapter.new_message(role="system", content=combined_content_str)
+            )
             system_message_added = True
         else:
-            enhanced.append(msg)
+            # Re-append in dict form
+
+            enhanced.append(adapted_message.to_openai_param())
 
     if not system_message_added:
-        enhanced.insert(0, Message(role="system", content=web_search_content))
+        enhanced.insert(
+            0, MessageAdapter.new_message(role="system", content=web_search_content)
+        )
 
     return WebSearchEnhancedMessages(
         messages=enhanced,
@@ -224,19 +261,24 @@ async def generate_search_query_from_llm(
     )
 
     messages = [
-        Message(role="system", content=system_prompt),
-        Message(role="user", content=user_message),
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_message},
     ]
 
     req = {
         "model": model_name,
-        "messages": [m.model_dump() for m in messages],
+        "messages": messages,
         "max_tokens": 150,
     }
 
+    logger.info("Generate search query start model=%s", model_name)
+    logger.debug(
+        "User message len=%d", len(user_message) if isinstance(user_message, str) else 0
+    )
     try:
         response = await client.chat.completions.create(**req)
     except Exception as exc:
+        logger.exception("LLM call failed")
         raise RuntimeError(f"Failed to generate search query: {exc}") from exc
 
     try:
@@ -244,16 +286,20 @@ async def generate_search_query_from_llm(
         msg = choices[0].message
         content = (getattr(msg, "content", None) or "").strip()
     except Exception as exc:
+        logger.exception("Invalid LLM response structure")
         raise RuntimeError(f"Invalid response structure from LLM: {exc}") from exc
 
     if not content:
+        logger.error("LLM returned empty search query")
         raise RuntimeError("LLM returned an empty search query")
 
+    logger.info("Generate search query success")
+    logger.debug("Generated query len=%d", len(content))
     return content
 
 
 async def handle_web_search(
-    req_messages: List[Message], model_name: str, client
+    req_messages: ChatRequest, model_name: str, client
 ) -> WebSearchEnhancedMessages:
     """Handle web search enhancement for a conversation.
 
@@ -269,18 +315,30 @@ async def handle_web_search(
         WebSearchEnhancedMessages with web search context added, or original
         messages if no user query is found or search fails
     """
-    user_query = get_last_user_query(req_messages)
+    logger.info("Handle web search start")
+    logger.debug(
+        "Handle web search messages_in=%d model=%s",
+        len(req_messages.messages),
+        model_name,
+    )
+    user_query = req_messages.get_last_user_query()
     if not user_query:
-        return WebSearchEnhancedMessages(messages=req_messages, sources=[])
+        logger.info("No user query found")
+        return WebSearchEnhancedMessages(messages=req_messages.messages, sources=[])
 
     try:
         concise_query = await generate_search_query_from_llm(
             user_query, model_name, client
         )
-        return await enhance_messages_with_web_search(req_messages, concise_query)
+        logger.info("Enhancing messages with web search context")
+        return await enhance_messages_with_web_search(
+            req_messages.messages, concise_query
+        )
 
     except HTTPException:
-        return WebSearchEnhancedMessages(messages=req_messages, sources=[])
+        logger.exception("Web search provider error")
+        return WebSearchEnhancedMessages(messages=req_messages.messages, sources=[])
 
     except Exception:
-        return WebSearchEnhancedMessages(messages=req_messages, sources=[])
+        logger.exception("Unexpected error during web search handling")
+        return WebSearchEnhancedMessages(messages=req_messages.messages, sources=[])
