@@ -270,11 +270,12 @@ async def chat_completion(
     )
 
     client = AsyncOpenAI(base_url=model_url, api_key="<not-needed>")
-
     if auth_info.prompt_document:
         try:
             nildb_prompt: str = await get_prompt_from_nildb(auth_info.prompt_document)
-            req.messages.insert(0, Message(role="system", content=nildb_prompt))
+            req.messages.insert(
+                0, MessageAdapter.new_message(role="system", content=nildb_prompt)
+            )
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

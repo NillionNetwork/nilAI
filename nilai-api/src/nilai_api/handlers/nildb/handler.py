@@ -114,7 +114,7 @@ async def get_prompt_from_nildb(prompt_document: PromptDocument) -> str:
     else:
         data_dict = dict(document_data) if document_data else {}
 
-    if data_dict.get("owner", None) != prompt_document.owner_did:
+    if data_dict.get("owner", None) != str(prompt_document.owner_did):
         raise ValueError(
             "Non-owning entity trying to invoke access to a document resource"
         )
