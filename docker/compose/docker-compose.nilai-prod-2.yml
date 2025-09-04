@@ -18,6 +18,9 @@ services:
     depends_on:
       etcd:
         condition: service_healthy
+      gpt_20b_gpu:
+        # Llama takes less time to initialize
+        condition: service_healthy
     command: >
       --model meta-llama/Llama-3.1-8B-Instruct
       --gpu-memory-utilization 0.23
@@ -53,7 +56,6 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
-
     ulimits:
       memlock: -1
       stack: 67108864
@@ -62,9 +64,6 @@ services:
     restart: unless-stopped
     depends_on:
       etcd:
-        condition: service_healthy
-      llama_8b_gpu:
-        # Llama takes less time to initialize
         condition: service_healthy
     command: >
       --model openai/gpt-oss-20b

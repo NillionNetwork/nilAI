@@ -33,6 +33,8 @@ services:
       - ETCD_PORT=2379
       - TOOL_SUPPORT=false
       - MULTIMODAL_SUPPORT=true
+      - MODEL_NUM_RETRIES=60
+      - MODEL_RETRY_TIMEOUT=20
     volumes:
       - hugging_face_models:/root/.cache/huggingface
     healthcheck:
