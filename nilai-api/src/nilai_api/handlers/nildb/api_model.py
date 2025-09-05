@@ -1,11 +1,7 @@
 from pydantic import BaseModel, ConfigDict
+from typing import TypeAlias
 
-
-class PromptDelegationRequest(BaseModel):
-    """Prompt Delegation Token Request model"""
-
-    model_config = ConfigDict(validate_assignment=True)
-    used_id: str
+PromptDelegationRequest: TypeAlias = str
 
 
 class PromptDelegationToken(BaseModel):

@@ -4,7 +4,7 @@ from nuc_helpers import (
     pay_for_subscription,
     get_root_token,
     get_nilai_public_key,
-    get_invocation_token,
+    get_invocation_token as nuc_helpers_get_invocation_token,
     validate_token,
     InvocationToken,
     RootToken,
@@ -17,11 +17,19 @@ from nuc.nilauth import NilauthClient, BlindModule
 from nuc.token import Did
 from nuc.validate import ValidationParameters, InvocationRequirement
 
+# These correspond to the key used to test with nilAuth. Otherwise the OWNER DID would not match the issuer
+DOCUMENT_ID = "bb93f3a4-ba4c-4e20-8f2e-c0650c75a372"
+DOCUMENT_OWNER_DID = (
+    "did:nil:030923f2e7120c50e42905b857ddd2947f6ecced6bb02aab64e63b28e9e2e06d10"
+)
+
 
 def get_nuc_token(
     usage_limit: int | None = None,
     expires_at: datetime | None = None,
     blind_module: BlindModule = BlindModule.NILAI,
+    document_id: str | None = None,
+    document_owner_did: str | None = None,
     create_delegation: bool = False,
     create_invalid_delegation: bool = False,
 ) -> InvocationToken:
@@ -48,6 +56,9 @@ def get_nuc_token(
     server_wallet, server_keypair, server_private_key = get_wallet_and_private_key(
         PRIVATE_KEY
     )
+
+    print("Private key: ", server_wallet)
+    print("Public key: ", server_private_key.pubkey)
     nilauth_client = NilauthClient(f"http://{NILAUTH_ENDPOINT}")
 
     if not server_private_key.pubkey:
@@ -99,6 +110,8 @@ def get_nuc_token(
             user_public_key,
             usage_limit=delegation_usage_limit,
             expires_at=delegation_expires_at,
+            document_id=document_id,
+            document_owner_did=document_owner_did,
         )
 
         # Create invalid delegation chain if requested (for testing)
@@ -109,17 +122,19 @@ def get_nuc_token(
                 user_public_key,
                 usage_limit=5,
                 expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
+                document_id=document_id,
+                document_owner_did=document_owner_did,
             )
 
         # Create invocation token from delegation
-        invocation_token: InvocationToken = get_invocation_token(
+        invocation_token: InvocationToken = nuc_helpers_get_invocation_token(
             delegation_token,
             nilai_public_key,
             user_private_key,
         )
     else:
         # Create invocation token directly from root token
-        invocation_token: InvocationToken = get_invocation_token(
+        invocation_token: InvocationToken = nuc_helpers_get_invocation_token(
             root_token,
             nilai_public_key,
             server_private_key,
@@ -146,6 +161,16 @@ def get_rate_limited_nuc_token(rate_limit: int = 3) -> InvocationToken:
         usage_limit=rate_limit,
         expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
         create_delegation=True,
+    )
+
+
+def get_document_id_nuc_token() -> InvocationToken:
+    """Convenience function for getting NILDB NUC tokens."""
+    print("DOCUMENT_ID", DOCUMENT_ID)
+    return get_nuc_token(
+        create_delegation=True,
+        document_id=DOCUMENT_ID,
+        document_owner_did=DOCUMENT_OWNER_DID,
     )
 
 

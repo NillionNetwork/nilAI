@@ -2,7 +2,6 @@ import pytest
 from unittest.mock import patch
 from nilai_api.auth.nuc import get_token_prompt_document
 from nilai_api.auth.common import PromptDocument
-from nuc.token import Did
 
 
 class TestNucAuthFunctions:
@@ -12,7 +11,7 @@ class TestNucAuthFunctions:
     def test_get_token_prompt_document_success(self, mock_from_token):
         """Test successful prompt document extraction"""
         mock_prompt_doc = PromptDocument(
-            document_id="test-doc-123", owner_did=Did.parse(f"did:nil:{'1' * 66}")
+            document_id="test-doc-123", owner_did=f"did:nil:{'1' * 66}"
         )
         mock_from_token.return_value = mock_prompt_doc
 

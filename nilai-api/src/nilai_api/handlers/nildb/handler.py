@@ -1,3 +1,4 @@
+from typing import Optional
 from nilai_api.handlers.nildb.config import CONFIG
 
 from secretvaults import SecretVaultBuilderClient, SecretVaultUserClient
@@ -17,12 +18,18 @@ from nilai_api.auth.common import PromptDocument
 from nilai_api.handlers.nildb.api_model import PromptDelegationToken
 
 import datetime
-from functools import lru_cache
 
 
-@lru_cache(maxsize=1)
+BUILDER_CLIENT: Optional[SecretVaultBuilderClient] = None
+USER_CLIENT: Optional[SecretVaultUserClient] = None
+
+
 async def create_builder_client():
     """Create and return a builder client using proper initialization pattern"""
+    global BUILDER_CLIENT
+    if BUILDER_CLIENT is not None:
+        return BUILDER_CLIENT
+
     # Create keypair from private key
     keypair = Keypair.from_hex(CONFIG.BUILDER_PRIVATE_KEY)
 
@@ -34,7 +41,7 @@ async def create_builder_client():
     }
 
     # Create SecretVaultBuilderClient with proper initialization
-    builder_client = await SecretVaultBuilderClient.from_options(
+    BUILDER_CLIENT = await SecretVaultBuilderClient.from_options(
         keypair=keypair,
         urls=urls,
         blindfold=BlindfoldFactoryConfig(
@@ -43,17 +50,20 @@ async def create_builder_client():
     )
 
     # Get root token for use in other functions
-    await builder_client.refresh_root_token()
+    await BUILDER_CLIENT.refresh_root_token()
 
-    return builder_client
+    return BUILDER_CLIENT
 
 
-@lru_cache(maxsize=1)
 async def create_user_client() -> SecretVaultUserClient:
     """Create and return a user client using proper initialization pattern"""
+    global USER_CLIENT
+    if USER_CLIENT is not None:
+        return USER_CLIENT
+
     # Create keypair from private key
     keypair = Keypair.from_hex(CONFIG.BUILDER_PRIVATE_KEY)
-    user_client = await SecretVaultUserClient.from_options(
+    USER_CLIENT = await SecretVaultUserClient.from_options(
         keypair=keypair,
         base_urls=CONFIG.NODES,
         blindfold=BlindfoldFactoryConfig(
@@ -61,7 +71,7 @@ async def create_user_client() -> SecretVaultUserClient:
         ),
     )
 
-    return user_client
+    return USER_CLIENT
 
 
 async def get_nildb_delegation_token(user_did: str) -> PromptDelegationToken:
@@ -92,7 +102,9 @@ async def get_nildb_delegation_token(user_did: str) -> PromptDelegationToken:
 async def get_prompt_from_nildb(prompt_document: PromptDocument) -> str:
     """Read a specific document - core functionality"""
     read_params = ReadDataRequestParams(
-        collection=CONFIG.COLLECTION, document=Uuid(prompt_document.document_id)
+        collection=CONFIG.COLLECTION,
+        document=Uuid(prompt_document.document_id),
+        subject=Uuid(prompt_document.owner_did),
     )
     user_client = await create_user_client()
     document_response = await user_client.read_data(read_params)

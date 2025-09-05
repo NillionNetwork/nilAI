@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 class PromptDocument(BaseModel):
     document_id: str
-    owner_did: Did
+    owner_did: str
 
     @staticmethod
     @lru_cache(maxsize=128)
@@ -47,9 +47,18 @@ class PromptDocument(BaseModel):
         for i, proof in enumerate(token_envelope.proofs[::-1]):
             meta = proof.token.meta if proof.token else None
             logger.debug(f"Proof {i} meta: {meta}")
-            if meta is not None and meta.get("document_id", None) is not None:
+            if (
+                meta is not None
+                and meta.get("document_id", None) is not None
+                and meta.get("document_owner_did", None) is not None
+            ):
+                if Did.parse(meta["document_owner_did"]) != proof.token.issuer:
+                    raise ValueError(
+                        f"Document owner DID {meta['document_owner_did']} does not match issuer {proof.token.issuer}"
+                    )
                 return PromptDocument(
-                    document_id=meta["document_id"], owner_did=proof.token.issuer
+                    document_id=meta["document_id"],
+                    owner_did=meta["document_owner_did"],
                 )
 
         return None

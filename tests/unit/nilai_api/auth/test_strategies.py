@@ -6,7 +6,6 @@ from fastapi import HTTPException
 from nilai_api.auth.strategies import api_key_strategy, jwt_strategy, nuc_strategy
 from nilai_api.auth.common import AuthenticationInfo, PromptDocument
 from nilai_api.db.users import UserModel
-from nuc.token import Did
 
 
 class TestAuthStrategies:
@@ -36,7 +35,7 @@ class TestAuthStrategies:
     def mock_prompt_document(self):
         """Mock PromptDocument fixture"""
         return PromptDocument(
-            document_id="test-document-123", owner_did=Did.parse(f"did:nil:{'1' * 66}")
+            document_id="test-document-123", owner_did=f"did:nil:{'1' * 66}"
         )
 
     @pytest.mark.asyncio

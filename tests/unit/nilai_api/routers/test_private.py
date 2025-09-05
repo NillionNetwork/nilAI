@@ -110,7 +110,8 @@ def mock_state(mocker):
     )
     # Patch the get_attestation_report function
     mocker.patch(
-        "nilai_api.attestation.get_attestation_report",
+        "nilai_api.routers.private.get_attestation_report",
+        new_callable=AsyncMock,
         return_value=attestation_response,
     )
 
@@ -156,10 +157,8 @@ def test_get_attestation(mock_user, mock_user_manager, mock_state, client):
     )
     assert response.status_code == 200
     assert response.json()["verifying_key"] == "test-verifying-key"
-    assert response.json()["cpu_attestation"] == "bW9ja19xdW90ZQ=="
-    # GPU attestation returns actual attestation data, not the mocked value
-    assert "gpu_attestation" in response.json()
-    assert response.json()["gpu_attestation"] is not None
+    assert response.json()["cpu_attestation"] == "test-cpu-attestation"
+    assert response.json()["gpu_attestation"] == "test-gpu-attestation"
 
 
 def test_get_models(mock_user, mock_user_manager, mock_state, client):
@@ -185,7 +184,6 @@ def test_chat_completion(mock_user, mock_state, mock_user_manager, mocker, clien
     mock_chat.completions = mock_chat_completions
     mock_async_openai_instance = MagicMock()
     mock_async_openai_instance.chat = mock_chat
-    mock_async_openai_instance.close = mocker.AsyncMock()
     mocker.patch(
         "nilai_api.routers.private.AsyncOpenAI", return_value=mock_async_openai_instance
     )

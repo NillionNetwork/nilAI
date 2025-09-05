@@ -34,7 +34,7 @@ dependencies = [
     "nuc-helpers",
     "nuc>=0.1.0",
     "pyyaml>=6.0.1",
-    "secretvaults>=0.2.1",
+    "secretvaults",
 ]
 
 
@@ -45,3 +45,6 @@ build-backend = "hatchling.build"
 [tool.uv.sources]
 nilai-common = { workspace = true }
 nuc-helpers = { workspace = true }
+
+# TODO: Remove this once the secretvaults package is released with the fix
+secretvaults = { git = "https://github.com/jcabrero/secretvaults-py", rev = "main" }

@@ -49,7 +49,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.get("/delegation")
+@router.get("/v1/delegation")
 async def get_prompt_store_delegation(
     prompt_delegation_request: PromptDelegationRequest,
     auth_info: AuthenticationInfo = Depends(get_auth_info),
@@ -61,7 +61,7 @@ async def get_prompt_store_delegation(
         )
 
     try:
-        return await get_nildb_delegation_token(prompt_delegation_request.used_id)
+        return await get_nildb_delegation_token(prompt_delegation_request)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

@@ -1420,7 +1420,7 @@ requires-dist = [
     { name = "python-dotenv", specifier = ">=1.0.1" },
     { name = "pyyaml", specifier = ">=6.0.1" },
     { name = "redis", specifier = ">=5.2.1" },
-    { name = "secretvaults", specifier = ">=0.2.1" },
+    { name = "secretvaults", git = "https://github.com/jcabrero/secretvaults-py?rev=main" },
     { name = "sqlalchemy", specifier = ">=2.0.36" },
     { name = "uvicorn", specifier = ">=0.32.1" },
     { name = "verifier" },
@@ -2516,7 +2516,7 @@ sdist = { url = "https://files.pythonhosted.org/packages/9b/41/bb668a6e419230354
 [[package]]
 name = "secretvaults"
 version = "0.2.1"
-source = { registry = "https://pypi.org/simple" }
+source = { git = "https://github.com/jcabrero/secretvaults-py?rev=main#498ee5304fdcc730d1810fcf6172e56fa6dd7d16" }
 dependencies = [
     { name = "aiohttp" },
     { name = "blindfold" },
@@ -2524,10 +2524,6 @@ dependencies = [
     { name = "pydantic" },
     { name = "python-dotenv" },
     { name = "structlog" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/85/cb/a2577091e6cd8caed0d313e39600b4f6851be66ffa3ef36fac8932dd0d7b/secretvaults-0.2.1.tar.gz", hash = "sha256:819167ac4a992185fcbd3454d0f735a2fec0918a573911e6da628fb03e853e39", size = 28241, upload-time = "2025-08-18T14:30:28.527Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/dc/1c/2ffc9365baace0e9f64d0280074704657249c0093c8ed04974e9f458dfe9/secretvaults-0.2.1-py3-none-any.whl", hash = "sha256:d3fbc844f3439ab393a63722886234e1731bdd2170213233f2a0fd9d04031bd2", size = 35438, upload-time = "2025-08-18T14:30:27.013Z" },
 ]
 
 [[package]]

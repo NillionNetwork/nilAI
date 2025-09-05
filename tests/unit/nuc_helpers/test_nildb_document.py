@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch, MagicMock
-from nuc_helpers.nildb_document import PromptDocument
 from nuc.token import Did
+from nuc_helpers.nildb_document import PromptDocument
 from ..nuc_helpers import DummyDecodedNucToken, DummyNucTokenEnvelope
 
 
@@ -26,11 +26,14 @@ class TestPromptDocument(unittest.TestCase):
     @patch("nuc.envelope.NucTokenEnvelope.parse")
     def test_from_token_with_document_id_returns_prompt_document(self, mock_parse):
         """Test that from_token returns PromptDocument when document_id is found"""
-        issuer_did = Did.parse(f"did:nil:{'1' * 66}")
+        issuer_did = f"did:nil:{'1' * 66}"
         document_id = "test-document-123"
 
         proofs = [
-            DummyDecodedNucToken({"document_id": document_id}, issuer_did),
+            DummyDecodedNucToken(
+                {"document_id": document_id, "document_owner_did": issuer_did},
+                Did.parse(issuer_did),
+            ),
             DummyDecodedNucToken({}),
         ]
         envelope = DummyNucTokenEnvelope(proofs)
@@ -47,15 +50,21 @@ class TestPromptDocument(unittest.TestCase):
     @patch("nuc.envelope.NucTokenEnvelope.parse")
     def test_from_token_multiple_document_ids_returns_first(self, mock_parse):
         """Test that from_token returns the first document_id found (uppermost in chain)"""
-        issuer_did_1 = Did.parse(f"did:nil:{'1' * 66}")
-        issuer_did_2 = Did.parse(f"did:nil:{'2' * 66}")
+        issuer_did_1 = f"did:nil:{'1' * 66}"
+        issuer_did_2 = f"did:nil:{'2' * 66}"
         document_id_1 = "first-document"
         document_id_2 = "second-document"
 
         # Note: proofs are processed in reverse order, so the last one is "uppermost"
         proofs = [
-            DummyDecodedNucToken({"document_id": document_id_2}, issuer_did_2),
-            DummyDecodedNucToken({"document_id": document_id_1}, issuer_did_1),
+            DummyDecodedNucToken(
+                {"document_id": document_id_2, "document_owner_did": issuer_did_2},
+                Did.parse(issuer_did_2),
+            ),
+            DummyDecodedNucToken(
+                {"document_id": document_id_1, "document_owner_did": issuer_did_1},
+                Did.parse(issuer_did_1),
+            ),
         ]
         envelope = DummyNucTokenEnvelope(proofs)
         mock_parse.return_value = envelope
@@ -71,12 +80,18 @@ class TestPromptDocument(unittest.TestCase):
     @patch("nuc.envelope.NucTokenEnvelope.parse")
     def test_from_token_with_none_document_id_skips(self, mock_parse):
         """Test that from_token skips proofs with None document_id"""
-        issuer_did = Did.parse(f"did:nil:{'1' * 66}")
+        issuer_did = f"did:nil:{'1' * 66}"
         document_id = "valid-document"
 
         proofs = [
-            DummyDecodedNucToken({"document_id": None}),
-            DummyDecodedNucToken({"document_id": document_id}, issuer_did),
+            DummyDecodedNucToken(
+                {"document_id": None, "document_owner_did": issuer_did},
+                Did.parse(issuer_did),
+            ),
+            DummyDecodedNucToken(
+                {"document_id": document_id, "document_owner_did": issuer_did},
+                Did.parse(issuer_did),
+            ),
         ]
         envelope = DummyNucTokenEnvelope(proofs)
         mock_parse.return_value = envelope
@@ -92,7 +107,7 @@ class TestPromptDocument(unittest.TestCase):
     @patch("nuc.envelope.NucTokenEnvelope.parse")
     def test_from_token_with_null_token_meta_skips(self, mock_parse):
         """Test that from_token skips proofs with null token meta"""
-        issuer_did = Did.parse(f"did:nil:{'1' * 66}")
+        issuer_did = f"did:nil:{'1' * 66}"
         document_id = "valid-document"
 
         # Create a proof with null token
@@ -101,7 +116,10 @@ class TestPromptDocument(unittest.TestCase):
 
         proofs = [
             proof_with_null_token,
-            DummyDecodedNucToken({"document_id": document_id}, issuer_did),
+            DummyDecodedNucToken(
+                {"document_id": document_id, "document_owner_did": issuer_did},
+                Did.parse(issuer_did),
+            ),
         ]
         envelope = DummyNucTokenEnvelope(proofs)
         mock_parse.return_value = envelope
@@ -116,7 +134,7 @@ class TestPromptDocument(unittest.TestCase):
 
     def test_prompt_document_model_validation(self):
         """Test that PromptDocument model validates correctly"""
-        issuer_did = Did.parse(f"did:nil:{'1' * 66}")
+        issuer_did = f"did:nil:{'1' * 66}"
         document_id = "test-document-123"
 
         prompt_doc = PromptDocument(document_id=document_id, owner_did=issuer_did)
@@ -127,10 +145,15 @@ class TestPromptDocument(unittest.TestCase):
     def test_cache_functionality(self):
         """Test that the cache works correctly"""
         with patch("nuc.envelope.NucTokenEnvelope.parse") as mock_parse:
-            issuer_did = Did.parse(f"did:nil:{'1' * 66}")
+            issuer_did = f"did:nil:{'1' * 66}"
             document_id = "cached-document"
 
-            proofs = [DummyDecodedNucToken({"document_id": document_id}, issuer_did)]
+            proofs = [
+                DummyDecodedNucToken(
+                    {"document_id": document_id, "document_owner_did": issuer_did},
+                    Did.parse(issuer_did),
+                )
+            ]
             envelope = DummyNucTokenEnvelope(proofs)
             mock_parse.return_value = envelope
 

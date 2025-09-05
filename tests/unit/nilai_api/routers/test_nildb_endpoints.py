@@ -5,10 +5,8 @@ from fastapi import HTTPException, status
 from nilai_api.auth.common import AuthenticationInfo, PromptDocument
 from nilai_api.db.users import UserData, UserModel
 from nilai_api.handlers.nildb.api_model import (
-    PromptDelegationRequest,
     PromptDelegationToken,
 )
-from nuc.token import Did
 from datetime import datetime, timezone
 
 
@@ -92,7 +90,7 @@ class TestNilDBEndpoints:
         ) as mock_get_delegation:
             mock_get_delegation.return_value = mock_prompt_delegation_token
 
-            request = PromptDelegationRequest(used_id="user-123")
+            request = "user-123"
 
             result = await get_prompt_store_delegation(
                 request, mock_auth_info_subscription_owner
@@ -110,7 +108,7 @@ class TestNilDBEndpoints:
         """Test delegation token request by regular user (not subscription owner)"""
         from nilai_api.routers.private import get_prompt_store_delegation
 
-        request = PromptDelegationRequest(used_id="user-123")
+        request = "user-123"
 
         with pytest.raises(HTTPException) as exc_info:
             await get_prompt_store_delegation(request, mock_auth_info_regular_user)
@@ -132,7 +130,7 @@ class TestNilDBEndpoints:
         ) as mock_get_delegation:
             mock_get_delegation.side_effect = Exception("Handler failed")
 
-            request = PromptDelegationRequest(used_id="user-123")
+            request = "user-123"
 
             with pytest.raises(HTTPException) as exc_info:
                 await get_prompt_store_delegation(
@@ -151,7 +149,7 @@ class TestNilDBEndpoints:
         from nilai_common import ChatRequest
 
         mock_prompt_document = PromptDocument(
-            document_id="test-doc-123", owner_did=Did.parse("did:nil:" + "1" * 66)
+            document_id="test-doc-123", owner_did="did:nil:" + "1" * 66
         )
 
         mock_user = MagicMock()
@@ -251,7 +249,7 @@ class TestNilDBEndpoints:
         from nilai_common import ChatRequest
 
         mock_prompt_document = PromptDocument(
-            document_id="test-doc-123", owner_did=Did.parse("did:nil:" + "1" * 66)
+            document_id="test-doc-123", owner_did="did:nil:" + "1" * 66
         )
 
         mock_user = MagicMock()
@@ -385,14 +383,12 @@ class TestNilDBEndpoints:
     def test_prompt_delegation_request_model_validation(self):
         """Test PromptDelegationRequest model validation"""
         # Valid request
-        valid_request = PromptDelegationRequest(used_id="user-123")
-        assert valid_request.used_id == "user-123"
+        valid_request = "user-123"
+        assert valid_request == "user-123"
 
         # Test with different types of user IDs
-        request_with_uuid = PromptDelegationRequest(
-            used_id="550e8400-e29b-41d4-a716-446655440000"
-        )
-        assert request_with_uuid.used_id == "550e8400-e29b-41d4-a716-446655440000"
+        request_with_uuid = "550e8400-e29b-41d4-a716-446655440000"
+        assert request_with_uuid == "550e8400-e29b-41d4-a716-446655440000"
 
     def test_prompt_delegation_token_model_validation(self):
         """Test PromptDelegationToken model validation"""

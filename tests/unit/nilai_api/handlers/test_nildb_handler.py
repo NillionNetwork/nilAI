@@ -8,7 +8,6 @@ from nilai_api.handlers.nildb.handler import (
 )
 from nilai_api.handlers.nildb.api_model import PromptDelegationToken
 from nilai_api.auth.common import PromptDocument
-from nuc.token import Did
 from secretvaults.common.types import Uuid
 
 
@@ -30,7 +29,7 @@ class TestNilDBHandler:
     def mock_prompt_document(self):
         """Mock PromptDocument for tests"""
         return PromptDocument(
-            document_id="test-document-123", owner_did=Did.parse("did:nil:" + "1" * 66)
+            document_id="test-document-123", owner_did="did:nil:" + "1" * 66
         )
 
     @pytest.fixture
@@ -82,7 +81,6 @@ class TestNilDBHandler:
             mock_from_options.return_value = mock_client
 
             # Clear the cache first
-            create_builder_client.cache_clear()
 
             result = await create_builder_client()
 
@@ -111,7 +109,6 @@ class TestNilDBHandler:
             mock_from_options.return_value = mock_client
 
             # Clear the cache first
-            create_user_client.cache_clear()
 
             result = await create_user_client()
 
