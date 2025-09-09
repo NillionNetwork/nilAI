@@ -1,5 +1,7 @@
 import logging
 import re
+import json
+import asyncio
 from functools import lru_cache
 from typing import List, Dict, Any
 
@@ -262,8 +264,8 @@ async def generate_search_query_from_llm(
     )
 
     messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_message},
+        MessageAdapter.new_message(role="system", content=system_prompt),
+        MessageAdapter.new_message(role="user", content=user_message),
     ]
 
     req = {
@@ -283,9 +285,9 @@ async def generate_search_query_from_llm(
         raise RuntimeError(f"Failed to generate search query: {exc}") from exc
 
     try:
-        choices = getattr(response, "choices", None) or []
+        choices = response.choices or []
         msg = choices[0].message
-        content = (getattr(msg, "content", None) or "").strip()
+        content = (msg.content or "").strip()
     except Exception as exc:
         logger.exception("Invalid LLM response structure")
         raise RuntimeError(f"Invalid response structure from LLM: {exc}") from exc
@@ -328,12 +330,57 @@ async def handle_web_search(
         return WebSearchEnhancedMessages(messages=req_messages.messages, sources=[])
 
     try:
-        concise_query = await generate_search_query_from_llm(
-            user_query, model_name, client
+        # First, analyze topics within the user message and decide per-topic web search need.
+        topics = await analyze_web_search_topics(user_query, model_name, client)
+        topics_to_search = [t for t in topics if t["needs_search"]]
+        topics_to_search = topics_to_search[:4] # limit to 3 topics
+
+        if not topics_to_search:
+            logger.info("No topics require web search; returning original messages")
+            return WebSearchEnhancedMessages(
+                messages=req_messages.messages, sources=[]
+            )
+
+        # Generate a focused query per topic
+        topic_queries: List[Dict[str, str]] = []
+        for t in topics_to_search:
+            topic = str(t.get("topic", "")).strip()
+            if not topic:
+                continue
+            try:
+                # Provide topic focus and the original user query for context
+                topic_prompt = (
+                    f"Focus on this topic extracted from the user's message: '{topic}'.\n"
+                    f"Original user message: {user_query}"
+                )
+                q = await generate_search_query_from_llm(topic_prompt, model_name, client)
+                topic_queries.append({"topic": topic, "query": q})
+            except Exception:
+                logger.exception("Failed generating query for topic '%s'", topic)
+
+        if not topic_queries:
+            logger.info("No valid topic queries generated; falling back to single query")
+            concise_query = await generate_search_query_from_llm(
+                user_query, model_name, client
+            )
+            return await enhance_messages_with_web_search(
+                req_messages.messages, concise_query
+            )
+
+        # Perform searches concurrently for all topic queries
+        async def _search(q: str) -> WebSearchContext:
+            try:
+                return await perform_web_search_async(q)
+            except Exception:
+                logger.exception("Search failed for query '%s'", q)
+                return WebSearchContext(prompt="", sources=[])
+
+        contexts: List[WebSearchContext] = await asyncio.gather(
+            *[_search(tq["query"]) for tq in topic_queries]
         )
-        logger.info("Enhancing messages with web search context")
-        return await enhance_messages_with_web_search(
-            req_messages.messages, concise_query
+
+        return await enhance_messages_with_multi_web_search(
+            req_messages.messages, topic_queries, contexts
         )
 
     except HTTPException:
@@ -343,3 +390,133 @@ async def handle_web_search(
     except Exception:
         logger.exception("Unexpected error during web search handling")
         return WebSearchEnhancedMessages(messages=req_messages.messages, sources=[])
+
+
+async def analyze_web_search_topics(
+    user_message: str, model_name: str, client
+) -> List[Dict[str, Any]]:
+    """Use the LLM to identify topics and whether each needs web search.
+
+    Returns a list of dicts: {"topic": str, "needs_search": bool, "reason": str}
+    """
+    system_prompt = (
+        "You are a planner that analyzes a user's message, splits it into distinct topics, "
+        "and decides for each whether a web search is necessary.\n"
+        "Decide 'needs_search' = true only if the answer likely requires current, time-sensitive, or external factual information "
+        "(e.g., current events, latest versions, live stats, product pricing/availability, or specific details not in general knowledge).\n"
+        "If a topic is general knowledge or timeless, set 'needs_search' = false.\n"
+        "Extract up to 4 concise topics.\n\n"
+        "Return ONLY valid JSON matching this schema, no extra text: \n"
+        "{\n  \"topics\": [\n    {\n      \"topic\": \"<concise topic>\",\n      \"needs_search\": true/false\n    }\n  ]\n}\n"
+    )
+
+    messages = [
+        MessageAdapter.new_message(role="system", content=system_prompt),
+        MessageAdapter.new_message(role="user", content=user_message),
+    ]
+
+    req = {
+        "model": model_name,
+        "messages": messages,
+        "temperature": 0.0,
+    }
+
+    logger.info("Analyze web search topics start model=%s", model_name)
+    try:
+        response = await client.chat.completions.create(**req)
+        choices = response.choices or []
+        msg = choices[0].message
+        content = (msg.content or "").strip()
+    except Exception as exc:
+        logger.exception("LLM call failed for topic analysis")
+        return []
+
+    content_str = content
+    if content_str.startswith("```"):
+        content_str = content_str.strip().lstrip("`")
+        if content.lower().startswith("```json"):
+            content_str = content.split("\n", 1)[1] if "\n" in content else content
+        content_str = content_str.rstrip("`")
+
+    try:
+        data = json.loads(content_str)
+        topics = data.get("topics", []) if isinstance(data, dict) else []
+        out: List[Dict[str, Any]] = []
+        for t in topics:
+            if not isinstance(t, dict):
+                continue
+            topic = str(t.get("topic", "")).strip()
+            needs = bool(t.get("needs_search", False))
+            if topic:
+                out.append({"topic": topic, "needs_search": needs})
+        logger.info("Analyze topics success topics=%d", len(out))
+        return out
+    except Exception:
+        logger.exception("Failed to parse topic analysis JSON")
+        return []
+
+
+async def enhance_messages_with_multi_web_search(
+    messages: List[Message], topic_queries: List[Dict[str, str]], contexts: List[WebSearchContext]
+) -> WebSearchEnhancedMessages:
+    """Enhance messages with multiple topic-specific web search contexts."""
+    if not topic_queries or not contexts:
+        return WebSearchEnhancedMessages(messages=messages, sources=[])
+
+    # Build a merged content block
+    sections: List[str] = []
+    all_sources: List[Source] = []
+
+    for idx, (tq, ctx) in enumerate(zip(topic_queries, contexts), start=1):
+        topic = tq.get("topic", "").strip()
+        query = tq.get("query", "").strip()
+        if not query:
+            continue
+
+        all_sources.append(Source(source="web_search_query", content=f"{topic} :: {query}"))
+
+        header = (
+            f"Topic {idx}: {topic}\n"
+            f"Query: \"{query}\"\n\n"
+            "Web Search Results:\n"
+        )
+        block = ctx.prompt.strip() if ctx.prompt else "(no results)"
+        sections.append(header + block)
+        all_sources.extend(ctx.sources)
+
+    if not sections:
+        return WebSearchEnhancedMessages(messages=messages, sources=[])
+
+    web_search_content = (
+        "You have access to the following topic-specific web search results.\n\n"
+        "Use this information to provide accurate and up-to-date answers. "
+        "Cite sources when appropriate.\n\n"
+        + "\n\n".join(sections)
+        + "\n\nPlease provide a comprehensive answer based on the relevant search results above."
+    )
+
+    enhanced: List[Message] = []
+    if messages:
+        first = MessageAdapter(raw=messages[0])
+        if first.role == "system":
+            existing_text = first.extract_text() or ""
+            merged_content = (
+                (existing_text + "\n\n" + web_search_content) if existing_text else web_search_content
+            )
+            enhanced.append(
+                MessageAdapter.new_message(role="system", content=merged_content)
+            )
+            for msg in messages[1:]:
+                enhanced.append(MessageAdapter(raw=msg).to_openai_param())
+        else:
+            enhanced.append(
+                MessageAdapter.new_message(role="system", content=web_search_content)
+            )
+            for msg in messages:
+                enhanced.append(MessageAdapter(raw=msg).to_openai_param())
+    else:
+        enhanced.append(
+            MessageAdapter.new_message(role="system", content=web_search_content)
+        )
+
+    return WebSearchEnhancedMessages(messages=enhanced, sources=all_sources)
