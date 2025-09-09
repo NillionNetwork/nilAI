@@ -215,13 +215,30 @@ async def enhance_messages_with_web_search(
         "Please provide a comprehensive answer based on the search results above."
     )
 
-    enhanced: List[Message] = [
-        MessageAdapter.new_message(role="system", content=web_search_content)
-    ]
+    enhanced: List[Message] = []
 
-    for msg in messages:
-        adapted_message = MessageAdapter(raw=msg)
-        enhanced.append(adapted_message.to_openai_param())
+    if messages:
+        first = MessageAdapter(raw=messages[0])
+        if first.role == "system":
+            existing_text = first.extract_text() or ""
+            merged_content = (
+                (existing_text + "\n\n" + web_search_content) if existing_text else web_search_content
+            )
+            enhanced.append(
+                MessageAdapter.new_message(role="system", content=merged_content)
+            )
+            for msg in messages[1:]:
+                enhanced.append(MessageAdapter(raw=msg).to_openai_param())
+        else:
+            enhanced.append(
+                MessageAdapter.new_message(role="system", content=web_search_content)
+            )
+            for msg in messages:
+                enhanced.append(MessageAdapter(raw=msg).to_openai_param())
+    else:
+        enhanced.append(
+            MessageAdapter.new_message(role="system", content=web_search_content)
+        )
 
     return WebSearchEnhancedMessages(
         messages=enhanced,
