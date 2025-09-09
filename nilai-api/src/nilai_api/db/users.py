@@ -10,14 +10,7 @@ from sqlalchemy import Integer, String, DateTime
 from sqlalchemy.exc import SQLAlchemyError
 
 from nilai_api.db import Base, Column, get_db_session
-from nilai_api.config import (
-    USER_RATE_LIMIT_MINUTE,
-    USER_RATE_LIMIT_HOUR,
-    USER_RATE_LIMIT_DAY,
-    WEB_SEARCH_RATE_LIMIT_MINUTE,
-    WEB_SEARCH_RATE_LIMIT_HOUR,
-    WEB_SEARCH_RATE_LIMIT_DAY,
-)
+from nilai_api.config import CONFIG
 
 logger = logging.getLogger(__name__)
 
@@ -36,19 +29,25 @@ class UserModel(Base):
         DateTime(timezone=True), server_default=sqlalchemy.func.now(), nullable=False
     )  # type: ignore
     last_activity: datetime = Column(DateTime(timezone=True), nullable=True)  # type: ignore
-    ratelimit_day: int = Column(Integer, default=USER_RATE_LIMIT_DAY, nullable=True)  # type: ignore
-    ratelimit_hour: int = Column(Integer, default=USER_RATE_LIMIT_HOUR, nullable=True)  # type: ignore
+    ratelimit_day: int = Column(
+        Integer, default=CONFIG.rate_limiting.user_rate_limit_day, nullable=True
+    )  # type: ignore
+    ratelimit_hour: int = Column(
+        Integer, default=CONFIG.rate_limiting.user_rate_limit_hour, nullable=True
+    )  # type: ignore
     ratelimit_minute: int = Column(
-        Integer, default=USER_RATE_LIMIT_MINUTE, nullable=True
+        Integer, default=CONFIG.rate_limiting.user_rate_limit_minute, nullable=True
     )  # type: ignore
     web_search_ratelimit_day: int = Column(
-        Integer, default=WEB_SEARCH_RATE_LIMIT_DAY, nullable=True
+        Integer, default=CONFIG.rate_limiting.web_search_rate_limit_day, nullable=True
     )  # type: ignore
     web_search_ratelimit_hour: int = Column(
-        Integer, default=WEB_SEARCH_RATE_LIMIT_HOUR, nullable=True
+        Integer, default=CONFIG.rate_limiting.web_search_rate_limit_hour, nullable=True
     )  # type: ignore
     web_search_ratelimit_minute: int = Column(
-        Integer, default=WEB_SEARCH_RATE_LIMIT_MINUTE, nullable=True
+        Integer,
+        default=CONFIG.rate_limiting.web_search_rate_limit_minute,
+        nullable=True,
     )  # type: ignore
 
     def __repr__(self):
@@ -133,9 +132,9 @@ class UserManager:
         name: str,
         apikey: str | None = None,
         userid: str | None = None,
-        ratelimit_day: int | None = USER_RATE_LIMIT_DAY,
-        ratelimit_hour: int | None = USER_RATE_LIMIT_HOUR,
-        ratelimit_minute: int | None = USER_RATE_LIMIT_MINUTE,
+        ratelimit_day: int | None = CONFIG.rate_limiting.user_rate_limit_day,
+        ratelimit_hour: int | None = CONFIG.rate_limiting.user_rate_limit_hour,
+        ratelimit_minute: int | None = CONFIG.rate_limiting.user_rate_limit_minute,
     ) -> UserModel:
         """
         Insert a new user into the database.
@@ -153,10 +152,18 @@ class UserManager:
         """
         userid = userid if userid else UserManager.generate_user_id()
         apikey = apikey if apikey else UserManager.generate_api_key()
-        ratelimit_day = ratelimit_day if ratelimit_day else USER_RATE_LIMIT_DAY
-        ratelimit_hour = ratelimit_hour if ratelimit_hour else USER_RATE_LIMIT_HOUR
+        ratelimit_day = (
+            ratelimit_day if ratelimit_day else CONFIG.rate_limiting.user_rate_limit_day
+        )
+        ratelimit_hour = (
+            ratelimit_hour
+            if ratelimit_hour
+            else CONFIG.rate_limiting.user_rate_limit_hour
+        )
         ratelimit_minute = (
-            ratelimit_minute if ratelimit_minute else USER_RATE_LIMIT_MINUTE
+            ratelimit_minute
+            if ratelimit_minute
+            else CONFIG.rate_limiting.user_rate_limit_minute
         )
         user = UserModel(
             userid=userid,

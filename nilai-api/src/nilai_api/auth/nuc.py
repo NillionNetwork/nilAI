@@ -5,7 +5,7 @@ from nuc.envelope import NucTokenEnvelope
 from nuc.nilauth import NilauthClient
 from nuc.token import Did, NucToken, Command
 from functools import lru_cache
-from nilai_api.config import NILAUTH_TRUSTED_ROOT_ISSUERS
+from nilai_api.config import CONFIG
 from nilai_api.state import state
 from nilai_api.auth.common import AuthenticationError
 
@@ -32,7 +32,7 @@ def get_validator() -> NucTokenValidator:
     try:
         nilauth_public_keys = [
             Did(NilauthClient(key).about().public_key.serialize())
-            for key in NILAUTH_TRUSTED_ROOT_ISSUERS
+            for key in CONFIG.auth.nilauth_trusted_root_issuers
         ]
     except Exception as e:
         logger.error(f"Error getting validator: {e}")

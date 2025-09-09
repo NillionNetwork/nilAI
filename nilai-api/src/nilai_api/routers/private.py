@@ -12,7 +12,7 @@ from nilai_api.handlers.web_search import handle_web_search
 from fastapi import APIRouter, Body, Depends, HTTPException, status, Request
 from fastapi.responses import StreamingResponse
 from nilai_api.auth import get_auth_info, AuthenticationInfo
-from nilai_api.config import MODEL_CONCURRENT_RATE_LIMIT
+from nilai_api.config import CONFIG
 from nilai_api.crypto import sign_message
 from nilai_api.db.logs import QueryLogManager
 from nilai_api.db.users import UserManager
@@ -143,8 +143,9 @@ async def chat_completion_concurrent_rate_limit(request: Request) -> Tuple[int, 
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid request body")
     key = f"chat:{chat_request.model}"
-    limit = MODEL_CONCURRENT_RATE_LIMIT.get(
-        chat_request.model, MODEL_CONCURRENT_RATE_LIMIT.get("default", 50)
+    limit = CONFIG.rate_limiting.model_concurrent_rate_limit.get(
+        chat_request.model,
+        CONFIG.rate_limiting.model_concurrent_rate_limit.get("default", 50),
     )
     return limit, key
 

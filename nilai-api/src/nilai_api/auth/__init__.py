@@ -3,7 +3,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from logging import getLogger
 
-from nilai_api import config
+from nilai_api.config import CONFIG
 from nilai_api.db.users import UserManager
 from nilai_api.auth.strategies import AuthenticationStrategy
 
@@ -25,7 +25,7 @@ async def get_auth_info(
     credentials: HTTPAuthorizationCredentials = Security(bearer_scheme),
 ) -> AuthenticationInfo:
     try:
-        strategy_name: str = config.AUTH_STRATEGY.upper()
+        strategy_name: str = CONFIG.auth.strategy.upper()
 
         try:
             strategy = AuthenticationStrategy[strategy_name]

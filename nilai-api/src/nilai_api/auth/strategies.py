@@ -8,7 +8,7 @@ from nilai_api.auth.nuc import (
     get_token_rate_limit,
     get_token_prompt_document,
 )
-from nilai_api.config import DOCS_TOKEN
+from nilai_api.config import CONFIG
 from nilai_api.auth.common import (
     PromptDocument,
     TokenRateLimits,
@@ -69,7 +69,7 @@ def allow_token(
     return decorator
 
 
-@allow_token(DOCS_TOKEN)
+@allow_token(CONFIG.docs.token)
 async def api_key_strategy(api_key: str) -> AuthenticationInfo:
     user_model: Optional[UserModel] = await UserManager.check_api_key(api_key)
     if user_model:
@@ -81,7 +81,7 @@ async def api_key_strategy(api_key: str) -> AuthenticationInfo:
     raise AuthenticationError("Missing or invalid API key")
 
 
-@allow_token(DOCS_TOKEN)
+@allow_token(CONFIG.docs.token)
 async def jwt_strategy(jwt_creds: str) -> AuthenticationInfo:
     result = validate_jwt(jwt_creds)
     user_model: Optional[UserModel] = await UserManager.check_api_key(
@@ -107,7 +107,7 @@ async def jwt_strategy(jwt_creds: str) -> AuthenticationInfo:
         )
 
 
-@allow_token(DOCS_TOKEN)
+@allow_token(CONFIG.docs.token)
 async def nuc_strategy(nuc_token) -> AuthenticationInfo:
     """
     Validate a NUC token and return the user model
