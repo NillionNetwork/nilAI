@@ -35,6 +35,12 @@ TextContent: TypeAlias = ChatCompletionContentPartTextParam
 Message: TypeAlias = ChatCompletionMessageParam  # SDK union of message shapes
 
 
+# ---------- Domain-specific objects for web search ----------
+class ResultContent(BaseModel):
+    text: str
+    truncated: bool = False
+
+
 # ---------- Models you already had ----------
 class Choice(OpenaAIChoice):
     pass
@@ -49,9 +55,16 @@ class SearchResult(BaseModel):
     title: str
     body: str
     url: str
+    content: ResultContent | None = None
 
     def as_source(self) -> "Source":
-        return Source(source=self.url, content=self.body)
+        text = self.content.text if self.content else self.body
+        return Source(source=self.url, content=text)
+
+    def model_post_init(self, __context) -> None:
+        # Auto-derive structured fields when not provided
+        if self.content is None and isinstance(self.body, str) and self.body:
+            self.content = ResultContent(text=self.body)
 
 
 class Topic(BaseModel):

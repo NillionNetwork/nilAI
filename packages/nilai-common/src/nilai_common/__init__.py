@@ -13,6 +13,7 @@ from nilai_common.api_model import (
     Source,
     WebSearchEnhancedMessages,
     WebSearchContext,
+    ResultContent,
     TopicResponse,
     Topic,
     Message,
@@ -45,4 +46,5 @@ __all__ = [
     "Topic",
     "WebSearchEnhancedMessages",
     "WebSearchContext",
+    "ResultContent",
 ]
