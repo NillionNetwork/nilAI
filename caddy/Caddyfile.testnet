@@ -1,0 +1,42 @@
+(ssl_config) {
+	tls {
+		protocols tls1.2 tls1.3
+	}
+}
+
+{$NILAI_SERVER_DOMAIN} {
+	import ssl_config
+
+	handle_path /grafana/* {
+		uri strip_prefix /grafana
+		reverse_proxy grafana:3000
+	}
+
+	handle_path /nuc/* {
+		uri strip_prefix /nuc
+		reverse_proxy nilai-nuc-api:8080
+	}
+
+	handle_path /testnet/* {
+		uri strip_prefix /testnet
+		reverse_proxy testnet-nilai-nuc-api:8080
+	}
+
+	handle {
+		reverse_proxy nilai-api:8080
+	}
+}
+
+
+{$TESTNET_NILAI_SERVER_DOMAIN} {
+	import ssl_config
+
+	handle_path /grafana/* {
+		uri strip_prefix /grafana
+		reverse_proxy grafana:3000
+	}
+
+	handle {
+		reverse_proxy testnet-nilai-nuc-api:8080
+	}
+}

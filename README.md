@@ -138,33 +138,23 @@ docker compose -f production-compose.yml up -d
 For a complete production setup with custom images:
 
 ```shell
-# 1. Generate the production compose file
+# 1a. Generate the Production 1 image
 python3 ./scripts/docker-composer.py --prod \
-  -f docker/compose/docker-compose.llama-3b-gpu.yml \
-  -f docker/compose/docker-compose.llama-8b-gpu.yml \
-  -f docker/compose/docker-compose.deepseek-14b-gpu.yml \
-  --image 'nillion/nilai-api:latest=public.ecr.aws/k5d9x2g2/nilai-api:v0.2.0-alpha0' \
-  --image 'nillion/nilai-vllm:latest=public.ecr.aws/k5d9x2g2/nilai-vllm:v0.2.0-alpha0' \
-  --image 'nillion/nilai-attestation:latest=public.ecr.aws/k5d9x2g2/nilai-attestation:v0.2.0-alpha0' \
+  -f docker/compose/docker-compose.nilai-prod-1.yml \
+  --image 'nillion/nilai-api:latest=public.ecr.aws/k5d9x2g2/nilai-api:v0.2.0-alpha2' \
+  --image 'nillion/nilai-vllm:latest=public.ecr.aws/k5d9x2g2/nilai-vllm:v0.2.0-alpha2' \
+  --image 'nillion/nilai-attestation:latest=public.ecr.aws/k5d9x2g2/nilai-attestation:v0.2.0-alpha2' \
   --testnet \
   -o production-compose.yml
 
-# 1. Generate the production compose file
+# 1b. Generate the Production 2 image
 python3 ./scripts/docker-composer.py --prod \
-  -f docker/compose/docker-compose.llama-3b-gpu.yml \
-  --image 'nillion/nilai-api:latest=public.ecr.aws/k5d9x2g2/nilai-api:v0.2.0-alpha0' \
-  --image 'nillion/nilai-vllm:latest=public.ecr.aws/k5d9x2g2/nilai-vllm:v0.2.0-alpha0' \
-  --image 'nillion/nilai-attestation:latest=public.ecr.aws/k5d9x2g2/nilai-attestation:v0.2.0-alpha0' \
-  --testnet \
+  -f docker/compose/docker-compose.nilai-prod-2.yml \
+  --image 'nillion/nilai-api:latest=public.ecr.aws/k5d9x2g2/nilai-api:v0.2.0-alpha2' \
+  --image 'nillion/nilai-vllm:latest=public.ecr.aws/k5d9x2g2/nilai-vllm:v0.2.0-alpha2' \
+  --image 'nillion/nilai-attestation:latest=public.ecr.aws/k5d9x2g2/nilai-attestation:v0.2.0-alpha2' \
   -o production-compose.yml
 
-# Or:
-python3 ./scripts/docker-composer.py --prod \
-  -f docker/compose/docker-compose.llama-70b-gpu.yml \
-  --image 'nillion/nilai-api:latest=public.ecr.aws/k5d9x2g2/nilai-api:v0.2.0-alpha0' \
-  --image 'nillion/nilai-vllm:latest=public.ecr.aws/k5d9x2g2/nilai-vllm:v0.2.0-alpha0' \
-  --image 'nillion/nilai-attestation:latest=public.ecr.aws/k5d9x2g2/nilai-attestation:v0.2.0-alpha0' \
-  -o production-compose.yml
 
 # 2. Deploy using the generated file
 docker compose -f production-compose.yml up -d
