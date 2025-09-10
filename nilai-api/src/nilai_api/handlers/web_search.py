@@ -250,9 +250,7 @@ async def perform_web_search_async(query: str) -> WebSearchContext:
 
     # Fetch each result URL once and extract main content
     client = _get_http_client()
-    tasks = [
-        _fetch_and_extract_page_content(r.url, client) for r in initial_results
-    ]
+    tasks = [_fetch_and_extract_page_content(r.url, client) for r in initial_results]
     contents = await asyncio.gather(*tasks)
 
     enriched_results: List[SearchResult] = []
@@ -388,9 +386,7 @@ async def handle_web_search(
 
         if not topics_to_search:
             logger.info("No topics require web search; returning original messages")
-            return WebSearchEnhancedMessages(
-                messages=req_messages.messages, sources=[]
-            )
+            return WebSearchEnhancedMessages(messages=req_messages.messages, sources=[])
 
         async def _generate_query(topic_obj: Topic) -> TopicQuery | None:
             topic_str = topic_obj.topic.strip()
@@ -404,13 +400,15 @@ async def handle_web_search(
             except Exception:
                 logger.exception("Failed generating query for topic '%s'", topic_str)
                 return None
-        
+
         query_generation_tasks = [_generate_query(t) for t in topics_to_search]
         generated_results = await asyncio.gather(*query_generation_tasks)
         topic_queries: List[TopicQuery] = [res for res in generated_results if res]
 
         if not topic_queries:
-            logger.info("No valid topic queries generated; falling back to single query")
+            logger.info(
+                "No valid topic queries generated; falling back to single query"
+            )
             concise_query = await generate_search_query_from_llm(
                 user_query, model_name, client
             )
@@ -456,7 +454,7 @@ async def analyze_web_search_topics(
         "If a topic is general knowledge or timeless, set 'needs_search' = false.\n"
         "Extract up to 4 concise topics.\n\n"
         "Return ONLY valid JSON matching this schema, no extra text: \n"
-        "{\n  \"topics\": [\n    {\n      \"topic\": \"<concise topic>\",\n      \"needs_search\": true/false\n    }\n  ]\n}\n"
+        '{\n  "topics": [\n    {\n      "topic": "<concise topic>",\n      "needs_search": true/false\n    }\n  ]\n}\n'
     )
 
     messages = [
@@ -481,8 +479,11 @@ async def analyze_web_search_topics(
         logger.exception("LLM call failed for topic analysis")
         return []
 
+
 async def enhance_messages_with_multi_web_search(
-    messages: List[Message], topic_queries: List[TopicQuery], contexts: List[WebSearchContext]
+    messages: List[Message],
+    topic_queries: List[TopicQuery],
+    contexts: List[WebSearchContext],
 ) -> WebSearchEnhancedMessages:
     """Enhance messages with multiple topic-specific web search contexts."""
     if not topic_queries or not contexts:
@@ -500,11 +501,7 @@ async def enhance_messages_with_multi_web_search(
 
         all_sources.append(Source(source=WEB_SEARCH_QUERY_SOURCE, content=query))
 
-        header = (
-            f"Topic {idx}: {topic}\n"
-            f"Query: \"{query}\"\n\n"
-            "Web Search Results:\n"
-        )
+        header = f'Topic {idx}: {topic}\nQuery: "{query}"\n\nWeb Search Results:\n'
         block = ctx.prompt.strip() if ctx.prompt else "(no results)"
         sections.append(header + block)
         all_sources.extend(ctx.sources)

@@ -41,7 +41,6 @@ class ResultContent(BaseModel):
     truncated: bool = False
 
 
-# ---------- Models you already had ----------
 class Choice(OpenaAIChoice):
     pass
 
@@ -175,7 +174,9 @@ class MessageAdapter(BaseModel):
         return self.raw
 
     @staticmethod
-    def merge_system_content(messages: List[Message], system_content: str) -> List[Message]:
+    def merge_system_content(
+        messages: List[Message], system_content: str
+    ) -> List[Message]:
         """Prepend or merge a system message with the given content.
 
         - If the first message is a system message, append the new content after a blank line.
@@ -187,13 +188,17 @@ class MessageAdapter(BaseModel):
         first = MessageAdapter(raw=messages[0])
         if first.role == "system":
             existing = first.extract_text() or ""
-            merged = (existing + "\n\n" + system_content) if existing else system_content
+            merged = (
+                (existing + "\n\n" + system_content) if existing else system_content
+            )
             new_first = MessageAdapter.new_message(role="system", content=merged)
-            return [new_first] + [MessageAdapter(raw=m).to_openai_param() for m in messages[1:]]
+            return [new_first] + [
+                MessageAdapter(raw=m).to_openai_param() for m in messages[1:]
+            ]
 
-        return [
-            MessageAdapter.new_message(role="system", content=system_content)
-        ] + [MessageAdapter(raw=m).to_openai_param() for m in messages]
+        return [MessageAdapter.new_message(role="system", content=system_content)] + [
+            MessageAdapter(raw=m).to_openai_param() for m in messages
+        ]
 
 
 def adapt_messages(msgs: List[Message]) -> List[MessageAdapter]:
