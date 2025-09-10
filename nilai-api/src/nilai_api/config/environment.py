@@ -3,6 +3,6 @@ from pydantic import BaseModel, Field
 
 
 class EnvironmentConfig(BaseModel):
-    environment: Literal["testnet", "mainnet"] = Field(
+    environment: Literal["testnet", "mainnet", "ci"] = Field(
         default="mainnet", description="The environment to use"
     )

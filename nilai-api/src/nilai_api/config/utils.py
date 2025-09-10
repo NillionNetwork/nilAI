@@ -95,7 +95,6 @@ def create_config_model(
             # Use YAML value
             model_data[field_name] = yaml_data[field_name]
         # If neither env nor yaml has the value, let Pydantic handle defaults
-
     return model_class(**model_data)
 
 

@@ -25,7 +25,7 @@ async def get_auth_info(
     credentials: HTTPAuthorizationCredentials = Security(bearer_scheme),
 ) -> AuthenticationInfo:
     try:
-        strategy_name: str = CONFIG.auth.strategy.upper()
+        strategy_name: str = CONFIG.auth.auth_strategy.upper()
 
         try:
             strategy = AuthenticationStrategy[strategy_name]

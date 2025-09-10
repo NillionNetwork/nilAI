@@ -98,7 +98,7 @@ if db_host:
     db_port = nilai_config.database.port
     db_user = nilai_config.database.user
     db_pass = nilai_config.database.password
-    db_name = nilai_config.database.name
+    db_name = nilai_config.database.db
     config.set_main_option(
         "sqlalchemy.url",
         f"postgresql+asyncpg://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}",

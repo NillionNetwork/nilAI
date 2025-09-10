@@ -2,17 +2,17 @@ from pydantic import BaseModel, Field
 
 
 class DatabaseConfig(BaseModel):
-    user: str = Field(default="postgres", description="Database user")
-    password: str = Field(default="", description="Database password")
-    host: str = Field(default="localhost", description="Database host")
-    port: int = Field(default=5432, description="Database port")
-    name: str = Field(default="nilai_users", description="Database name")
+    user: str = Field(description="Database user")
+    password: str = Field(description="Database password")
+    host: str = Field(description="Database host")
+    port: int = Field(description="Database port")
+    db: str = Field(description="Database name")
 
 
 class EtcdConfig(BaseModel):
-    host: str = Field(default="localhost", description="ETCD host")
-    port: int = Field(default=2379, description="ETCD port")
+    host: str = Field(description="ETCD host")
+    port: int = Field(description="ETCD port")
 
 
 class RedisConfig(BaseModel):
-    url: str = Field(default="redis://localhost:6379", description="Redis URL")
+    url: str = Field(description="Redis URL")

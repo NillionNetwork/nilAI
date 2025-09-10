@@ -8,7 +8,7 @@ from fastapi.security import HTTPAuthorizationCredentials
 from nilai_api.config import CONFIG as config
 
 # For these tests, we will use the api_key strategy
-config.auth.strategy = "api_key"
+config.auth.auth_strategy = "api_key"
 
 
 @pytest.fixture
