@@ -227,7 +227,6 @@ def get_delegation_token(
         )
         .build(private_key)
     )
-    print("DELEGATED TOKEN", delegated_token)
     return DelegationToken(token=delegated_token)
 
 

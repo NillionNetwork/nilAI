@@ -26,7 +26,6 @@ import pytest
 def client():
     """Create an HTTPX client with default headers"""
     invocation_token: str = api_key_getter()
-    print("BASE_URL", BASE_URL)
     return httpx.Client(
         base_url=BASE_URL,
         headers={
@@ -106,7 +105,6 @@ def nillion_2025_client():
 def document_id_client():
     """Create an HTTPX client with default headers"""
     invocation_token = get_document_id_nuc_token()
-    print("BASE_URL", BASE_URL)
     return httpx.Client(
         base_url=BASE_URL,
         headers={
