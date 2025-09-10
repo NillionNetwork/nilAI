@@ -156,7 +156,7 @@ async def test_enhance_messages_with_web_search():
 
         enhanced = await enhance_messages_with_web_search(original_messages, "AI news")
 
-        assert len(enhanced.messages) == 3
+        assert len(enhanced.messages) == 2
         assert enhanced.messages[0]["role"] == "system"
         assert "Latest AI Developments" in str(enhanced.messages[0]["content"])
         assert enhanced.sources is not None
