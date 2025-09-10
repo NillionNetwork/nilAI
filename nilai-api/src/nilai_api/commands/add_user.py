@@ -1,7 +1,7 @@
 import asyncio
 import json
 
-from nilai_api.db.users import RateLimits, UserManager
+from nilai_api.db.users import RateLimits, UserManager, UserModel
 import click
 
 
@@ -37,7 +37,7 @@ def main(
     web_search_ratelimit_minute: int | None,
 ):
     async def add_user():
-        user = await UserManager.insert_user(
+        user: UserModel = await UserManager.insert_user(
             name,
             apikey,
             userid,
@@ -55,9 +55,12 @@ def main(
                 "userid": user.userid,
                 "name": user.name,
                 "apikey": user.apikey,
-                "ratelimit_day": user.ratelimit_day,
-                "ratelimit_hour": user.ratelimit_hour,
-                "ratelimit_minute": user.ratelimit_minute,
+                "ratelimit_day": user.rate_limits_obj.user_rate_limit_day,
+                "ratelimit_hour": user.rate_limits_obj.user_rate_limit_hour,
+                "ratelimit_minute": user.rate_limits_obj.user_rate_limit_minute,
+                "web_search_ratelimit_day": user.rate_limits_obj.web_search_rate_limit_day,
+                "web_search_ratelimit_hour": user.rate_limits_obj.web_search_rate_limit_hour,
+                "web_search_ratelimit_minute": user.rate_limits_obj.web_search_rate_limit_minute,
             },
             indent=4,
         )
