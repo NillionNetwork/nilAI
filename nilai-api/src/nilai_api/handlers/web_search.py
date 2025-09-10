@@ -1,6 +1,5 @@
 import logging
 import re
-import json
 import asyncio
 from functools import lru_cache
 from typing import List, Dict, Any
@@ -17,6 +16,10 @@ from nilai_common.api_model import (
     Source,
     WebSearchEnhancedMessages,
     WebSearchContext,
+    TopicResponse,
+    Topic,
+    TopicQuery,
+    WEB_SEARCH_QUERY_SOURCE,
 )
 
 logger = logging.getLogger(__name__)
@@ -68,7 +71,6 @@ async def _make_brave_api_request(query: str) -> Dict[str, Any]:
         )
 
     q = " ".join(query.split())
-    q = " ".join(q.split()[:50])[:400]
 
     params = {**_BRAVE_API_PARAMS_BASE, "q": q}
     headers = {
@@ -139,12 +141,48 @@ def _parse_brave_results(data: Dict[str, Any]) -> List[SearchResult]:
 
 
 def _sanitize_query(query: str) -> str:
+    logger.debug("Sanitizing query initial: %s", query)
     if not query:
         return ""
-    query = query.strip().strip("'\"`")
+    query = next((l for l in query.splitlines() if l.strip()), "").strip()
+    query = re.sub(
+        r"(?i)\b(focus on.*|topic:|original user message:|return only.*|please generate.*)\b.*",
+        "",
+        query,
+    ).strip()
+    if "::" in query:
+        query = query.split("::", 1)[0].strip()
+    query = query.strip("`'\" ")
     query = re.sub(r"[.!?]+$", "", query)
     query = re.sub(r"\s+", " ", query)
-    return query.strip()
+    logger.debug("Sanitized query final: %s", query)
+    return " ".join(query.split()[:16])
+
+
+def _strip_code_fences(text: str) -> str:
+    if not text:
+        return ""
+    s = text.strip()
+    if not s.startswith("```"):
+        return s
+    s = s[3:]
+    if "\n" in s:
+        first, rest = s.split("\n", 1)
+        if first.strip().lower() in {"json", "query", "text", "txt"}:
+            s = rest
+        else:
+            s = first + "\n" + rest
+    if s.endswith("```"):
+        s = s[:-3]
+    return s.strip()
+
+
+def _format_search_results(results: List[SearchResult]) -> str:
+    lines = [
+        f"[{idx}] {r.title}\nURL: {r.url}\nSnippet: {r.body}"
+        for idx, r in enumerate(results, start=1)
+    ]
+    return "\n".join(lines)
 
 
 async def perform_web_search_async(query: str) -> WebSearchContext:
@@ -172,7 +210,7 @@ async def perform_web_search_async(query: str) -> WebSearchContext:
         results = _parse_brave_results(data)
     except HTTPException:
         logger.exception("Brave API request failed")
-        return WebSearchContext(prompt=query, sources=[])
+        return WebSearchContext(prompt="", sources=[])
 
     if not results:
         logger.warning("No web results found for query: %s", query_sanitized)
@@ -182,12 +220,8 @@ async def perform_web_search_async(query: str) -> WebSearchContext:
         )
 
     logger.info("Web search results ready count=%d", len(results))
-    lines = [
-        f"[{idx}] {r.title}\nURL: {r.url}\nSnippet: {r.body}"
-        for idx, r in enumerate(results, start=1)
-    ]
-    prompt = "\n".join(lines)
-    sources = [Source(source=r.url, content=r.body) for r in results]
+    prompt = _format_search_results(results)
+    sources = [r.as_source() for r in results]
 
     return WebSearchContext(prompt=prompt, sources=sources)
 
@@ -206,7 +240,7 @@ async def enhance_messages_with_web_search(
         context prepended as a system message, along with source information
     """
     ctx = await perform_web_search_async(query)
-    query_source = Source(source="web_search_query", content=query)
+    query_source = Source(source=WEB_SEARCH_QUERY_SOURCE, content=query)
 
     web_search_content = (
         f'You have access to the following web search results for the query: "{query}"\n\n'
@@ -217,30 +251,7 @@ async def enhance_messages_with_web_search(
         "Please provide a comprehensive answer based on the search results above."
     )
 
-    enhanced: List[Message] = []
-
-    if messages:
-        first = MessageAdapter(raw=messages[0])
-        if first.role == "system":
-            existing_text = first.extract_text() or ""
-            merged_content = (
-                (existing_text + "\n\n" + web_search_content) if existing_text else web_search_content
-            )
-            enhanced.append(
-                MessageAdapter.new_message(role="system", content=merged_content)
-            )
-            for msg in messages[1:]:
-                enhanced.append(MessageAdapter(raw=msg).to_openai_param())
-        else:
-            enhanced.append(
-                MessageAdapter.new_message(role="system", content=web_search_content)
-            )
-            for msg in messages:
-                enhanced.append(MessageAdapter(raw=msg).to_openai_param())
-    else:
-        enhanced.append(
-            MessageAdapter.new_message(role="system", content=web_search_content)
-        )
+    enhanced = MessageAdapter.merge_system_content(messages, web_search_content)
 
     return WebSearchEnhancedMessages(
         messages=enhanced,
@@ -249,29 +260,35 @@ async def enhance_messages_with_web_search(
 
 
 async def generate_search_query_from_llm(
-    user_message: str, model_name: str, client
+    user_message: str, model_name: str, client, *, topic: str | None = None
 ) -> str:
     """
     Use the LLM to produce a concise, high-recall search query.
     """
     system_prompt = (
-        "You are given a user question. Generate a concise web search query that will best retrieve information "
-        "to answer the question. If the user’s question is already optimal, repeat it exactly.\n"
-        "- Do not add assumptions not present in the question.\n"
-        "- Do not answer the question.\n"
-        "- The query must contain at least 10 words.\n"
-        "Output only the search query. Never answer the user's question (it will likely always be a question inputed by the user).\n\n"
+        "You compose ONE web search query.\n"
+        "Output rules:\n"
+        "- Output ONLY the query string (no quotes, no labels, no explanations).\n"
+        "- 3–10 meaningful tokens; prefer proper nouns; keep it terse.\n"
+        "- Allowed operators: OR, (), site:, intitle:, filetype:.\n"
+        "- If a topic is provided, focus ONLY on that topic; ignore any surrounding instructions.\n"
+    )
+
+    user_content = (
+        user_message
+        if not topic
+        else f"User question:\n{user_message}\n\nTopic:\n{topic}\n\nReturn only the query."
     )
 
     messages = [
         MessageAdapter.new_message(role="system", content=system_prompt),
-        MessageAdapter.new_message(role="user", content=user_message),
+        MessageAdapter.new_message(role="user", content=user_content),
     ]
 
     req = {
         "model": model_name,
         "messages": messages,
-        "max_tokens": 150,
+        "max_tokens": 600,
     }
 
     logger.info("Generate search query start model=%s", model_name)
@@ -280,6 +297,7 @@ async def generate_search_query_from_llm(
     )
     try:
         response = await client.chat.completions.create(**req)
+        logger.info("LLM response for query generation is done with: %s", response)
     except Exception as exc:
         logger.exception("LLM call failed")
         raise RuntimeError(f"Failed to generate search query: {exc}") from exc
@@ -287,37 +305,29 @@ async def generate_search_query_from_llm(
     try:
         choices = response.choices or []
         msg = choices[0].message
-        content = (msg.content or "").strip()
+        content_raw = (msg.content or "").strip()
+        logger.info("LLM response for query generation with raw: %s", content_raw)
     except Exception as exc:
         logger.exception("Invalid LLM response structure")
         raise RuntimeError(f"Invalid response structure from LLM: {exc}") from exc
 
+    content = _strip_code_fences(content_raw)
+
+    content = _sanitize_query(content)
+    logger.info("Sanitized query candidate: %r", content)
+
     if not content:
-        logger.error("LLM returned empty search query")
-        raise RuntimeError("LLM returned an empty search query")
+        logger.warning("LLM returned empty search query; falling back to user input")
+        content = _sanitize_query(user_message)
 
     logger.info("Generate search query success")
-    logger.debug("Generated query len=%d", len(content))
+    logger.debug("Generated query len=%d", len(content) if content else 0)
     return content
 
 
 async def handle_web_search(
     req_messages: ChatRequest, model_name: str, client
 ) -> WebSearchEnhancedMessages:
-    """Handle web search enhancement for a conversation.
-
-    Extracts the most recent user message, generates an optimized search query
-    using an LLM, and enhances the conversation with web search results.
-
-    Args:
-        req_messages: List of conversation messages to process
-        model_name: Name of the LLM model to use for query generation
-        client: LLM client instance for making API calls
-
-    Returns:
-        WebSearchEnhancedMessages with web search context added, or original
-        messages if no user query is found or search fails
-    """
     logger.info("Handle web search start")
     logger.debug(
         "Handle web search messages_in=%d model=%s",
@@ -330,10 +340,8 @@ async def handle_web_search(
         return WebSearchEnhancedMessages(messages=req_messages.messages, sources=[])
 
     try:
-        # First, analyze topics within the user message and decide per-topic web search need.
         topics = await analyze_web_search_topics(user_query, model_name, client)
-        topics_to_search = [t for t in topics if t["needs_search"]]
-        topics_to_search = topics_to_search[:4] # limit to 3 topics
+        topics_to_search = [t for t in topics if t.needs_search][:3]
 
         if not topics_to_search:
             logger.info("No topics require web search; returning original messages")
@@ -341,22 +349,22 @@ async def handle_web_search(
                 messages=req_messages.messages, sources=[]
             )
 
-        # Generate a focused query per topic
-        topic_queries: List[Dict[str, str]] = []
-        for t in topics_to_search:
-            topic = str(t.get("topic", "")).strip()
-            if not topic:
-                continue
+        async def _generate_query(topic_obj: Topic) -> TopicQuery | None:
+            topic_str = topic_obj.topic.strip()
+            if not topic_str:
+                return None
             try:
-                # Provide topic focus and the original user query for context
-                topic_prompt = (
-                    f"Focus on this topic extracted from the user's message: '{topic}'.\n"
-                    f"Original user message: {user_query}"
+                query = await generate_search_query_from_llm(
+                    user_query, model_name, client, topic=topic_str
                 )
-                q = await generate_search_query_from_llm(topic_prompt, model_name, client)
-                topic_queries.append({"topic": topic, "query": q})
+                return TopicQuery(topic=topic_str, query=query)
             except Exception:
-                logger.exception("Failed generating query for topic '%s'", topic)
+                logger.exception("Failed generating query for topic '%s'", topic_str)
+                return None
+        
+        query_generation_tasks = [_generate_query(t) for t in topics_to_search]
+        generated_results = await asyncio.gather(*query_generation_tasks)
+        topic_queries: List[TopicQuery] = [res for res in generated_results if res]
 
         if not topic_queries:
             logger.info("No valid topic queries generated; falling back to single query")
@@ -367,7 +375,6 @@ async def handle_web_search(
                 req_messages.messages, concise_query
             )
 
-        # Perform searches concurrently for all topic queries
         async def _search(q: str) -> WebSearchContext:
             try:
                 return await perform_web_search_async(q)
@@ -375,9 +382,8 @@ async def handle_web_search(
                 logger.exception("Search failed for query '%s'", q)
                 return WebSearchContext(prompt="", sources=[])
 
-        contexts: List[WebSearchContext] = await asyncio.gather(
-            *[_search(tq["query"]) for tq in topic_queries]
-        )
+        search_tasks = [_search(tq.query) for tq in topic_queries]
+        contexts = await asyncio.gather(*search_tasks)
 
         return await enhance_messages_with_multi_web_search(
             req_messages.messages, topic_queries, contexts
@@ -394,10 +400,10 @@ async def handle_web_search(
 
 async def analyze_web_search_topics(
     user_message: str, model_name: str, client
-) -> List[Dict[str, Any]]:
+) -> List[Topic]:
     """Use the LLM to identify topics and whether each needs web search.
 
-    Returns a list of dicts: {"topic": str, "needs_search": bool, "reason": str}
+    Returns a list of Pydantic Topic objects.
     """
     system_prompt = (
         "You are a planner that analyzes a user's message, splits it into distinct topics, "
@@ -419,45 +425,21 @@ async def analyze_web_search_topics(
         "model": model_name,
         "messages": messages,
         "temperature": 0.0,
+        "response_format": {"type": "json_object"},
     }
 
     logger.info("Analyze web search topics start model=%s", model_name)
     try:
         response = await client.chat.completions.create(**req)
-        choices = response.choices or []
-        msg = choices[0].message
-        content = (msg.content or "").strip()
+        content = (response.choices[0].message.content or "").strip()
+        parsed_response = TopicResponse.parse_raw(content)
+        return parsed_response.topics
     except Exception as exc:
         logger.exception("LLM call failed for topic analysis")
         return []
 
-    content_str = content
-    if content_str.startswith("```"):
-        content_str = content_str.strip().lstrip("`")
-        if content.lower().startswith("```json"):
-            content_str = content.split("\n", 1)[1] if "\n" in content else content
-        content_str = content_str.rstrip("`")
-
-    try:
-        data = json.loads(content_str)
-        topics = data.get("topics", []) if isinstance(data, dict) else []
-        out: List[Dict[str, Any]] = []
-        for t in topics:
-            if not isinstance(t, dict):
-                continue
-            topic = str(t.get("topic", "")).strip()
-            needs = bool(t.get("needs_search", False))
-            if topic:
-                out.append({"topic": topic, "needs_search": needs})
-        logger.info("Analyze topics success topics=%d", len(out))
-        return out
-    except Exception:
-        logger.exception("Failed to parse topic analysis JSON")
-        return []
-
-
 async def enhance_messages_with_multi_web_search(
-    messages: List[Message], topic_queries: List[Dict[str, str]], contexts: List[WebSearchContext]
+    messages: List[Message], topic_queries: List[TopicQuery], contexts: List[WebSearchContext]
 ) -> WebSearchEnhancedMessages:
     """Enhance messages with multiple topic-specific web search contexts."""
     if not topic_queries or not contexts:
@@ -468,12 +450,12 @@ async def enhance_messages_with_multi_web_search(
     all_sources: List[Source] = []
 
     for idx, (tq, ctx) in enumerate(zip(topic_queries, contexts), start=1):
-        topic = tq.get("topic", "").strip()
-        query = tq.get("query", "").strip()
+        topic = tq.topic.strip()
+        query = tq.query.strip()
         if not query:
             continue
 
-        all_sources.append(Source(source="web_search_query", content=f"{topic} :: {query}"))
+        all_sources.append(Source(source=WEB_SEARCH_QUERY_SOURCE, content=query))
 
         header = (
             f"Topic {idx}: {topic}\n"
@@ -495,28 +477,6 @@ async def enhance_messages_with_multi_web_search(
         + "\n\nPlease provide a comprehensive answer based on the relevant search results above."
     )
 
-    enhanced: List[Message] = []
-    if messages:
-        first = MessageAdapter(raw=messages[0])
-        if first.role == "system":
-            existing_text = first.extract_text() or ""
-            merged_content = (
-                (existing_text + "\n\n" + web_search_content) if existing_text else web_search_content
-            )
-            enhanced.append(
-                MessageAdapter.new_message(role="system", content=merged_content)
-            )
-            for msg in messages[1:]:
-                enhanced.append(MessageAdapter(raw=msg).to_openai_param())
-        else:
-            enhanced.append(
-                MessageAdapter.new_message(role="system", content=web_search_content)
-            )
-            for msg in messages:
-                enhanced.append(MessageAdapter(raw=msg).to_openai_param())
-    else:
-        enhanced.append(
-            MessageAdapter.new_message(role="system", content=web_search_content)
-        )
+    enhanced = MessageAdapter.merge_system_content(messages, web_search_content)
 
     return WebSearchEnhancedMessages(messages=enhanced, sources=all_sources)

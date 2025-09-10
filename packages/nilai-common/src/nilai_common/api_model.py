@@ -50,6 +50,23 @@ class SearchResult(BaseModel):
     body: str
     url: str
 
+    def as_source(self) -> "Source":
+        return Source(source=self.url, content=self.body)
+
+
+class Topic(BaseModel):
+    topic: str
+    needs_search: bool = Field(..., alias="needs_search")
+
+
+class TopicResponse(BaseModel):
+    topics: List[Topic]
+
+
+class TopicQuery(BaseModel):
+    topic: str
+    query: str
+
 
 # ---------- Helpers ----------
 def _extract_text_from_content(content: Any) -> Optional[str]:
@@ -144,6 +161,27 @@ class MessageAdapter(BaseModel):
         # Return the original dict for API calls.
         return self.raw
 
+    @staticmethod
+    def merge_system_content(messages: List[Message], system_content: str) -> List[Message]:
+        """Prepend or merge a system message with the given content.
+
+        - If the first message is a system message, append the new content after a blank line.
+        - Otherwise, create a new system message and prepend it.
+        """
+        if not messages:
+            return [MessageAdapter.new_message(role="system", content=system_content)]
+
+        first = MessageAdapter(raw=messages[0])
+        if first.role == "system":
+            existing = first.extract_text() or ""
+            merged = (existing + "\n\n" + system_content) if existing else system_content
+            new_first = MessageAdapter.new_message(role="system", content=merged)
+            return [new_first] + [MessageAdapter(raw=m).to_openai_param() for m in messages[1:]]
+
+        return [
+            MessageAdapter.new_message(role="system", content=system_content)
+        ] + [MessageAdapter(raw=m).to_openai_param() for m in messages]
+
 
 def adapt_messages(msgs: List[Message]) -> List[MessageAdapter]:
     return [MessageAdapter(raw=m) for m in msgs]
@@ -160,6 +198,10 @@ class WebSearchContext(BaseModel):
 
     prompt: str
     sources: List[Source]
+
+
+# Common source-type identifier for recording the original query used in web search
+WEB_SEARCH_QUERY_SOURCE = "web_search_query"
 
 
 # ---------- Request/response models ----------
@@ -206,6 +248,9 @@ class ChatRequest(BaseModel):
     def has_multimodal_content(self) -> bool:
         """True if any message contains an image content part."""
         return any([m.is_multimodal_part() for m in self.adapted_messages])
+
+
+## Note: merge_system_message moved to MessageAdapter.merge_system_content
 
 
 class SignedChatCompletion(ChatCompletion):
