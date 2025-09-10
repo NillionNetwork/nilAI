@@ -146,7 +146,7 @@ def _sanitize_query(query: str) -> str:
     logger.debug("Sanitizing query initial: %s", query)
     if not query:
         return ""
-    query = next((l for l in query.splitlines() if l.strip()), "").strip()
+    query = next((line for line in query.splitlines() if line.strip()), "").strip()
     query = re.sub(
         r"(?i)\b(focus on.*|topic:|original user message:|return only.*|please generate.*)\b.*",
         "",
@@ -475,7 +475,7 @@ async def analyze_web_search_topics(
         content = (response.choices[0].message.content or "").strip()
         parsed_response = TopicResponse.parse_raw(content)
         return parsed_response.topics
-    except Exception as exc:
+    except Exception:
         logger.exception("LLM call failed for topic analysis")
         return []
 
