@@ -54,10 +54,11 @@ jobs:
       - name: pyright
         run: uv run pyright
 
-      - name: Run tests
+      - name: Run unit tests
         run: uv run pytest -v tests/unit
 
-
+      - name: Run integration tests
+        run: uv run pytest -v tests/integration
 
   start-runner:
     name: Start self-hosted EC2 runner

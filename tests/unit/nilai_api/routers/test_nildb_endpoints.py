@@ -3,7 +3,7 @@ from unittest.mock import patch, MagicMock, AsyncMock
 from fastapi import HTTPException, status
 
 from nilai_api.auth.common import AuthenticationInfo, PromptDocument
-from nilai_api.db.users import UserData, UserModel
+from nilai_api.db.users import RateLimits, UserData, UserModel
 from nilai_api.handlers.nildb.api_model import (
     PromptDelegationToken,
 )
@@ -25,12 +25,10 @@ class TestNilDBEndpoints:
         mock_user_model.queries = 0
         mock_user_model.signup_date = datetime.now(timezone.utc)
         mock_user_model.last_activity = datetime.now(timezone.utc)
-        mock_user_model.ratelimit_day = 1000
-        mock_user_model.ratelimit_hour = 100
-        mock_user_model.ratelimit_minute = 10
-        mock_user_model.web_search_ratelimit_day = 100
-        mock_user_model.web_search_ratelimit_hour = 50
-        mock_user_model.web_search_ratelimit_minute = 5
+        mock_user_model.rate_limits = (
+            RateLimits().get_effective_limits().model_dump_json()
+        )
+        mock_user_model.rate_limits_obj = RateLimits().get_effective_limits()
 
         return UserData.from_sqlalchemy(mock_user_model)
 
@@ -46,12 +44,10 @@ class TestNilDBEndpoints:
         mock_user_model.queries = 0
         mock_user_model.signup_date = datetime.now(timezone.utc)
         mock_user_model.last_activity = datetime.now(timezone.utc)
-        mock_user_model.ratelimit_day = 1000
-        mock_user_model.ratelimit_hour = 100
-        mock_user_model.ratelimit_minute = 10
-        mock_user_model.web_search_ratelimit_day = 100
-        mock_user_model.web_search_ratelimit_hour = 50
-        mock_user_model.web_search_ratelimit_minute = 5
+        mock_user_model.rate_limits = (
+            RateLimits().get_effective_limits().model_dump_json()
+        )
+        mock_user_model.rate_limits_obj = RateLimits().get_effective_limits()
 
         return UserData.from_sqlalchemy(mock_user_model)
 
@@ -156,6 +152,7 @@ class TestNilDBEndpoints:
         mock_user.userid = "test-user-id"
         mock_user.name = "Test User"
         mock_user.apikey = "test-api-key"
+        mock_user.rate_limits = RateLimits().get_effective_limits()
 
         mock_auth_info = AuthenticationInfo(
             user=mock_user, token_rate_limit=None, prompt_document=mock_prompt_document
@@ -256,6 +253,7 @@ class TestNilDBEndpoints:
         mock_user.userid = "test-user-id"
         mock_user.name = "Test User"
         mock_user.apikey = "test-api-key"
+        mock_user.rate_limits = RateLimits().get_effective_limits()
 
         mock_auth_info = AuthenticationInfo(
             user=mock_user, token_rate_limit=None, prompt_document=mock_prompt_document
@@ -297,6 +295,7 @@ class TestNilDBEndpoints:
         mock_user.userid = "test-user-id"
         mock_user.name = "Test User"
         mock_user.apikey = "test-api-key"
+        mock_user.rate_limits = RateLimits().get_effective_limits()
 
         mock_auth_info = AuthenticationInfo(
             user=mock_user,
