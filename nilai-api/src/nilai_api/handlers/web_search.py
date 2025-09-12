@@ -141,43 +141,6 @@ def _parse_brave_results(data: Dict[str, Any]) -> List[SearchResult]:
     return results
 
 
-def _sanitize_query(query: str) -> str:
-    logger.debug("Sanitizing query initial: %s", query)
-    if not query:
-        return ""
-    query = next((line for line in query.splitlines() if line.strip()), "").strip()
-    query = re.sub(
-        r"(?i)\b(focus on.*|topic:|original user message:|return only.*|please generate.*)\b.*",
-        "",
-        query,
-    ).strip()
-    if "::" in query:
-        query = query.split("::", 1)[0].strip()
-    query = query.strip("`'\" ")
-    query = re.sub(r"[.!?]+$", "", query)
-    query = re.sub(r"\s+", " ", query)
-    logger.debug("Sanitized query final: %s", query)
-    return " ".join(query.split()[:16])
-
-
-def _strip_code_fences(text: str) -> str:
-    if not text:
-        return ""
-    s = text.strip()
-    if not s.startswith("```"):
-        return s
-    s = s[3:]
-    if "\n" in s:
-        first, rest = s.split("\n", 1)
-        if first.strip().lower() in {"json", "query", "text", "txt"}:
-            s = rest
-        else:
-            s = first + "\n" + rest
-    if s.endswith("```"):
-        s = s[:-3]
-    return s.strip()
-
-
 def _format_search_results(results: List[SearchResult]) -> str:
     lines = [
         f"[{idx}] {r.title}\nURL: {r.url}\nContent: {r.body}"
@@ -225,23 +188,22 @@ async def perform_web_search_async(query: str) -> WebSearchContext:
     main content with trafilatura. If extraction fails, falls back to
     the Brave snippet.
     """
-    query_sanitized = _sanitize_query(query)
-    if not query_sanitized:
-        logger.warning("Empty or invalid query after sanitization")
+    if not (query and query.strip()):
+        logger.warning("Empty or invalid query provided for web search")
         return WebSearchContext(prompt="", sources=[])
 
     logger.info("Web search start")
-    logger.debug("Web search sanitized query: %s", query_sanitized)
+    logger.debug("Web search query: %s", query)
 
     try:
-        data = await _make_brave_api_request(query_sanitized)
+        data = await _make_brave_api_request(query)
         initial_results = _parse_brave_results(data)
     except HTTPException:
         logger.exception("Brave API request failed")
         return WebSearchContext(prompt="", sources=[])
 
     if not initial_results:
-        logger.warning("No web results found for query: %s", query_sanitized)
+        logger.warning("No web results found for query: %s", query)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No web search results found",
@@ -351,14 +313,13 @@ async def generate_search_query_from_llm(
         logger.exception("Invalid LLM response structure")
         raise RuntimeError(f"Invalid response structure from LLM: {exc}") from exc
 
-    content = _strip_code_fences(content_raw)
+    content = content_raw
 
-    content = _sanitize_query(content)
-    logger.info("Sanitized query candidate: %r", content)
+    logger.info("Generated query candidate (raw): %r", content)
 
     if not content:
         logger.warning("LLM returned empty search query; falling back to user input")
-        content = _sanitize_query(user_message)
+        content = user_message
 
     logger.info("Generate search query success")
     logger.debug("Generated query len=%d", len(content) if content else 0)
