@@ -3,6 +3,7 @@ from typing import Optional
 from fastapi import HTTPException, status
 from nilai_api.db.users import UserData
 from nuc_helpers.usage import TokenRateLimits, TokenRateLimit
+from nuc_helpers.nildb_document import PromptDocument
 
 
 class AuthenticationError(HTTPException):
@@ -17,6 +18,7 @@ class AuthenticationError(HTTPException):
 class AuthenticationInfo(BaseModel):
     user: UserData
     token_rate_limit: Optional[TokenRateLimits]
+    prompt_document: Optional[PromptDocument]
 
 
 __all__ = [
@@ -24,4 +26,5 @@ __all__ = [
     "AuthenticationInfo",
     "TokenRateLimits",
     "TokenRateLimit",
+    "PromptDocument",
 ]

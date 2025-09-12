@@ -10,11 +10,13 @@ pytest tests/e2e/test_http.py
 
 import json
 
+
 from .config import BASE_URL, test_models, AUTH_STRATEGY, api_key_getter
 from .nuc import (
     get_rate_limited_nuc_token,
     get_invalid_rate_limited_nuc_token,
     get_nildb_nuc_token,
+    get_document_id_nuc_token,
 )
 import httpx
 import pytest
@@ -93,6 +95,22 @@ def nillion_2025_client():
             "accept": "application/json",
             "Content-Type": "application/json",
             "Authorization": "Bearer Nillion2025",
+        },
+        verify=False,
+        timeout=None,
+    )
+
+
+@pytest.fixture
+def document_id_client():
+    """Create an HTTPX client with default headers"""
+    invocation_token = get_document_id_nuc_token()
+    return httpx.Client(
+        base_url=BASE_URL,
+        headers={
+            "accept": "application/json",
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {invocation_token.token}",
         },
         verify=False,
         timeout=None,
@@ -791,3 +809,71 @@ def test_model_streaming_request_high_token(client):
         assert chunk_count > 0, (
             "Should receive at least one chunk for high token streaming request"
         )
+
+
+@pytest.mark.skipif(
+    AUTH_STRATEGY != "nuc", reason="NUC required for this tests on nilDB"
+)
+def test_nildb_delegation(client: httpx.Client):
+    """Tests getting a delegation token for nilDB and validating that token to be valid"""
+    from secretvaults.common.keypair import Keypair
+    from nuc.envelope import NucTokenEnvelope
+    from nuc.validate import NucTokenValidator, ValidationParameters
+    from nuc.nilauth import NilauthClient
+    from nilai_api.config import CONFIG
+    from nuc.token import Did
+
+    keypair = Keypair.generate()
+    did = keypair.to_did_string()
+
+    response = client.get("/delegation", params={"prompt_delegation_request": did})
+
+    assert response.status_code == 200, (
+        f"Delegation token should be returned: {response.text}"
+    )
+    assert "token" in response.json(), "Delegation token should be returned"
+    assert "did" in response.json(), "Delegation did should be returned"
+    token = response.json()["token"]
+    did = response.json()["did"]
+    assert token is not None, "Delegation token should be returned"
+    assert did is not None, "Delegation did should be returned"
+
+    # Validate the token with nilAuth url for nilDB
+    nuc_token_envelope = NucTokenEnvelope.parse(token)
+    nilauth_public_keys = [
+        Did(NilauthClient(CONFIG.nildb.nilauth_url).about().public_key.serialize())
+    ]
+    NucTokenValidator(nilauth_public_keys).validate(
+        nuc_token_envelope, context={}, parameters=ValidationParameters.default()
+    )
+
+
+@pytest.mark.parametrize(
+    "model",
+    test_models,
+)
+@pytest.mark.skipif(
+    AUTH_STRATEGY != "nuc", reason="NUC required for this tests on nilDB"
+)
+def test_nildb_prompt_document(document_id_client: httpx.Client, model):
+    """Tests getting a prompt document from nilDB and executing a chat completion with it"""
+    payload = {
+        "model": model,
+        "messages": [
+            {
+                "role": "system",
+                "content": "You are a helpful assistant.",
+            },
+            {"role": "user", "content": "Can you make a small rhyme?"},
+        ],
+        "temperature": 0.2,
+    }
+
+    response = document_id_client.post("/chat/completions", json=payload, timeout=30)
+
+    assert response.status_code == 200, (
+        f"Response should be successful: {response.text}"
+    )
+    # Response must talk about cheese which is what the prompt document contains
+    message: str = response.json()["choices"][0].get("message", {}).get("content", None)
+    assert "cheese" in message.lower(), "Response should contain cheese"

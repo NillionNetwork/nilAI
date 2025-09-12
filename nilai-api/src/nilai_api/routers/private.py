@@ -12,12 +12,21 @@ from nilai_api.handlers.web_search import handle_web_search
 from fastapi import APIRouter, Body, Depends, HTTPException, status, Request
 from fastapi.responses import StreamingResponse
 from nilai_api.auth import get_auth_info, AuthenticationInfo
-from nilai_api.config import MODEL_CONCURRENT_RATE_LIMIT
+from nilai_api.config import CONFIG
 from nilai_api.crypto import sign_message
 from nilai_api.db.logs import QueryLogManager
 from nilai_api.db.users import UserManager
 from nilai_api.rate_limiting import RateLimit
 from nilai_api.state import state
+
+from nilai_api.handlers.nildb.api_model import (
+    PromptDelegationRequest,
+    PromptDelegationToken,
+)
+from nilai_api.handlers.nildb.handler import (
+    get_nildb_delegation_token,
+    get_prompt_from_nildb,
+)
 
 # Internal libraries
 from nilai_common import (
@@ -38,6 +47,26 @@ from openai import AsyncOpenAI
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+@router.get("/v1/delegation")
+async def get_prompt_store_delegation(
+    prompt_delegation_request: PromptDelegationRequest,
+    auth_info: AuthenticationInfo = Depends(get_auth_info),
+) -> PromptDelegationToken:
+    if not auth_info.user.is_subscription_owner:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Prompt storage is reserved to subscription owners",
+        )
+
+    try:
+        return await get_nildb_delegation_token(prompt_delegation_request)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Server unable to produce delegation tokens: {str(e)}",
+        )
 
 
 @router.get("/v1/usage", tags=["Usage"])
@@ -114,8 +143,9 @@ async def chat_completion_concurrent_rate_limit(request: Request) -> Tuple[int, 
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid request body")
     key = f"chat:{chat_request.model}"
-    limit = MODEL_CONCURRENT_RATE_LIMIT.get(
-        chat_request.model, MODEL_CONCURRENT_RATE_LIMIT.get("default", 50)
+    limit = CONFIG.rate_limiting.model_concurrent_rate_limit.get(
+        chat_request.model,
+        CONFIG.rate_limiting.model_concurrent_rate_limit.get("default", 50),
     )
     return limit, key
 
@@ -241,6 +271,17 @@ async def chat_completion(
     )
 
     client = AsyncOpenAI(base_url=model_url, api_key="<not-needed>")
+    if auth_info.prompt_document:
+        try:
+            nildb_prompt: str = await get_prompt_from_nildb(auth_info.prompt_document)
+            req.messages.insert(
+                0, MessageAdapter.new_message(role="system", content=nildb_prompt)
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Unable to extract prompt from nilDB: {str(e)}",
+            )
 
     if req.nilrag:
         logger.info(f"[chat] nilrag start request_id={request_id}")
@@ -315,6 +356,7 @@ async def chat_completion(
                     model=req.model,
                     prompt_tokens=prompt_token_usage,
                     completion_tokens=completion_token_usage,
+                    web_search_calls=len(sources) if sources else 0,
                 )
                 logger.info(
                     f"[chat] stream done request_id={request_id} prompt_tokens={prompt_token_usage} completion_tokens={completion_token_usage} duration_ms={(time.monotonic() - t_call) * 1000:.0f} total_ms={(time.monotonic() - t_start) * 1000:.0f}"
@@ -373,6 +415,7 @@ async def chat_completion(
         model=req.model,
         prompt_tokens=model_response.usage.prompt_tokens,
         completion_tokens=model_response.usage.completion_tokens,
+        web_search_calls=len(sources) if sources else 0,
     )
 
     # Sign the response

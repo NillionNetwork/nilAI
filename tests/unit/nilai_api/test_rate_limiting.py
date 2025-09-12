@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 from datetime import datetime, timedelta, timezone
 
 from nilai_api.auth import TokenRateLimit, TokenRateLimits
+from nilai_api.db.users import RateLimits
 import pytest
 import pytest_asyncio
 from fastapi import HTTPException, Request
@@ -44,13 +45,17 @@ async def test_concurrent_rate_limit(req):
 
     user_limits = UserRateLimits(
         subscription_holder=random_id(),
-        day_limit=None,
-        hour_limit=None,
-        minute_limit=None,
         token_rate_limit=None,
-        web_search_day_limit=None,
-        web_search_hour_limit=None,
-        web_search_minute_limit=None,
+        rate_limits=RateLimits(
+            user_rate_limit_day=None,
+            user_rate_limit_hour=None,
+            user_rate_limit_minute=None,
+            web_search_rate_limit_day=None,
+            web_search_rate_limit_hour=None,
+            web_search_rate_limit_minute=None,
+            user_rate_limit=None,
+            web_search_rate_limit=None,
+        ),
     )
 
     futures = [consume_generator(rate_limit(req, user_limits)) for _ in range(5)]
@@ -73,39 +78,48 @@ async def test_concurrent_rate_limit(req):
     [
         UserRateLimits(
             subscription_holder=random_id(),
-            day_limit=10,
-            hour_limit=None,
-            minute_limit=None,
             token_rate_limit=None,
-            web_search_day_limit=None,
-            web_search_hour_limit=None,
-            web_search_minute_limit=None,
+            rate_limits=RateLimits(
+                user_rate_limit_day=10,
+                user_rate_limit_hour=None,
+                user_rate_limit_minute=None,
+                web_search_rate_limit_day=None,
+                web_search_rate_limit_hour=None,
+                web_search_rate_limit_minute=None,
+                user_rate_limit=None,
+                web_search_rate_limit=None,
+            ),
         ),
         UserRateLimits(
             subscription_holder=random_id(),
-            day_limit=None,
-            hour_limit=11,
-            minute_limit=None,
             token_rate_limit=None,
-            web_search_day_limit=None,
-            web_search_hour_limit=None,
-            web_search_minute_limit=None,
+            rate_limits=RateLimits(
+                user_rate_limit_day=None,
+                user_rate_limit_hour=11,
+                user_rate_limit_minute=None,
+                web_search_rate_limit_day=None,
+                web_search_rate_limit_hour=None,
+                web_search_rate_limit_minute=None,
+                user_rate_limit=None,
+                web_search_rate_limit=None,
+            ),
         ),
         UserRateLimits(
             subscription_holder=random_id(),
-            day_limit=None,
-            hour_limit=None,
-            minute_limit=12,
             token_rate_limit=None,
-            web_search_day_limit=None,
-            web_search_hour_limit=None,
-            web_search_minute_limit=None,
+            rate_limits=RateLimits(
+                user_rate_limit_day=None,
+                user_rate_limit_hour=None,
+                user_rate_limit_minute=12,
+                web_search_rate_limit_day=None,
+                web_search_rate_limit_hour=None,
+                web_search_rate_limit_minute=None,
+                user_rate_limit=None,
+                web_search_rate_limit=None,
+            ),
         ),
         UserRateLimits(
             subscription_holder=random_id(),
-            day_limit=None,
-            hour_limit=None,
-            minute_limit=None,
             token_rate_limit=TokenRateLimits(
                 limits=[
                     TokenRateLimit(
@@ -115,9 +129,16 @@ async def test_concurrent_rate_limit(req):
                     )
                 ]
             ),
-            web_search_day_limit=None,
-            web_search_hour_limit=None,
-            web_search_minute_limit=None,
+            rate_limits=RateLimits(
+                user_rate_limit_day=None,
+                user_rate_limit_hour=None,
+                user_rate_limit_minute=None,
+                web_search_rate_limit_day=None,
+                web_search_rate_limit_hour=None,
+                web_search_rate_limit_minute=None,
+                user_rate_limit=None,
+                web_search_rate_limit=None,
+            ),
         ),
     ],
 )
@@ -160,15 +181,18 @@ async def test_web_search_rate_limits(redis_client):
     rate_limit = RateLimit(web_search_extractor=web_search_extractor)
     user_limits = UserRateLimits(
         subscription_holder=apikey,
-        day_limit=None,
-        hour_limit=None,
-        minute_limit=None,
         token_rate_limit=None,
-        web_search_day_limit=72,
-        web_search_hour_limit=3,
-        web_search_minute_limit=1,
+        rate_limits=RateLimits(
+            user_rate_limit_day=None,
+            user_rate_limit_hour=None,
+            user_rate_limit_minute=None,
+            web_search_rate_limit_day=72,
+            web_search_rate_limit_hour=3,
+            web_search_rate_limit_minute=1,
+            user_rate_limit=None,
+            web_search_rate_limit=None,
+        ),
     )
-
     # First request should succeed (minute limit: 1, hour limit: 3, day limit: 72)
     await consume_generator(rate_limit(mock_request, user_limits))
 
@@ -179,23 +203,27 @@ async def test_web_search_rate_limits(redis_client):
 
 @pytest.mark.asyncio
 async def test_global_web_search_rps_limit(req, redis_client, monkeypatch):
-    from nilai_api import rate_limiting as rl
+    from nilai_api.config import CONFIG
 
     await redis_client[0].delete("global:web_search:rps")
-    monkeypatch.setattr(rl.WEB_SEARCH_SETTINGS, "rps", 20)
-    monkeypatch.setattr(rl.WEB_SEARCH_SETTINGS, "max_concurrent_requests", 20)
-    monkeypatch.setattr(rl.WEB_SEARCH_SETTINGS, "count", 1)
+    monkeypatch.setattr(CONFIG.web_search, "rps", 20)
+    monkeypatch.setattr(CONFIG.web_search, "max_concurrent_requests", 20)
+    monkeypatch.setattr(CONFIG.web_search, "count", 1)
 
     rate_limit = RateLimit(web_search_extractor=lambda _: True)
     user_limits = UserRateLimits(
         subscription_holder=random_id(),
-        day_limit=None,
-        hour_limit=None,
-        minute_limit=None,
         token_rate_limit=None,
-        web_search_day_limit=None,
-        web_search_hour_limit=None,
-        web_search_minute_limit=None,
+        rate_limits=RateLimits(
+            user_rate_limit_day=None,
+            user_rate_limit_hour=None,
+            user_rate_limit_minute=None,
+            web_search_rate_limit_day=None,
+            web_search_rate_limit_hour=None,
+            web_search_rate_limit_minute=None,
+            user_rate_limit=None,
+            web_search_rate_limit=None,
+        ),
     )
 
     async def run_guarded(i, times, t0):
@@ -216,23 +244,27 @@ async def test_global_web_search_rps_limit(req, redis_client, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_queueing_across_seconds(req, redis_client, monkeypatch):
-    from nilai_api import rate_limiting as rl
+    from nilai_api.config import CONFIG
 
     await redis_client[0].delete("global:web_search:rps")
-    monkeypatch.setattr(rl.WEB_SEARCH_SETTINGS, "rps", 20)
-    monkeypatch.setattr(rl.WEB_SEARCH_SETTINGS, "max_concurrent_requests", 20)
-    monkeypatch.setattr(rl.WEB_SEARCH_SETTINGS, "count", 1)
+    monkeypatch.setattr(CONFIG.web_search, "rps", 20)
+    monkeypatch.setattr(CONFIG.web_search, "max_concurrent_requests", 20)
+    monkeypatch.setattr(CONFIG.web_search, "count", 1)
 
     rate_limit = RateLimit(web_search_extractor=lambda _: True)
     user_limits = UserRateLimits(
         subscription_holder=random_id(),
-        day_limit=None,
-        hour_limit=None,
-        minute_limit=None,
         token_rate_limit=None,
-        web_search_day_limit=None,
-        web_search_hour_limit=None,
-        web_search_minute_limit=None,
+        rate_limits=RateLimits(
+            user_rate_limit_day=None,
+            user_rate_limit_hour=None,
+            user_rate_limit_minute=None,
+            web_search_rate_limit_day=None,
+            web_search_rate_limit_hour=None,
+            web_search_rate_limit_minute=None,
+            user_rate_limit=None,
+            web_search_rate_limit=None,
+        ),
     )
 
     async def run_guarded(i, times, t0):

@@ -14,7 +14,7 @@ from nilai_common.config import SETTINGS
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    client, rate_limit_command = await setup_redis_conn(config.REDIS_URL)
+    client, rate_limit_command = await setup_redis_conn(config.CONFIG.redis.url)
 
     yield {"redis": client, "redis_rate_limit_command": rate_limit_command}
 

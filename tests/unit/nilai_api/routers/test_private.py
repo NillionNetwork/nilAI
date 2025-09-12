@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-from nilai_api.db.users import UserModel
+from nilai_api.db.users import RateLimits, UserModel
 from nilai_common import AttestationReport
 
 from nilai_api.state import state
@@ -28,6 +28,8 @@ def mock_user():
     mock.completion_tokens_details = None
     mock.prompt_tokens_details = None
     mock.queries = 10
+    mock.rate_limits = RateLimits().get_effective_limits().model_dump_json()
+    mock.rate_limits_obj = RateLimits().get_effective_limits()
     return mock
 
 
@@ -62,7 +64,11 @@ def mock_user_manager(mock_user, mocker):
     mocker.patch.object(
         UserManager,
         "insert_user",
-        return_value={"userid": "test-user-id", "apikey": "test-api-key"},
+        return_value={
+            "userid": "test-user-id",
+            "apikey": "test-api-key",
+            "rate_limits": RateLimits().get_effective_limits().model_dump_json(),
+        },
     )
     mocker.patch.object(
         UserManager,
@@ -73,8 +79,16 @@ def mock_user_manager(mock_user, mocker):
         UserManager,
         "get_all_users",
         return_value=[
-            {"userid": "test-user-id", "apikey": "test-api-key"},
-            {"userid": "test-user-id-2", "apikey": "test-api-key"},
+            {
+                "userid": "test-user-id",
+                "apikey": "test-api-key",
+                "rate_limits": RateLimits().get_effective_limits().model_dump_json(),
+            },
+            {
+                "userid": "test-user-id-2",
+                "apikey": "test-api-key",
+                "rate_limits": RateLimits().get_effective_limits().model_dump_json(),
+            },
         ],
     )
     mocker.patch.object(QueryLogManager, "log_query")
@@ -83,7 +97,7 @@ def mock_user_manager(mock_user, mocker):
 
 
 @pytest.fixture
-def mock_state(mocker, event_loop):
+def mock_state(mocker):
     # Prepare expected models data
 
     expected_models = {"ABC": model_endpoint}
@@ -110,7 +124,8 @@ def mock_state(mocker, event_loop):
     )
     # Patch the get_attestation_report function
     mocker.patch(
-        "nilai_api.attestation.get_attestation_report",
+        "nilai_api.routers.private.get_attestation_report",
+        new_callable=AsyncMock,
         return_value=attestation_response,
     )
 

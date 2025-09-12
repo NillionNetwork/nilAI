@@ -189,6 +189,8 @@ def get_delegation_token(
     user_public_key: NilAuthPublicKey,
     usage_limit: int | None = None,
     expires_at: datetime.datetime | None = None,
+    document_id: str | None = None,
+    document_owner_did: str | None = None,
 ) -> DelegationToken:
     """
     Delegate the root token to the delegated key
@@ -200,6 +202,10 @@ def get_delegation_token(
     Returns:
         The delegation token
     """
+    if bool(document_id) != bool(document_owner_did):
+        raise ValueError(
+            f"If Document ID or document owner DID provided, the other must also be provided: Document ID: {document_id} Document Owner DID: {document_owner_did}"
+        )
 
     root_token_envelope = NucTokenEnvelope.parse(root_token.token)
     delegated_token = (
@@ -212,7 +218,13 @@ def get_delegation_token(
         )
         .audience(Did(user_public_key.serialize()))
         .command(Command(["nil", "ai", "generate"]))
-        .meta({"usage_limit": usage_limit})
+        .meta(
+            {
+                "usage_limit": usage_limit,
+                "document_id": document_id,
+                "document_owner_did": document_owner_did,
+            }
+        )
         .build(private_key)
     )
     return DelegationToken(token=delegated_token)

@@ -8,7 +8,7 @@ import httpx
 import trafilatura
 from fastapi import HTTPException, status
 
-from nilai_api.config import WEB_SEARCH_SETTINGS
+from nilai_api.config import CONFIG
 from nilai_common.api_model import (
     ChatRequest,
     MessageAdapter,
@@ -34,9 +34,9 @@ _BRAVE_API_HEADERS = {
 
 _BRAVE_API_PARAMS_BASE = {
     "summary": 1,
-    "count": WEB_SEARCH_SETTINGS.count,
-    "country": WEB_SEARCH_SETTINGS.country,
-    "lang": WEB_SEARCH_SETTINGS.lang,
+    "count": CONFIG.web_search.count,
+    "country": CONFIG.web_search.country,
+    "lang": CONFIG.web_search.lang,
 }
 
 
@@ -48,10 +48,8 @@ def _get_http_client() -> httpx.AsyncClient:
         An AsyncClient configured with timeouts and connection limits
     """
     return httpx.AsyncClient(
-        timeout=WEB_SEARCH_SETTINGS.timeout,
-        limits=httpx.Limits(
-            max_connections=WEB_SEARCH_SETTINGS.max_concurrent_requests
-        ),
+        timeout=CONFIG.web_search.timeout,
+        limits=httpx.Limits(max_connections=CONFIG.web_search.max_concurrent_requests),
     )
 
 
@@ -67,7 +65,7 @@ async def _make_brave_api_request(query: str) -> Dict[str, Any]:
     Raises:
         HTTPException: If API key is missing or API request fails
     """
-    if not WEB_SEARCH_SETTINGS.api_key:
+    if not CONFIG.web_search.api_key:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Missing BRAVE_SEARCH_API key in environment",
@@ -78,7 +76,7 @@ async def _make_brave_api_request(query: str) -> Dict[str, Any]:
     params = {**_BRAVE_API_PARAMS_BASE, "q": q}
     headers = {
         **_BRAVE_API_HEADERS,
-        "X-Subscription-Token": WEB_SEARCH_SETTINGS.api_key,
+        "X-Subscription-Token": CONFIG.web_search.api_key,
     }
 
     client = _get_http_client()
@@ -90,9 +88,7 @@ async def _make_brave_api_request(query: str) -> Dict[str, Any]:
         params.get("lang"),
         params.get("count"),
     )
-    resp = await client.get(
-        WEB_SEARCH_SETTINGS.api_path, headers=headers, params=params
-    )
+    resp = await client.get(CONFIG.web_search.api_path, headers=headers, params=params)
 
     if resp.status_code >= 400:
         logger.error("Brave API error: %s - %s", resp.status_code, resp.text)

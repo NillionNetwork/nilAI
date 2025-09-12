@@ -1,83 +1,64 @@
-import os
-from typing import List, Dict, Any, Optional
-import yaml
-from dotenv import load_dotenv
-from dataclasses import dataclass
-
-load_dotenv()
-
-ENVIRONMENT: str = os.getenv("ENVIRONMENT", "testnet")
-
-ETCD_HOST: str = os.getenv("ETCD_HOST", "localhost")
-ETCD_PORT: int = int(os.getenv("ETCD_PORT", 2379))
-
-
-REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379")
-
-DOCS_TOKEN: str | None = os.getenv("DOCS_TOKEN", None)
-
-DB_USER: str = os.getenv("POSTGRES_USER", "postgres")
-DB_PASS: str = os.getenv("POSTGRES_PASSWORD", "")
-DB_HOST: str = os.getenv("POSTGRES_HOST", "localhost")
-DB_PORT: int = int(os.getenv("POSTGRES_PORT", 5432))
-DB_NAME: str = os.getenv("POSTGRES_DB", "nilai_users")
+# Import all configuration models
+import json
+from .environment import EnvironmentConfig
+from .database import DatabaseConfig, EtcdConfig, RedisConfig
+from .auth import AuthConfig, DocsConfig
+from .nildb import NilDBConfig
+from .web_search import WebSearchSettings
+from .rate_limiting import RateLimitingConfig
+from .utils import create_config_model, CONFIG_DATA
+from pydantic import BaseModel
+import logging
 
 
-NILAUTH_TRUSTED_ROOT_ISSUERS: List[str] = os.getenv(
-    "NILAUTH_TRUSTED_ROOT_ISSUERS", ""
-).split(",")
+class NilAIConfig(BaseModel):
+    """Centralized configuration container for the Nilai API."""
 
-AUTH_STRATEGY: str = os.getenv("AUTH_STRATEGY", "api_key")
-
-
-# Web Search API configuration
-@dataclass
-class WebSearchSettings:
-    api_key: Optional[str] = None
-    api_path: str = "https://api.search.brave.com/res/v1/web/search"
-    count: int = 3
-    lang: str = "en"
-    country: str = "us"
-    timeout: float = 20.0
-    max_concurrent_requests: int = 20
-    rps: int = 20
-
-
-WEB_SEARCH_SETTINGS = WebSearchSettings(api_key=os.getenv("BRAVE_SEARCH_API"))
-
-# Default values
-USER_RATE_LIMIT_MINUTE: Optional[int] = 100
-USER_RATE_LIMIT_HOUR: Optional[int] = 1000
-USER_RATE_LIMIT_DAY: Optional[int] = 10000
-WEB_SEARCH_RATE_LIMIT_MINUTE: Optional[int] = 1
-WEB_SEARCH_RATE_LIMIT_HOUR: Optional[int] = 3
-WEB_SEARCH_RATE_LIMIT_DAY: Optional[int] = 72
-MODEL_CONCURRENT_RATE_LIMIT: Dict[str, int] = {}
-
-
-def load_config_from_yaml(config_path: str) -> Dict[str, Any]:
-    if os.path.exists(config_path):
-        with open(config_path, "r") as f:
-            return yaml.safe_load(f)
-    return {}
-
-
-config_file: str = "config.yaml"
-config_path = os.path.join(os.path.dirname(__file__), config_file)
-
-if not os.path.exists(config_path):
-    config_file = "config.yaml"
-    config_path = os.path.join(os.path.dirname(__file__), config_file)
-
-config_data = load_config_from_yaml(config_path)
-
-# Overwrite with values from yaml
-if config_data:
-    USER_RATE_LIMIT_MINUTE = config_data.get(
-        "user_rate_limit_minute", USER_RATE_LIMIT_MINUTE
+    environment: EnvironmentConfig = create_config_model(
+        EnvironmentConfig, "", CONFIG_DATA
     )
-    USER_RATE_LIMIT_HOUR = config_data.get("user_rate_limit_hour", USER_RATE_LIMIT_HOUR)
-    USER_RATE_LIMIT_DAY = config_data.get("user_rate_limit_day", USER_RATE_LIMIT_DAY)
-    MODEL_CONCURRENT_RATE_LIMIT = config_data.get(
-        "model_concurrent_rate_limit", MODEL_CONCURRENT_RATE_LIMIT
+    database: DatabaseConfig = create_config_model(
+        DatabaseConfig, "database", CONFIG_DATA, "POSTGRES_"
     )
+    etcd: EtcdConfig = create_config_model(EtcdConfig, "etcd", CONFIG_DATA, "ETCD_")
+    redis: RedisConfig = create_config_model(
+        RedisConfig, "redis", CONFIG_DATA, "REDIS_"
+    )
+    auth: AuthConfig = create_config_model(AuthConfig, "auth", CONFIG_DATA)
+    docs: DocsConfig = create_config_model(DocsConfig, "docs", CONFIG_DATA, "DOCS_")
+    web_search: WebSearchSettings = create_config_model(
+        WebSearchSettings, "web_search", CONFIG_DATA, "WEB_SEARCH_"
+    )
+    rate_limiting: RateLimitingConfig = create_config_model(
+        RateLimitingConfig, "rate_limiting", CONFIG_DATA
+    )
+    nildb: NilDBConfig = create_config_model(
+        NilDBConfig, "nildb", CONFIG_DATA, "NILDB_"
+    )
+
+    def prettify(self):
+        """Print the config in a pretty format removing passwords and other sensitive information"""
+        config_dict = self.model_dump()
+        keywords = ["pass", "token", "key"]
+        for key, value in config_dict.items():
+            if isinstance(value, str):
+                for keyword in keywords:
+                    print(key, keyword, keyword in key)
+                    if keyword in key and value is not None:
+                        config_dict[key] = "***************"
+            if isinstance(value, dict):
+                for k, v in value.items():
+                    for keyword in keywords:
+                        if keyword in k and v is not None:
+                            value[k] = "***************"
+        return json.dumps(config_dict, indent=4)
+
+
+# Global config instance
+CONFIG = NilAIConfig()
+__all__ = [
+    # Main config object
+    "CONFIG"
+]
+
+logging.info(CONFIG.prettify())

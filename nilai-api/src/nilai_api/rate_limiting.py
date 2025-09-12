@@ -2,8 +2,9 @@ import asyncio
 from asyncio import iscoroutine
 from typing import Callable, Tuple, Awaitable, Annotated
 
+from nilai_api.db.users import RateLimits
 from pydantic import BaseModel
-from nilai_api.config import WEB_SEARCH_SETTINGS
+from nilai_api.config import CONFIG
 
 from fastapi.params import Depends
 from fastapi import status, HTTPException, Request
@@ -14,7 +15,7 @@ from nilai_api.auth import get_auth_info, AuthenticationInfo, TokenRateLimits
 LUA_RATE_LIMIT_SCRIPT = """
 local key = KEYS[1]
 local limit = tonumber(ARGV[1])
-local expire_time = ARGV[2]
+local expire_time = tonumber(ARGV[2])
 
 local current = tonumber(redis.call('get', key) or "0")
 if current > 0 then
@@ -25,14 +26,17 @@ if current > 0 then
         return 0
     end
 else
-    redis.call("SET", key, 1, "px", expire_time)
+    if expire_time > 0 then
+        redis.call("SET", key, 1, "px", expire_time)
+    else
+        redis.call("SET", key, 1)
+    end
     return 0
 end
 """
-
-DAY_MS = 24 * 60 * 60 * 1000
-HOUR_MS = 60 * 60 * 1000
 MINUTE_MS = 60 * 1000
+HOUR_MS = 60 * MINUTE_MS
+DAY_MS = 24 * HOUR_MS
 
 
 async def setup_redis_conn(redis_url):
@@ -50,13 +54,8 @@ async def _extract_coroutine_result(maybe_future, request: Request):
 
 class UserRateLimits(BaseModel):
     subscription_holder: str
-    day_limit: int | None
-    hour_limit: int | None
-    minute_limit: int | None
     token_rate_limit: TokenRateLimits | None
-    web_search_day_limit: int | None
-    web_search_hour_limit: int | None
-    web_search_minute_limit: int | None
+    rate_limits: RateLimits
 
 
 def get_user_limits(
@@ -70,13 +69,8 @@ def get_user_limits(
     # So we use the apikey as the id
     return UserRateLimits(
         subscription_holder=auth_info.user.apikey,
-        day_limit=auth_info.user.ratelimit_day,
-        hour_limit=auth_info.user.ratelimit_hour,
-        minute_limit=auth_info.user.ratelimit_minute,
         token_rate_limit=auth_info.token_rate_limit,
-        web_search_day_limit=auth_info.user.web_search_ratelimit_day,
-        web_search_hour_limit=auth_info.user.web_search_ratelimit_hour,
-        web_search_minute_limit=auth_info.user.web_search_ratelimit_minute,
+        rate_limits=auth_info.user.rate_limits,
     )
 
 
@@ -113,22 +107,30 @@ class RateLimit:
             redis,
             redis_rate_limit_command,
             f"minute:{user_limits.subscription_holder}",
-            user_limits.minute_limit,
+            user_limits.rate_limits.user_rate_limit_minute,
             MINUTE_MS,
         )
         await self.check_bucket(
             redis,
             redis_rate_limit_command,
             f"hour:{user_limits.subscription_holder}",
-            user_limits.hour_limit,
+            user_limits.rate_limits.user_rate_limit_hour,
             HOUR_MS,
         )
         await self.check_bucket(
             redis,
             redis_rate_limit_command,
             f"day:{user_limits.subscription_holder}",
-            user_limits.day_limit,
+            user_limits.rate_limits.user_rate_limit_day,
             DAY_MS,
+        )
+
+        await self.check_bucket(
+            redis,
+            redis_rate_limit_command,
+            f"user:{user_limits.subscription_holder}",
+            user_limits.rate_limits.user_rate_limit,
+            0,  # No expiration for for-good rate limit
         )
 
         if (
@@ -156,11 +158,11 @@ class RateLimit:
 
             if web_search_enabled:
                 allowed_rps = min(
-                    WEB_SEARCH_SETTINGS.rps,
+                    CONFIG.web_search.rps,
                     max(
                         1,
-                        WEB_SEARCH_SETTINGS.max_concurrent_requests
-                        // WEB_SEARCH_SETTINGS.count,
+                        CONFIG.web_search.max_concurrent_requests
+                        // CONFIG.web_search.count,
                     ),
                 )
                 await self.wait_for_bucket(
@@ -170,10 +172,27 @@ class RateLimit:
                     allowed_rps,
                     1000,
                 )
+
+                await self.check_bucket(
+                    redis,
+                    redis_rate_limit_command,
+                    f"web_search:{user_limits.subscription_holder}",
+                    user_limits.rate_limits.web_search_rate_limit,
+                    0,  # No expiration for for-good rate limit
+                )
+
                 web_search_limits = [
-                    (user_limits.web_search_minute_limit, MINUTE_MS, "minute"),
-                    (user_limits.web_search_hour_limit, HOUR_MS, "hour"),
-                    (user_limits.web_search_day_limit, DAY_MS, "day"),
+                    (
+                        user_limits.rate_limits.web_search_rate_limit_minute,
+                        MINUTE_MS,
+                        "minute",
+                    ),
+                    (
+                        user_limits.rate_limits.web_search_rate_limit_hour,
+                        HOUR_MS,
+                        "hour",
+                    ),
+                    (user_limits.rate_limits.web_search_rate_limit_day, DAY_MS, "day"),
                 ]
 
                 for limit, milliseconds, time_unit in web_search_limits:

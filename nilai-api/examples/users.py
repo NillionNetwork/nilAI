@@ -30,6 +30,7 @@ async def main():
         model="gpt-3.5-turbo",
         prompt_tokens=8,
         completion_tokens=7,
+        web_search_calls=1,
     )
 
 

@@ -205,9 +205,16 @@ def restore_files_variable(output_file, files_placeholder):
     print("Restored ${FILES} variable")
 
 
-def process_compose_yaml(output_file):
+def process_compose_yaml(output_file, preserve_volumes=False):
     """Process the compose YAML file to remove volumes and convert bind mount formats"""
-    print("Processing compose YAML for volume removal and bind mount conversions...")
+    if preserve_volumes:
+        print(
+            "Processing compose YAML for bind mount conversions (preserving volumes)..."
+        )
+    else:
+        print(
+            "Processing compose YAML for volume removal and bind mount conversions..."
+        )
 
     with open(output_file, "r") as f:
         content = f.read()
@@ -216,8 +223,8 @@ def process_compose_yaml(output_file):
         # Parse YAML
         compose_data = yaml.safe_load(content)
 
-        # Remove global volumes section entirely
-        if "volumes" in compose_data:
+        # Remove global volumes section entirely (unless preserving volumes)
+        if "volumes" in compose_data and not preserve_volumes:
             print("Removing global volumes section...")
             del compose_data["volumes"]
 
@@ -245,11 +252,15 @@ def process_compose_yaml(output_file):
                                 else:
                                     new_volumes.append(f"{source}:{target}")
                             elif volume.get("type") == "volume":
-                                # Remove volume mounts entirely
-                                print(
-                                    f"Removing volume mount from service {service_name}: {volume}"
-                                )
-                                continue
+                                if preserve_volumes:
+                                    # Keep volume mounts when preserving volumes
+                                    new_volumes.append(volume)
+                                else:
+                                    # Remove volume mounts entirely
+                                    print(
+                                        f"Removing volume mount from service {service_name}: {volume}"
+                                    )
+                                    continue
                             else:
                                 # Keep other types as-is
                                 new_volumes.append(volume)
@@ -267,17 +278,25 @@ def process_compose_yaml(output_file):
                                     # It's a bind mount (absolute path, relative path, or variable)
                                     new_volumes.append(volume)
                                 else:
-                                    # It's a volume mount (named volume)
+                                    if preserve_volumes:
+                                        # Keep volume mount when preserving volumes
+                                        new_volumes.append(volume)
+                                    else:
+                                        # It's a volume mount (named volume)
+                                        print(
+                                            f"Removing volume mount from service {service_name}: {volume}"
+                                        )
+                                        continue
+                            else:
+                                if preserve_volumes:
+                                    # Keep volume mount when preserving volumes
+                                    new_volumes.append(volume)
+                                else:
+                                    # Single name without colon - likely a volume mount
                                     print(
                                         f"Removing volume mount from service {service_name}: {volume}"
                                     )
                                     continue
-                            else:
-                                # Single name without colon - likely a volume mount
-                                print(
-                                    f"Removing volume mount from service {service_name}: {volume}"
-                                )
-                                continue
                     if new_volumes:
                         service_config["volumes"] = new_volumes
                     else:
@@ -370,7 +389,7 @@ def main():
             restore_files_variable(args.output, files_placeholder)
 
             # Process YAML for volume and mount conversions
-            process_compose_yaml(args.output)
+            process_compose_yaml(args.output, preserve_volumes=args.dev)
         else:
             # Generate config and apply modifications
             temp_file = f"{args.output}.tmp"
@@ -385,7 +404,7 @@ def main():
             restore_files_variable(args.output, files_placeholder)
 
             # Process YAML for volume and mount conversions
-            process_compose_yaml(args.output)
+            process_compose_yaml(args.output, preserve_volumes=args.dev)
 
             # Apply image substitutions
             apply_image_substitutions(args.output, image_substitutions)
