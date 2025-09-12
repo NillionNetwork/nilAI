@@ -47,9 +47,10 @@ class RateLimits(BaseModel):
             or CONFIG.rate_limiting.web_search_rate_limit_hour,
             web_search_rate_limit_minute=self.web_search_rate_limit_minute
             or CONFIG.rate_limiting.web_search_rate_limit_minute,
-            # Set defaults for for_good limits (you can adjust these as needed)
-            user_rate_limit=self.user_rate_limit or 1000,
-            web_search_rate_limit=self.web_search_rate_limit or 100,
+            user_rate_limit=self.user_rate_limit
+            or CONFIG.rate_limiting.user_rate_limit,
+            web_search_rate_limit=self.web_search_rate_limit
+            or CONFIG.rate_limiting.user_rate_limit,
         )
 
 
