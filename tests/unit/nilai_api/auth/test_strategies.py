@@ -5,7 +5,7 @@ from fastapi import HTTPException
 
 from nilai_api.auth.strategies import api_key_strategy, jwt_strategy, nuc_strategy
 from nilai_api.auth.common import AuthenticationInfo, PromptDocument
-from nilai_api.db.users import UserModel
+from nilai_api.db.users import RateLimits, UserModel
 
 
 class TestAuthStrategies:
@@ -23,12 +23,8 @@ class TestAuthStrategies:
         mock.queries = 0
         mock.signup_date = datetime.now(timezone.utc)
         mock.last_activity = datetime.now(timezone.utc)
-        mock.ratelimit_day = 1000
-        mock.ratelimit_hour = 1000
-        mock.ratelimit_minute = 1000
-        mock.web_search_ratelimit_day = 100
-        mock.web_search_ratelimit_hour = 50
-        mock.web_search_ratelimit_minute = 10
+        mock.rate_limits = RateLimits().get_effective_limits().model_dump_json()
+        mock.rate_limits_obj = RateLimits().get_effective_limits()
         return mock
 
     @pytest.fixture
@@ -256,12 +252,10 @@ class TestAuthStrategies:
         mock_user_model.queries = 0
         mock_user_model.signup_date = datetime.now(timezone.utc)
         mock_user_model.last_activity = datetime.now(timezone.utc)
-        mock_user_model.ratelimit_day = 1000
-        mock_user_model.ratelimit_hour = 1000
-        mock_user_model.ratelimit_minute = 1000
-        mock_user_model.web_search_ratelimit_day = 100
-        mock_user_model.web_search_ratelimit_hour = 50
-        mock_user_model.web_search_ratelimit_minute = 10
+        mock_user_model.rate_limits = (
+            RateLimits().get_effective_limits().model_dump_json()
+        )
+        mock_user_model.rate_limits_obj = RateLimits().get_effective_limits()
 
         # Test API key strategy
         with patch("nilai_api.auth.strategies.UserManager.check_api_key") as mock_check:

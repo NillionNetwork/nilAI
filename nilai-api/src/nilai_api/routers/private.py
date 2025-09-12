@@ -356,6 +356,7 @@ async def chat_completion(
                     model=req.model,
                     prompt_tokens=prompt_token_usage,
                     completion_tokens=completion_token_usage,
+                    web_search_calls=len(sources) if sources else 0,
                 )
                 logger.info(
                     f"[chat] stream done request_id={request_id} prompt_tokens={prompt_token_usage} completion_tokens={completion_token_usage} duration_ms={(time.monotonic() - t_call) * 1000:.0f} total_ms={(time.monotonic() - t_start) * 1000:.0f}"
@@ -414,6 +415,7 @@ async def chat_completion(
         model=req.model,
         prompt_tokens=model_response.usage.prompt_tokens,
         completion_tokens=model_response.usage.completion_tokens,
+        web_search_calls=len(sources) if sources else 0,
     )
 
     # Sign the response

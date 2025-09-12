@@ -26,6 +26,7 @@ class QueryLog(Base):
     prompt_tokens: int = Column(Integer, nullable=False)  # type: ignore
     completion_tokens: int = Column(Integer, nullable=False)  # type: ignore
     total_tokens: int = Column(Integer, nullable=False)  # type: ignore
+    web_search_calls: int = Column(Integer, nullable=False)  # type: ignore
 
     def __repr__(self):
         return f"<QueryLog(userid={self.userid}, query_timestamp={self.query_timestamp}, total_tokens={self.total_tokens})>"
@@ -34,7 +35,11 @@ class QueryLog(Base):
 class QueryLogManager:
     @staticmethod
     async def log_query(
-        userid: str, model: str, prompt_tokens: int, completion_tokens: int
+        userid: str,
+        model: str,
+        prompt_tokens: int,
+        completion_tokens: int,
+        web_search_calls: int,
     ):
         """
         Log a user's query.
@@ -56,6 +61,7 @@ class QueryLogManager:
                     completion_tokens=completion_tokens,
                     total_tokens=total_tokens,
                     query_timestamp=datetime.now(timezone.utc),
+                    web_search_calls=web_search_calls,
                 )
                 session.add(query_log)
                 await session.commit()

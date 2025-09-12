@@ -1,7 +1,7 @@
 import asyncio
 import json
 
-from nilai_api.db.users import UserManager
+from nilai_api.db.users import RateLimits, UserManager, UserModel
 import click
 
 
@@ -12,6 +12,19 @@ import click
 @click.option("--ratelimit-day", type=int, help="number of request per day")
 @click.option("--ratelimit-hour", type=int, help="number of request per hour")
 @click.option("--ratelimit-minute", type=int, help="number of request per minute")
+@click.option(
+    "--web-search-ratelimit-day", type=int, help="number of web search request per day"
+)
+@click.option(
+    "--web-search-ratelimit-hour",
+    type=int,
+    help="number of web search request per hour",
+)
+@click.option(
+    "--web-search-ratelimit-minute",
+    type=int,
+    help="number of web search request per minute",
+)
 def main(
     name,
     apikey: str | None,
@@ -19,24 +32,35 @@ def main(
     ratelimit_day: int | None,
     ratelimit_hour: int | None,
     ratelimit_minute: int | None,
+    web_search_ratelimit_day: int | None,
+    web_search_ratelimit_hour: int | None,
+    web_search_ratelimit_minute: int | None,
 ):
     async def add_user():
-        user = await UserManager.insert_user(
+        user: UserModel = await UserManager.insert_user(
             name,
             apikey,
             userid,
-            ratelimit_day,
-            ratelimit_hour,
-            ratelimit_minute,
+            RateLimits(
+                user_rate_limit_day=ratelimit_day,
+                user_rate_limit_hour=ratelimit_hour,
+                user_rate_limit_minute=ratelimit_minute,
+                web_search_rate_limit_day=web_search_ratelimit_day,
+                web_search_rate_limit_hour=web_search_ratelimit_hour,
+                web_search_rate_limit_minute=web_search_ratelimit_minute,
+            ),
         )
         json_user = json.dumps(
             {
                 "userid": user.userid,
                 "name": user.name,
                 "apikey": user.apikey,
-                "ratelimit_day": user.ratelimit_day,
-                "ratelimit_hour": user.ratelimit_hour,
-                "ratelimit_minute": user.ratelimit_minute,
+                "ratelimit_day": user.rate_limits_obj.user_rate_limit_day,
+                "ratelimit_hour": user.rate_limits_obj.user_rate_limit_hour,
+                "ratelimit_minute": user.rate_limits_obj.user_rate_limit_minute,
+                "web_search_ratelimit_day": user.rate_limits_obj.web_search_rate_limit_day,
+                "web_search_ratelimit_hour": user.rate_limits_obj.web_search_rate_limit_hour,
+                "web_search_ratelimit_minute": user.rate_limits_obj.web_search_rate_limit_minute,
             },
             indent=4,
         )

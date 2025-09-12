@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
+import logging
 from unittest.mock import MagicMock
 
+from nilai_api.db.users import RateLimits
 import pytest
 from fastapi import HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
@@ -34,9 +36,8 @@ def mock_user_model():
     mock.queries = 0
     mock.signup_date = datetime.now(timezone.utc)
     mock.last_activity = datetime.now(timezone.utc)
-    mock.ratelimit_day = 1000
-    mock.ratelimit_hour = 1000
-    mock.ratelimit_minute = 1000
+    mock.rate_limits = RateLimits().get_effective_limits().model_dump_json()
+    mock.rate_limits_obj = RateLimits().get_effective_limits()
     return mock
 
 
@@ -44,6 +45,7 @@ def mock_user_model():
 def mock_user_data(mock_user_model):
     from nilai_api.db.users import UserData
 
+    logging.info(mock_user_model.rate_limits)
     return UserData.from_sqlalchemy(mock_user_model)
 
 
