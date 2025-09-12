@@ -191,10 +191,6 @@ class WebSearchContext(BaseModel):
     sources: List[Source]
 
 
-# Common source-type identifier for recording the original query used in web search
-WEB_SEARCH_QUERY_SOURCE = "web_search_query"
-
-
 # ---------- Request/response models ----------
 class ChatRequest(BaseModel):
     model: str

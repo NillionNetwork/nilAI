@@ -20,10 +20,12 @@ from nilai_common.api_model import (
     TopicResponse,
     Topic,
     TopicQuery,
-    WEB_SEARCH_QUERY_SOURCE,
 )
 
 logger = logging.getLogger(__name__)
+
+# Common source-type identifier for recording the original query used in web search
+WEB_SEARCH_QUERY_SOURCE = "web_search_query"
 
 _BRAVE_API_HEADERS = {
     "Api-Version": "2023-10-11",
@@ -142,6 +144,15 @@ def _parse_brave_results(data: Dict[str, Any]) -> List[SearchResult]:
 
 
 def _format_search_results(results: List[SearchResult]) -> str:
+    """Format search results into a readable, indexed text block.
+
+    Args:
+        results: List of SearchResult items to include in the output.
+
+    Returns:
+        A newline-joined string where each entry contains an index, title,
+        URL, and content snippet suitable for inclusion in a system prompt.
+    """
     lines = [
         f"[{idx}] {r.title}\nURL: {r.url}\nContent: {r.body}"
         for idx, r in enumerate(results, start=1)
@@ -263,7 +274,7 @@ async def enhance_messages_with_web_search(
 
 
 async def generate_search_query_from_llm(
-    user_message: str, model_name: str, client, *, topic: str | None = None
+    user_message: str, model_name: str, client: Any, *, topic: str | None = None
 ) -> str:
     """
     Use the LLM to produce a concise, high-recall search query.
@@ -327,8 +338,24 @@ async def generate_search_query_from_llm(
 
 
 async def handle_web_search(
-    req_messages: ChatRequest, model_name: str, client
+    req_messages: ChatRequest, model_name: str, client: Any
 ) -> WebSearchEnhancedMessages:
+    """Handle web search enhancement for a conversation.
+
+    Analyzes the user's message to identify topics that require web search,
+    generates optimized search queries for each topic using an LLM, and
+    enhances the conversation with relevant web search results. Falls back
+    to single-query search if topic analysis fails or no topics need search.
+
+    Args:
+        req_messages: ChatRequest containing conversation messages to process
+        model_name: Name of the LLM model to use for query generation
+        client: LLM client instance for making API calls
+
+    Returns:
+        WebSearchEnhancedMessages with web search context added, or original
+        messages if no user query is found or search fails
+    """
     logger.info("Handle web search start")
     logger.debug(
         "Handle web search messages_in=%d model=%s",
@@ -403,7 +430,7 @@ async def handle_web_search(
 
 
 async def analyze_web_search_topics(
-    user_message: str, model_name: str, client
+    user_message: str, model_name: str, client: Any
 ) -> List[Topic]:
     """Use the LLM to identify topics and whether each needs web search.
 
@@ -456,18 +483,18 @@ async def enhance_messages_with_multi_web_search(
     sections: List[str] = []
     all_sources: List[Source] = []
 
-    for idx, (tq, ctx) in enumerate(zip(topic_queries, contexts), start=1):
-        topic = tq.topic.strip()
-        query = tq.query.strip()
+    for idx, (topic_query, context) in enumerate(zip(topic_queries, contexts), start=1):
+        topic = topic_query.topic.strip()
+        query = topic_query.query.strip()
         if not query:
             continue
 
         all_sources.append(Source(source=WEB_SEARCH_QUERY_SOURCE, content=query))
 
         header = f'Topic {idx}: {topic}\nQuery: "{query}"\n\nWeb Search Results:\n'
-        block = ctx.prompt.strip() if ctx.prompt else "(no results)"
+        block = context.prompt.strip() if context.prompt else "(no results)"
         sections.append(header + block)
-        all_sources.extend(ctx.sources)
+        all_sources.extend(context.sources)
 
     if not sections:
         return WebSearchEnhancedMessages(messages=req.messages, sources=[])
