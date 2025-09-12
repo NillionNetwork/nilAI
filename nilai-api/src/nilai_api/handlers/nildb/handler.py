@@ -1,5 +1,5 @@
 from typing import Optional
-from nilai_api.handlers.nildb.config import CONFIG
+from nilai_api.config import CONFIG
 
 from secretvaults import SecretVaultBuilderClient, SecretVaultUserClient
 from secretvaults.common.keypair import Keypair
@@ -31,13 +31,13 @@ async def create_builder_client():
         return BUILDER_CLIENT
 
     # Create keypair from private key
-    keypair = Keypair.from_hex(CONFIG.BUILDER_PRIVATE_KEY)
+    keypair = Keypair.from_hex(CONFIG.nildb.builder_private_key)
 
     # Prepare URLs for the builder client
     urls = {
-        "chain": [CONFIG.NILCHAIN_URL],
-        "auth": CONFIG.NILAUTH_URL,
-        "dbs": CONFIG.NODES,
+        "chain": [CONFIG.nildb.nilchain_url],
+        "auth": CONFIG.nildb.nilauth_url,
+        "dbs": CONFIG.nildb.nodes,
     }
 
     # Create SecretVaultBuilderClient with proper initialization
@@ -62,10 +62,10 @@ async def create_user_client() -> SecretVaultUserClient:
         return USER_CLIENT
 
     # Create keypair from private key
-    keypair = Keypair.from_hex(CONFIG.BUILDER_PRIVATE_KEY)
+    keypair = Keypair.from_hex(CONFIG.nildb.builder_private_key)
     USER_CLIENT = await SecretVaultUserClient.from_options(
         keypair=keypair,
-        base_urls=CONFIG.NODES,
+        base_urls=CONFIG.nildb.nodes,
         blindfold=BlindfoldFactoryConfig(
             operation=BlindfoldOperation.STORE, use_cluster_key=True
         ),
@@ -102,7 +102,7 @@ async def get_nildb_delegation_token(user_did: str) -> PromptDelegationToken:
 async def get_prompt_from_nildb(prompt_document: PromptDocument) -> str:
     """Read a specific document - core functionality"""
     read_params = ReadDataRequestParams(
-        collection=CONFIG.COLLECTION,
+        collection=CONFIG.nildb.collection,
         document=Uuid(prompt_document.document_id),
         subject=Uuid(prompt_document.owner_did),
     )

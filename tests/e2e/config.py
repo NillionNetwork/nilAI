@@ -1,23 +1,28 @@
-import os
 from .nuc import get_nuc_token
+from nilai_api.config import CONFIG
 
-ENVIRONMENT = os.getenv("ENVIRONMENT", "ci")
+ENVIRONMENT = CONFIG.environment.environment
 # Left for API key for backwards compatibility
-AUTH_TOKEN = os.getenv("AUTH_TOKEN", "")
-AUTH_STRATEGY = os.getenv("AUTH_STRATEGY", "nuc")
+AUTH_TOKEN = CONFIG.auth.auth_token
+AUTH_STRATEGY = CONFIG.auth.auth_strategy
 
 match AUTH_STRATEGY:
     case "nuc":
         BASE_URL = "https://localhost/nuc/v1"
-
-        def api_key_getter():
-            return get_nuc_token().token
     case "api_key":
         BASE_URL = "https://localhost/v1"
-
-        def api_key_getter():
-            return AUTH_TOKEN
     case _:
+        raise ValueError(f"Invalid AUTH_STRATEGY: {AUTH_STRATEGY}")
+
+
+def api_key_getter() -> str:
+    if AUTH_STRATEGY == "nuc":
+        return get_nuc_token().token
+    elif AUTH_STRATEGY == "api_key":
+        if AUTH_TOKEN is None:
+            raise ValueError("Expected AUTH_TOKEN to be set")
+        return AUTH_TOKEN
+    else:
         raise ValueError(f"Invalid AUTH_STRATEGY: {AUTH_STRATEGY}")
 
 

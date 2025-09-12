@@ -26,7 +26,7 @@ dev = [
     "uvicorn>=0.32.1",
     "pytest-asyncio>=0.25.0",
     "testcontainers>=4.9.1",
-    "pyright>=1.1.400",
+    "pyright>=1.1.405",
     "pre-commit>=4.1.0",
     "httpx>=0.28.1",
 ]
@@ -47,7 +47,7 @@ nilai-api = { workspace = true }
 nilai-models = { workspace = true }
 nuc-helpers = { workspace = true }
 [tool.pyright]
-exclude = [".venv"]
+exclude = ["**/.venv", "**/.venv/**"]
 
 [tool.ruff]
-exclude = [".venv"]
+exclude = ["**/.venv", "**/.venv/**"]

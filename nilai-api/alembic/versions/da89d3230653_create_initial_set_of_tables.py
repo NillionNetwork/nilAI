@@ -10,11 +10,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
-from nilai_api.config import (
-    USER_RATE_LIMIT_MINUTE,
-    USER_RATE_LIMIT_HOUR,
-    USER_RATE_LIMIT_DAY,
-)
+from nilai_api.config import CONFIG
 
 
 # revision identifiers, used by Alembic.
@@ -39,15 +35,21 @@ def upgrade() -> None:
         ),
         sa.Column("last_activity", sa.DateTime, nullable=True),
         sa.Column(
-            "ratelimit_day", sa.Integer, default=USER_RATE_LIMIT_DAY, nullable=True
+            "ratelimit_day",
+            sa.Integer,
+            default=CONFIG.rate_limiting.user_rate_limit_day,
+            nullable=True,
         ),
         sa.Column(
-            "ratelimit_hour", sa.Integer, default=USER_RATE_LIMIT_HOUR, nullable=True
+            "ratelimit_hour",
+            sa.Integer,
+            default=CONFIG.rate_limiting.user_rate_limit_hour,
+            nullable=True,
         ),
         sa.Column(
             "ratelimit_minute",
             sa.Integer,
-            default=USER_RATE_LIMIT_MINUTE,
+            default=CONFIG.rate_limiting.user_rate_limit_minute,
             nullable=True,
         ),
     )

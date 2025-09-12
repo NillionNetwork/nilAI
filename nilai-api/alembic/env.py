@@ -11,7 +11,7 @@ from alembic import context
 from nilai_api.db import Base
 from nilai_api.db.users import UserModel
 from nilai_api.db.logs import QueryLog
-import nilai_api.config as nilai_config
+from nilai_api.config import CONFIG as nilai_config
 
 # If we don't use the models, they remain unused, and the migration fails
 # This is a workaround to ensure the models are loaded
@@ -93,12 +93,12 @@ def run_migrations_online() -> None:
 
 
 load_dotenv()
-db_host = nilai_config.DB_HOST
+db_host = nilai_config.database.host
 if db_host:
-    db_port = nilai_config.DB_PORT
-    db_user = nilai_config.DB_USER
-    db_pass = nilai_config.DB_PASS
-    db_name = nilai_config.DB_NAME
+    db_port = nilai_config.database.port
+    db_user = nilai_config.database.user
+    db_pass = nilai_config.database.password
+    db_name = nilai_config.database.db
     config.set_main_option(
         "sqlalchemy.url",
         f"postgresql+asyncpg://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}",

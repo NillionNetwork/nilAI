@@ -35,6 +35,7 @@ def _create_openai_client(api_key: str) -> OpenAI:
 def client():
     """Create an OpenAI client configured to use the Nilai API"""
     invocation_token: str = api_key_getter()
+
     return _create_openai_client(invocation_token)
 
 

@@ -5,10 +5,10 @@ import pytest
 from fastapi import HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
 
-import nilai_api.config as config
+from nilai_api.config import CONFIG as config
 
 # For these tests, we will use the api_key strategy
-config.AUTH_STRATEGY = "api_key"
+config.auth.auth_strategy = "api_key"
 
 
 @pytest.fixture

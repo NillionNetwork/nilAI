@@ -3,7 +3,7 @@ import time
 from asyncio import Semaphore
 from typing import Dict, Optional
 
-from nilai_api import config
+from nilai_api.config import CONFIG
 from nilai_api.crypto import generate_key_pair
 from nilai_common import ModelServiceDiscovery
 from nilai_common.api_model import ModelEndpoint
@@ -17,7 +17,7 @@ class AppState:
         self.sem = Semaphore(2)
 
         self.discovery_service = ModelServiceDiscovery(
-            host=config.ETCD_HOST, port=config.ETCD_PORT
+            host=CONFIG.etcd.host, port=CONFIG.etcd.port
         )
         self._uptime = time.time()
 

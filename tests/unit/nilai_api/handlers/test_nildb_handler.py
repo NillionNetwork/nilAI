@@ -18,11 +18,14 @@ class TestNilDBHandler:
     def mock_config(self):
         """Mock configuration for tests"""
         with patch("nilai_api.handlers.nildb.handler.CONFIG") as mock_config:
-            mock_config.NILCHAIN_URL = "http://test-nilchain.com"
-            mock_config.NILAUTH_URL = "http://test-nilauth.com"
-            mock_config.NODES = ["http://node1.com", "http://node2.com"]
-            mock_config.BUILDER_PRIVATE_KEY = "0x1234567890abcdef"
-            mock_config.COLLECTION = Uuid("12345678-1234-1234-1234-123456789012")
+            # Mock the nested nildb config structure
+            mock_nildb = MagicMock()
+            mock_nildb.nilchain_url = "http://test-nilchain.com"
+            mock_nildb.nilauth_url = "http://test-nilauth.com"
+            mock_nildb.nodes = ["http://node1.com", "http://node2.com"]
+            mock_nildb.builder_private_key = "0x1234567890abcdef"
+            mock_nildb.collection = Uuid("12345678-1234-1234-1234-123456789012")
+            mock_config.nildb = mock_nildb
             yield mock_config
 
     @pytest.fixture
@@ -85,7 +88,7 @@ class TestNilDBHandler:
             result = await create_builder_client()
 
             mock_keypair_from_hex.assert_called_once_with(
-                mock_config.BUILDER_PRIVATE_KEY
+                mock_config.nildb.builder_private_key
             )
             mock_from_options.assert_called_once()
             mock_client.refresh_root_token.assert_called_once()
@@ -113,7 +116,7 @@ class TestNilDBHandler:
             result = await create_user_client()
 
             mock_keypair_from_hex.assert_called_once_with(
-                mock_config.BUILDER_PRIVATE_KEY
+                mock_config.nildb.builder_private_key
             )
             mock_from_options.assert_called_once()
             assert result == mock_client

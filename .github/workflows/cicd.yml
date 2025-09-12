@@ -51,11 +51,13 @@ jobs:
           sed -i 's/HF_TOKEN=.*/HF_TOKEN=dummy_token/' .env
           sed -i 's/BRAVE_SEARCH_API=.*/BRAVE_SEARCH_API=dummy_api/' .env
 
+      - name: pyright
+        run: uv run pyright
+
       - name: Run tests
         run: uv run pytest -v tests/unit
 
-      - name: pyright
-        run: uv run pyright
+
 
   start-runner:
     name: Start self-hosted EC2 runner
@@ -252,6 +254,7 @@ jobs:
         run: |
           set -e
           export ENVIRONMENT=ci
+          export AUTH_STRATEGY=nuc
           uv run pytest -v tests/e2e
 
       - name: Run E2E tests for API Key

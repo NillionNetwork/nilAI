@@ -33,7 +33,7 @@ async def test_perform_web_search_async_success():
     }
 
     with (
-        patch("nilai_api.handlers.web_search.WEB_SEARCH_SETTINGS.api_key", "test-key"),
+        patch("nilai_api.config.CONFIG.web_search.api_key", "test-key"),
         patch(
             "nilai_api.handlers.web_search._make_brave_api_request",
             return_value=mock_data,
@@ -61,7 +61,7 @@ async def test_perform_web_search_async_no_results():
     mock_data = {"web": {"results": []}}
 
     with (
-        patch("nilai_api.handlers.web_search.WEB_SEARCH_SETTINGS.api_key", "test-key"),
+        patch("nilai_api.handlers.web_search.CONFIG.web_search.api_key", "test-key"),
         patch(
             "nilai_api.handlers.web_search._make_brave_api_request",
             return_value=mock_data,
@@ -101,7 +101,7 @@ async def test_perform_web_search_async_concurrent_queries():
     }
 
     with (
-        patch("nilai_api.handlers.web_search.WEB_SEARCH_SETTINGS.api_key", "test-key"),
+        patch("nilai_api.config.CONFIG.web_search.api_key", "test-key"),
         patch(
             "nilai_api.handlers.web_search._make_brave_api_request",
             side_effect=[mock_data_1, mock_data_2],
