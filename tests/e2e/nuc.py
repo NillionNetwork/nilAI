@@ -57,7 +57,6 @@ def get_nuc_token(
         PRIVATE_KEY
     )
 
-    print("Private key: ", server_wallet)
     print("Public key: ", server_private_key.pubkey)
     nilauth_client = NilauthClient(f"http://{NILAUTH_ENDPOINT}")
 

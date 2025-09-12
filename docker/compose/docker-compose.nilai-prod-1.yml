@@ -6,7 +6,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              count: all
+              count: 1
               capabilities: [gpu]
     ipc: host
     ulimits:
@@ -20,8 +20,8 @@ services:
         condition: service_healthy
     command: >
       --model google/gemma-3-27b-it
-      --gpu-memory-utilization 0.79
-      --max-model-len 60000
+      --gpu-memory-utilization 0.95
+      --max-model-len 100000
       --max-num-batched-tokens 8192
       --dtype bfloat16
       --kv-cache-dtype fp8
