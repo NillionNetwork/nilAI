@@ -32,8 +32,9 @@ dependencies = [
     "web3>=7.8.0",
     "click>=8.1.8",
     "nuc-helpers",
-    "nuc",
+    "nuc>=0.1.0",
     "pyyaml>=6.0.1",
+    "secretvaults",
 ]
 
 
@@ -45,4 +46,5 @@ build-backend = "hatchling.build"
 nilai-common = { workspace = true }
 nuc-helpers = { workspace = true }
 
-nuc = { git = "https://github.com/NillionNetwork/nuc-py.git", rev = "4922b5e9354e611cc31322d681eb29da05be584e" }
+# TODO: Remove this once the secretvaults package is released with the fix
+secretvaults = { git = "https://github.com/jcabrero/secretvaults-py", rev = "main" }

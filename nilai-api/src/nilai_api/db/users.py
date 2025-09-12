@@ -92,6 +92,10 @@ class UserData(BaseModel):
             web_search_ratelimit_minute=user.web_search_ratelimit_minute,
         )
 
+    @property
+    def is_subscription_owner(self):
+        return self.userid == self.apikey
+
 
 class UserManager:
     @staticmethod

@@ -85,7 +85,7 @@ class TokenRateLimits(BaseModel):
             token (str): The serialized delegation token.
 
         Returns:
-            Tuple[str, str, Optional[int]]: The signature, the effective usage limit, and the expiration date, or `None` if no usage limit is found.
+            TokenRateLimit: The signature, the effective usage limit, and the expiration date, or `None` if no usage limit is found.
 
         Raises:
             UsageLimitInconsistencyError: If usage limits across proofs or invocation are inconsistent.

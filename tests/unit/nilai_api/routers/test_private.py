@@ -83,7 +83,7 @@ def mock_user_manager(mock_user, mocker):
 
 
 @pytest.fixture
-def mock_state(mocker, event_loop):
+def mock_state(mocker):
     # Prepare expected models data
 
     expected_models = {"ABC": model_endpoint}
@@ -110,7 +110,8 @@ def mock_state(mocker, event_loop):
     )
     # Patch the get_attestation_report function
     mocker.patch(
-        "nilai_api.attestation.get_attestation_report",
+        "nilai_api.routers.private.get_attestation_report",
+        new_callable=AsyncMock,
         return_value=attestation_response,
     )
 

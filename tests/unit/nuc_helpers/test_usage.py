@@ -1,29 +1,9 @@
 import unittest
 from unittest.mock import patch
 from nuc_helpers.usage import TokenRateLimits, UsageLimitError, UsageLimitKind
+from ..nuc_helpers import DummyDecodedNucToken, DummyNucTokenEnvelope
 
 from datetime import datetime, timedelta, timezone
-
-
-# Dummy token envelope structure to simulate nuc.envelope
-class DummyNucToken:
-    def __init__(
-        self, meta=None, expires_at=datetime.now(timezone.utc) + timedelta(days=1)
-    ):
-        self.meta = meta or {}
-        self.expires_at = expires_at
-
-
-class DummyDecodedNucToken:
-    def __init__(self, meta=None):
-        self.token = DummyNucToken(meta)
-        self.signature = b"\x01\x02"
-
-
-class DummyNucTokenEnvelope:
-    def __init__(self, proofs, invocation_meta=None):
-        self.proofs = proofs
-        self.token = DummyDecodedNucToken(invocation_meta)
 
 
 class GetUsageLimitTests(unittest.TestCase):
