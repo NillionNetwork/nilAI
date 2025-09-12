@@ -173,33 +173,6 @@ class MessageAdapter(BaseModel):
         # Return the original dict for API calls.
         return self.raw
 
-    @staticmethod
-    def merge_system_content(
-        messages: List[Message], system_content: str
-    ) -> List[Message]:
-        """Prepend or merge a system message with the given content.
-
-        - If the first message is a system message, append the new content after a blank line.
-        - Otherwise, create a new system message and prepend it.
-        """
-        if not messages:
-            return [MessageAdapter.new_message(role="system", content=system_content)]
-
-        first = MessageAdapter(raw=messages[0])
-        if first.role == "system":
-            existing = first.extract_text() or ""
-            merged = (
-                (existing + "\n\n" + system_content) if existing else system_content
-            )
-            new_first = MessageAdapter.new_message(role="system", content=merged)
-            return [new_first] + [
-                MessageAdapter(raw=m).to_openai_param() for m in messages[1:]
-            ]
-
-        return [MessageAdapter.new_message(role="system", content=system_content)] + [
-            MessageAdapter(raw=m).to_openai_param() for m in messages
-        ]
-
 
 def adapt_messages(msgs: List[Message]) -> List[MessageAdapter]:
     return [MessageAdapter(raw=m) for m in msgs]
@@ -267,8 +240,44 @@ class ChatRequest(BaseModel):
         """True if any message contains an image content part."""
         return any([m.is_multimodal_part() for m in self.adapted_messages])
 
+    def ensure_system_content(self, system_content: str) -> None:
+        """Ensure the conversation starts with a system message containing the given content.
 
-## Note: merge_system_message moved to MessageAdapter.merge_system_content
+        This method directly mutates the `self.messages` list in place.
+
+        Logic cases:
+        1. Empty message list: Insert new system message at the beginning
+        2. First message is not system: Insert new system message at the beginning
+        3. First message is system: Merge content with existing system message
+           - String content: Append with separator
+           - List content: Add new text part to the list
+        """
+        msgs = self.messages
+
+        if not msgs:
+            msgs.insert(
+                0, MessageAdapter.new_message(role="system", content=system_content)
+            )
+            return
+
+        first_message = msgs[0]
+
+        if first_message.get("role") != "system":
+            msgs.insert(
+                0, MessageAdapter.new_message(role="system", content=system_content)
+            )
+            return
+
+        existing_text = MessageAdapter(raw=first_message).extract_text() or ""
+        content = first_message.get("content")
+
+        if content is None or isinstance(content, str):
+            first_message["content"] = (
+                existing_text + ("\n\n" if existing_text else "") + system_content
+            )
+        elif isinstance(content, list):
+            prefix = "\n\n" if existing_text else ""
+            content.append({"type": "text", "text": prefix + system_content})
 
 
 class SignedChatCompletion(ChatCompletion):

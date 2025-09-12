@@ -5,7 +5,7 @@ from nilai_api.handlers.web_search import (
     perform_web_search_async,
     enhance_messages_with_web_search,
 )
-from nilai_common import MessageAdapter
+from nilai_common import MessageAdapter, ChatRequest
 from nilai_common.api_model import (
     WebSearchContext,
     Source,
@@ -145,6 +145,7 @@ async def test_enhance_messages_with_web_search():
         ),
         MessageAdapter.new_message(role="user", content="What is the latest AI news?"),
     ]
+    req = ChatRequest(model="dummy", messages=original_messages)
 
     with patch("nilai_api.handlers.web_search.perform_web_search_async") as mock_search:
         mock_search.return_value = WebSearchContext(
@@ -154,7 +155,7 @@ async def test_enhance_messages_with_web_search():
             ],
         )
 
-        enhanced = await enhance_messages_with_web_search(original_messages, "AI news")
+        enhanced = await enhance_messages_with_web_search(req, "AI news")
 
         assert len(enhanced.messages) == 2
         assert enhanced.messages[0]["role"] == "system"

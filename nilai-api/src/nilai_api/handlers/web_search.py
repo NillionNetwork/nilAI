@@ -11,7 +11,6 @@ from fastapi import HTTPException, status
 from nilai_api.config import WEB_SEARCH_SETTINGS
 from nilai_common.api_model import (
     ChatRequest,
-    Message,
     MessageAdapter,
     SearchResult,
     Source,
@@ -269,7 +268,7 @@ async def perform_web_search_async(query: str) -> WebSearchContext:
 
 
 async def enhance_messages_with_web_search(
-    messages: List[Message], query: str
+    req: ChatRequest, query: str
 ) -> WebSearchEnhancedMessages:
     """Enhance a list of messages with web search context.
 
@@ -293,10 +292,10 @@ async def enhance_messages_with_web_search(
         "Please provide a comprehensive answer based on the search results above."
     )
 
-    enhanced = MessageAdapter.merge_system_content(messages, web_search_content)
+    req.ensure_system_content(web_search_content)
 
     return WebSearchEnhancedMessages(
-        messages=enhanced,
+        messages=req.messages,
         sources=[query_source] + ctx.sources,
     )
 
@@ -385,8 +384,13 @@ async def handle_web_search(
         topics_to_search = [t for t in topics if t.needs_search][:3]
 
         if not topics_to_search:
-            logger.info("No topics require web search; returning original messages")
-            return WebSearchEnhancedMessages(messages=req_messages.messages, sources=[])
+            logger.info(
+                "No topics require web search; falling back to single-query enrichment"
+            )
+            concise_query = await generate_search_query_from_llm(
+                user_query, model_name, client
+            )
+            return await enhance_messages_with_web_search(req_messages, concise_query)
 
         async def _generate_query(topic_obj: Topic) -> TopicQuery | None:
             topic_str = topic_obj.topic.strip()
@@ -412,9 +416,7 @@ async def handle_web_search(
             concise_query = await generate_search_query_from_llm(
                 user_query, model_name, client
             )
-            return await enhance_messages_with_web_search(
-                req_messages.messages, concise_query
-            )
+            return await enhance_messages_with_web_search(req_messages, concise_query)
 
         async def _search(q: str) -> WebSearchContext:
             try:
@@ -427,7 +429,7 @@ async def handle_web_search(
         contexts = await asyncio.gather(*search_tasks)
 
         return await enhance_messages_with_multi_web_search(
-            req_messages.messages, topic_queries, contexts
+            req_messages, topic_queries, contexts
         )
 
     except HTTPException:
@@ -481,13 +483,13 @@ async def analyze_web_search_topics(
 
 
 async def enhance_messages_with_multi_web_search(
-    messages: List[Message],
+    req: ChatRequest,
     topic_queries: List[TopicQuery],
     contexts: List[WebSearchContext],
 ) -> WebSearchEnhancedMessages:
     """Enhance messages with multiple topic-specific web search contexts."""
     if not topic_queries or not contexts:
-        return WebSearchEnhancedMessages(messages=messages, sources=[])
+        return WebSearchEnhancedMessages(messages=req.messages, sources=[])
 
     # Build a merged content block
     sections: List[str] = []
@@ -507,7 +509,7 @@ async def enhance_messages_with_multi_web_search(
         all_sources.extend(ctx.sources)
 
     if not sections:
-        return WebSearchEnhancedMessages(messages=messages, sources=[])
+        return WebSearchEnhancedMessages(messages=req.messages, sources=[])
 
     web_search_content = (
         "You have access to the following topic-specific web search results.\n\n"
@@ -517,6 +519,6 @@ async def enhance_messages_with_multi_web_search(
         + "\n\nPlease provide a comprehensive answer based on the relevant search results above."
     )
 
-    enhanced = MessageAdapter.merge_system_content(messages, web_search_content)
+    req.ensure_system_content(web_search_content)
 
-    return WebSearchEnhancedMessages(messages=enhanced, sources=all_sources)
+    return WebSearchEnhancedMessages(messages=req.messages, sources=all_sources)
