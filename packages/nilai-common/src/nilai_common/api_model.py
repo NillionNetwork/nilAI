@@ -35,7 +35,12 @@ TextContent: TypeAlias = ChatCompletionContentPartTextParam
 Message: TypeAlias = ChatCompletionMessageParam  # SDK union of message shapes
 
 
-# ---------- Models you already had ----------
+# ---------- Domain-specific objects for web search ----------
+class ResultContent(BaseModel):
+    text: str
+    truncated: bool = False
+
+
 class Choice(OpenaAIChoice):
     pass
 
@@ -49,6 +54,30 @@ class SearchResult(BaseModel):
     title: str
     body: str
     url: str
+    content: ResultContent | None = None
+
+    def as_source(self) -> "Source":
+        text = self.content.text if self.content else self.body
+        return Source(source=self.url, content=text)
+
+    def model_post_init(self, __context) -> None:
+        # Auto-derive structured fields when not provided
+        if self.content is None and isinstance(self.body, str) and self.body:
+            self.content = ResultContent(text=self.body)
+
+
+class Topic(BaseModel):
+    topic: str
+    needs_search: bool = Field(..., alias="needs_search")
+
+
+class TopicResponse(BaseModel):
+    topics: List[Topic]
+
+
+class TopicQuery(BaseModel):
+    topic: str
+    query: str
 
 
 # ---------- Helpers ----------
@@ -206,6 +235,45 @@ class ChatRequest(BaseModel):
     def has_multimodal_content(self) -> bool:
         """True if any message contains an image content part."""
         return any([m.is_multimodal_part() for m in self.adapted_messages])
+
+    def ensure_system_content(self, system_content: str) -> None:
+        """Ensure the conversation starts with a system message containing the given content.
+
+        This method directly mutates the `self.messages` list in place.
+
+        Logic cases:
+        1. Empty message list: Insert new system message at the beginning
+        2. First message is not system: Insert new system message at the beginning
+        3. First message is system: Merge content with existing system message
+           - String content: Append with separator
+           - List content: Add new text part to the list
+        """
+        msgs = self.messages
+
+        if not msgs:
+            msgs.insert(
+                0, MessageAdapter.new_message(role="system", content=system_content)
+            )
+            return
+
+        first_message = msgs[0]
+
+        if first_message.get("role") != "system":
+            msgs.insert(
+                0, MessageAdapter.new_message(role="system", content=system_content)
+            )
+            return
+
+        existing_text = MessageAdapter(raw=first_message).extract_text() or ""
+        content = first_message.get("content")
+
+        if content is None or isinstance(content, str):
+            first_message["content"] = (
+                existing_text + ("\n\n" if existing_text else "") + system_content
+            )
+        elif isinstance(content, list):
+            prefix = "\n\n" if existing_text else ""
+            content.append({"type": "text", "text": prefix + system_content})
 
 
 class SignedChatCompletion(ChatCompletion):
