@@ -4,7 +4,7 @@ import logging
 import time
 import uuid
 from base64 import b64encode
-from typing import AsyncGenerator, Optional, Union, List, Tuple
+from typing import AsyncGenerator, Optional, Union, List
 from nilai_api.attestation import get_attestation_report
 from nilai_api.handlers.nilrag import handle_nilrag
 from nilai_api.handlers.web_search import handle_web_search
@@ -42,6 +42,9 @@ from nilai_common import (
 
 
 from openai import AsyncOpenAI
+from nilai_api.handlers.code_execution import (
+    handle_code_execution_tool_calls_if_any,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -389,8 +392,34 @@ async def chat_completion(
         f"[chat] call done request_id={request_id} duration_ms={(time.monotonic() - t_call) * 1000:.0f}"
     )
     logger.info(f"[chat] call response: {response}")
+    # Handle tool calls (non-stream only) via helper
+    accumulated_prompt_tokens = 0
+    accumulated_completion_tokens = 0
+    try:
+        if getattr(response, "usage", None):
+            accumulated_prompt_tokens += response.usage.prompt_tokens
+            accumulated_completion_tokens += response.usage.completion_tokens
+    except Exception:
+        pass
+
+    tool_result = await handle_code_execution_tool_calls_if_any(
+        response=response,
+        current_messages=current_messages,  # type: ignore
+        req=req,
+        client=client,
+        logger=logger,
+    )
+    accumulated_prompt_tokens += tool_result.prompt_tokens_delta
+    accumulated_completion_tokens += tool_result.completion_tokens_delta
+    # Merge sources gathered via tool-calls (e.g., web_search)
+    if tool_result.extra_sources:
+        if sources is None:
+            sources = list(tool_result.extra_sources)
+        else:
+            sources.extend(tool_result.extra_sources)
+
     model_response = SignedChatCompletion(
-        **response.model_dump(),
+        **tool_result.response.model_dump(),
         signature="",
         sources=sources,
     )
@@ -404,17 +433,28 @@ async def chat_completion(
             detail="Model response does not contain usage statistics",
         )
     # Update token usage
+    # When tool calls are executed, we may have done multiple model calls.
+    # Accumulate token usage across calls for accounting.
+    prompt_tokens_used = (
+        accumulated_prompt_tokens if accumulated_prompt_tokens > 0 else model_response.usage.prompt_tokens
+    )
+    completion_tokens_used = (
+        accumulated_completion_tokens
+        if accumulated_completion_tokens > 0
+        else model_response.usage.completion_tokens
+    )
+
     await UserManager.update_token_usage(
         auth_info.user.userid,
-        prompt_tokens=model_response.usage.prompt_tokens,
-        completion_tokens=model_response.usage.completion_tokens,
+        prompt_tokens=prompt_tokens_used,
+        completion_tokens=completion_tokens_used,
     )
 
     await QueryLogManager.log_query(
         auth_info.user.userid,
         model=req.model,
-        prompt_tokens=model_response.usage.prompt_tokens,
-        completion_tokens=model_response.usage.completion_tokens,
+        prompt_tokens=prompt_tokens_used,
+        completion_tokens=completion_tokens_used,
         web_search_calls=len(sources) if sources else 0,
     )
 
@@ -424,6 +464,6 @@ async def chat_completion(
     model_response.signature = b64encode(signature).decode()
 
     logger.info(
-        f"[chat] done request_id={request_id} prompt_tokens={model_response.usage.prompt_tokens} completion_tokens={model_response.usage.completion_tokens} total_ms={(time.monotonic() - t_start) * 1000:.0f}"
+        f"[chat] done request_id={request_id} prompt_tokens={prompt_tokens_used} completion_tokens={completion_tokens_used} total_ms={(time.monotonic() - t_start) * 1000:.0f}"
     )
     return model_response

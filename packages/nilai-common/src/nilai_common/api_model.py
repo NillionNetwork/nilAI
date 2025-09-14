@@ -182,6 +182,9 @@ def adapt_messages(msgs: List[Message]) -> List[MessageAdapter]:
 class WebSearchEnhancedMessages(BaseModel):
     messages: List[Message]
     sources: List[Source]
+    # When enhancing messages, this captures the full system content that was injected.
+    # Useful for exposing the same content as a tool result when web search is invoked via tools.
+    system_content: Optional[str] = None
 
 
 class WebSearchContext(BaseModel):
@@ -330,3 +333,26 @@ class AttestationReport(BaseModel):
     verifying_key: Annotated[str, Field(description="PEM encoded public key")]
     cpu_attestation: AMDAttestationToken
     gpu_attestation: NVAttestationToken
+
+
+# ---------- Code execution / tool-calls ----------
+class CodeExecutionResult(BaseModel):
+    """Container for outcomes of handling tool-calls that execute code.
+
+    - response: Final chat completion after tool execution (or original if none).
+    - prompt_tokens_delta: Tokens consumed in follow-up calls due to tools.
+    - completion_tokens_delta: Tokens consumed in follow-up calls due to tools.
+    - extra_sources: Sources gathered during tool execution (e.g., web search).
+    """
+
+    response: ChatCompletion
+    prompt_tokens_delta: int = 0
+    completion_tokens_delta: int = 0
+    extra_sources: List[Source] = Field(default_factory=list)
+
+
+class WebSearchToolOutcome(BaseModel):
+    """Result of handling a web_search tool call."""
+
+    content: str
+    sources: List[Source] = Field(default_factory=list)
