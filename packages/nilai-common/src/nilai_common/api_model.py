@@ -19,10 +19,12 @@ from openai.types.chat import (
     ChatCompletionToolParam,
     ChatCompletionMessage,
 )
+
 from openai.types.chat.chat_completion_message_tool_call import (
     ChatCompletionMessageToolCall,
     Function as ChatToolFunction,
 )
+
 from openai.types.chat.chat_completion_content_part_text_param import (
     ChatCompletionContentPartTextParam,
 )
@@ -32,6 +34,9 @@ from openai.types.chat.chat_completion_content_part_image_param import (
 from openai.types.chat.chat_completion import Choice as OpenaAIChoice
 from pydantic import BaseModel, Field
 
+
+# Ensure symbol is referenced to satisfy linters (and re-export via __init__)
+_CHAT_TOOL_FUNCTION_EXPORT = ChatToolFunction
 
 # ---------- Aliases from the OpenAI SDK ----------
 ImageContent: TypeAlias = ChatCompletionContentPartImageParam
@@ -200,7 +205,6 @@ class MessageAdapter(BaseModel):
             ChatCompletionMessage, {"role": "assistant", "content": content}
         )
         return message
-
 
     def is_text_part(self) -> bool:
         return _extract_text_from_content(self.content) is not None

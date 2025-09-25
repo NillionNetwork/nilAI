@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Optional
 
 from e2b_code_interpreter import Sandbox
 
@@ -12,19 +11,18 @@ logger = logging.getLogger(__name__)
 def _run_in_sandbox_sync(code: str) -> str:
     logger.info("Starting code execution in sandbox")
     logger.debug(f"Code to execute: {code}")
-    
+
     try:
         with Sandbox.create() as sandbox:
             logger.debug("Sandbox created successfully")
             execution = sandbox.run_code(code)
             logger.debug("Code execution completed")
 
-
             if execution.logs and execution.logs.stdout:
                 output = "\n".join(execution.logs.stdout)
                 logger.debug(f"Captured stdout output: {output}")
                 return output
-            
+
             if hasattr(execution, "text") and execution.text:
                 logger.debug(f"Captured text output: {execution.text}")
                 return execution.text
@@ -38,7 +36,7 @@ def _run_in_sandbox_sync(code: str) -> str:
             except Exception as e:
                 logger.warning(f"Error getting execution result: {e}")
                 pass
-                
+
             logger.debug("No output captured from code execution")
             return ""
     except Exception as e:
@@ -59,4 +57,3 @@ async def execute_python(code: str) -> str:
     except Exception as e:
         logger.error(f"Error in async Python code execution: {e}")
         raise
-

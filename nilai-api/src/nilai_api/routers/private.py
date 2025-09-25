@@ -1,6 +1,5 @@
 # Fast API and serving
 import asyncio
-import json
 import logging
 import time
 import uuid
@@ -393,9 +392,11 @@ async def chat_completion(
     logger.info(f"[chat] call response: {response}")
 
     # Handle tool workflow fully inside tools.router
-    final_completion, agg_prompt_tokens, agg_completion_tokens = await handle_tool_workflow(
-        client, req, current_messages, response
-    )
+    (
+        final_completion,
+        agg_prompt_tokens,
+        agg_completion_tokens,
+    ) = await handle_tool_workflow(client, req, current_messages, response)
     logger.info(f"[chat] call final_completion: {final_completion}")
     model_response = SignedChatCompletion(
         **final_completion.model_dump(),
@@ -417,7 +418,9 @@ async def chat_completion(
         try:
             model_response.usage.prompt_tokens = agg_prompt_tokens
             model_response.usage.completion_tokens = agg_completion_tokens
-            model_response.usage.total_tokens = agg_prompt_tokens + agg_completion_tokens
+            model_response.usage.total_tokens = (
+                agg_prompt_tokens + agg_completion_tokens
+            )
         except Exception:
             pass
 

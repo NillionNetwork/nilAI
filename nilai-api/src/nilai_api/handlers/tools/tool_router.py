@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from typing import List, Optional, Any, Tuple, cast
+from typing import List, Optional, Tuple, cast
 from nilai_common import (
     Message,
     MessageAdapter,
@@ -17,10 +17,13 @@ from . import code_execution
 from openai import AsyncOpenAI
 
 import logging
+
 logger = logging.getLogger(__name__)
 
 
-async def route_and_execute_tool_call(tool_call: ChatCompletionMessageToolCall) -> Message:
+async def route_and_execute_tool_call(
+    tool_call: ChatCompletionMessageToolCall,
+) -> Message:
     """Route a single tool call to its implementation and return a tool message.
 
     The returned message is a dict compatible with OpenAI's ChatCompletionMessageParam
@@ -52,7 +55,9 @@ async def route_and_execute_tool_call(tool_call: ChatCompletionMessageToolCall) 
     )
 
 
-async def process_tool_calls(tool_calls: List[ChatCompletionMessageToolCall]) -> List[Message]:
+async def process_tool_calls(
+    tool_calls: List[ChatCompletionMessageToolCall],
+) -> List[Message]:
     msgs: List[Message] = []
     for tc in tool_calls:
         msg = await route_and_execute_tool_call(tc)
@@ -111,8 +116,10 @@ def extract_tool_calls_from_response_message(
         raw_args = data.get("arguments")
         try:
             args = (
-                json.loads(raw_args) if isinstance(raw_args, str) else raw_args
-            ) or data.get("parameters", {}) or {}
+                (json.loads(raw_args) if isinstance(raw_args, str) else raw_args)
+                or data.get("parameters", {})
+                or {}
+            )
         except Exception:
             args = data.get("parameters", {}) or {}
 
