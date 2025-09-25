@@ -19,6 +19,10 @@ from openai.types.chat import (
     ChatCompletionToolParam,
     ChatCompletionMessage,
 )
+from openai.types.chat.chat_completion_message_tool_call import (
+    ChatCompletionMessageToolCall,
+    Function as ChatToolFunction,
+)
 from openai.types.chat.chat_completion_content_part_text_param import (
     ChatCompletionContentPartTextParam,
 )
@@ -169,11 +173,34 @@ class MessageAdapter(BaseModel):
         return message
 
     @staticmethod
+    def new_assistant_tool_call_message(
+        tool_calls: List[ChatCompletionMessageToolCall],
+    ) -> Message:
+        """Create an assistant message carrying tool_calls.
+
+        Shape example:
+        {
+          "role": "assistant",
+          "tool_calls": [...],
+          "content": None,
+        }
+        """
+        return cast(
+            Message,
+            {
+                "role": "assistant",
+                "tool_calls": [tc.model_dump(exclude_unset=True) for tc in tool_calls],
+                "content": None,
+            },
+        )
+
+    @staticmethod
     def new_completion_message(content: str) -> ChatCompletionMessage:
         message: ChatCompletionMessage = cast(
             ChatCompletionMessage, {"role": "assistant", "content": content}
         )
         return message
+
 
     def is_text_part(self) -> bool:
         return _extract_text_from_content(self.content) is not None
