@@ -1,5 +1,6 @@
 # Fast API and serving
 import asyncio
+import json
 import logging
 import time
 import uuid
@@ -8,6 +9,7 @@ from typing import AsyncGenerator, Optional, Union, List, Tuple
 from nilai_api.attestation import get_attestation_report
 from nilai_api.handlers.nilrag import handle_nilrag
 from nilai_api.handlers.web_search import handle_web_search
+from nilai_api.handlers.tools.router import process_tool_calls
 
 from fastapi import APIRouter, Body, Depends, HTTPException, status, Request
 from fastapi.responses import StreamingResponse
@@ -385,15 +387,104 @@ async def chat_completion(
     logger.info(f"[chat] call message: {current_messages}")
     t_call = time.monotonic()
     response = await client.chat.completions.create(**request_kwargs)  # type: ignore
+    response_message = response.choices[0].message
     logger.info(
         f"[chat] call done request_id={request_id} duration_ms={(time.monotonic() - t_call) * 1000:.0f}"
     )
     logger.info(f"[chat] call response: {response}")
-    model_response = SignedChatCompletion(
-        **response.model_dump(),
-        signature="",
-        sources=sources,
-    )
+
+    # Aggregate usage in case we run tool calls + second completion
+    agg_prompt_tokens = response.usage.prompt_tokens if response.usage else 0
+    agg_completion_tokens = response.usage.completion_tokens if response.usage else 0
+
+    # If the model requested tools, route and execute them using e2b, then ask again
+    tool_calls = response_message.tool_calls
+
+    if not tool_calls and response_message.content:
+        logger.info(f"[chat] tool_calls begin parsing content")
+        try:
+            data = json.loads(response_message.content)
+            if isinstance(data, dict):
+                fn = data.get("function")
+                if isinstance(fn, dict) and "name" in fn:
+                    name = fn.get("name")
+                    args = fn.get("parameters", {}) 
+                else:
+                    # Fallbacks for other schemas (e.g., OpenAI-style)
+                    name = data.get("name") or data.get("tool") or data.get("function_name")
+                    raw_args = data.get("arguments")
+                    args = (json.loads(raw_args) if isinstance(raw_args, str) else raw_args) or data.get("parameters", {}) or {}
+
+                if isinstance(name, str) and name:
+                    from openai.types.chat.chat_completion_message_tool_call import (
+                        ChatCompletionMessageToolCall,
+                        Function,
+                    )
+                    tool_calls = [
+                        ChatCompletionMessageToolCall(
+                            id=f"call_{uuid.uuid4()}",
+                            type="function",
+                            function=Function(
+                                name=name,
+                                arguments=json.dumps(args),
+                            ),
+                        )
+                    ]
+        except (json.JSONDecodeError, TypeError, ValueError):
+            pass
+
+    logger.info(f"[chat] tool_calls after parsing content: {tool_calls}")
+    if tool_calls:
+        logger.info(
+            f"[chat] tool_calls detected request_id={request_id} count={len(tool_calls)}"
+        )
+        assistant_tool_call_msg = {
+            "role": "assistant",
+            "tool_calls": [
+                tc.model_dump(exclude_unset=True) for tc in tool_calls 
+            ],
+            "content": None,
+        }
+        current_messages = [*current_messages, assistant_tool_call_msg]
+
+        # Execute tools and append tool results
+        tool_messages = await process_tool_calls(tool_calls)
+        current_messages.extend(tool_messages)
+
+        # Second round: provide tool outputs back to the model
+        t_call2 = time.monotonic()
+        logger.info(f"[chat] second call start request_id={request_id}")
+        request_kwargs2 = {
+            "model": req.model,
+            "messages": current_messages,  # type: ignore
+            "top_p": req.top_p,
+            "temperature": req.temperature,
+            "max_tokens": req.max_tokens,
+        }
+        if req.tools:
+            request_kwargs2["tools"] = req.tools  # type: ignore
+
+        second = await client.chat.completions.create(**request_kwargs2)  # type: ignore
+        logger.info(
+            f"[chat] second call done request_id={request_id} duration_ms={(time.monotonic() - t_call2) * 1000:.0f}"
+        )
+        # Aggregate usage from second response
+        if second.usage:
+            agg_prompt_tokens += second.usage.prompt_tokens
+            agg_completion_tokens += second.usage.completion_tokens
+
+        model_response = SignedChatCompletion(
+            **second.model_dump(),
+            signature="",
+            sources=sources,
+        )
+    else:
+        model_response = SignedChatCompletion(
+            **response.model_dump(),
+            signature="",
+            sources=sources,
+        )
+
     logger.info(
         f"[chat] model_response request_id={request_id} duration_ms={(time.monotonic() - t_call) * 1000:.0f}"
     )
@@ -403,7 +494,16 @@ async def chat_completion(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Model response does not contain usage statistics",
         )
-    # Update token usage
+
+    if agg_prompt_tokens or agg_completion_tokens:
+        try:
+            model_response.usage.prompt_tokens = agg_prompt_tokens
+            model_response.usage.completion_tokens = agg_completion_tokens
+            model_response.usage.total_tokens = agg_prompt_tokens + agg_completion_tokens
+        except Exception:
+            pass
+
+    # Update token usage in DB
     await UserManager.update_token_usage(
         auth_info.user.userid,
         prompt_tokens=model_response.usage.prompt_tokens,

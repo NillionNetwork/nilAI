@@ -142,6 +142,33 @@ class MessageAdapter(BaseModel):
         return message
 
     @staticmethod
+    def new_tool_message(
+        name: str,
+        content: str,
+        tool_call_id: str,
+    ) -> Message:
+        """Create a tool role message compatible with OpenAI SDK types.
+
+        Example shape:
+        {
+          "role": "tool",
+          "name": "execute_python",
+          "content": "...",
+          "tool_call_id": "call_abc123"
+        }
+        """
+        message: Message = cast(
+            Message,
+            {
+                "role": "tool",
+                "name": name,
+                "content": content,
+                "tool_call_id": tool_call_id,
+            },
+        )
+        return message
+
+    @staticmethod
     def new_completion_message(content: str) -> ChatCompletionMessage:
         message: ChatCompletionMessage = cast(
             ChatCompletionMessage, {"role": "assistant", "content": content}
