@@ -382,6 +382,8 @@ async def chat_completion(
     }
     if req.tools:
         request_kwargs["tools"] = req.tools  # type: ignore
+        request_kwargs["tool_choice"] = getattr(req, "tool_choice", "auto")
+
     logger.info(f"[chat] call start request_id={request_id}")
     logger.info(f"[chat] call message: {current_messages}")
     t_call = time.monotonic()

@@ -17,6 +17,7 @@ RUN apt-get update && \
     apt-get install build-essential -y && \
     pip install uv && \
     uv sync && \
+    pip install --no-cache-dir --force-reinstall "vllm==0.10.1" && \
     apt-get clean && \
     apt-get autoremove && \
     rm -rf /var/lib/apt/lists/*

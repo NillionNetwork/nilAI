@@ -177,9 +177,8 @@ async def handle_tool_workflow(
         "top_p": req.top_p,
         "temperature": req.temperature,
         "max_tokens": req.max_tokens,
+        "tool_choice": "none",
     }
-    if req.tools:
-        request_kwargs["tools"] = req.tools  # type: ignore[assignment]
 
     logger.info("[tools] performing follow-up completion with tool outputs")
     logger.info(f"[tools] request_kwargs messages: {request_kwargs['messages']}")
