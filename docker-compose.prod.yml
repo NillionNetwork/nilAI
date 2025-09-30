@@ -21,7 +21,7 @@ services:
     env_file:
       - .env.mainnet
     environment:
-      - POSTGRES_DB=nuc-nilai-mainnet2
+      - POSTGRES_DB=${POSTGRES_DB_NUC}
     volumes:
       - ${FILES}/nilai-api/config.yaml:/app/nilai-api/src/nilai_api/config/config.yaml
   caddy:

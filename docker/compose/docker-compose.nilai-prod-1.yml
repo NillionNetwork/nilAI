@@ -13,7 +13,7 @@ services:
       memlock: -1
       stack: 67108864
     env_file:
-      - .env
+      - .env.mainnet
     restart: unless-stopped
     depends_on:
       etcd:
