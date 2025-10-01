@@ -133,7 +133,7 @@ async def response_completion(
                     "stream": True,
                     "top_p": req.top_p,
                     "temperature": req.temperature,
-                    "max_tokens": req.max_output_tokens,
+                    "max_tokens": req.max_tokens,
                     "extra_body": {
                         "stream_options": {
                             "include_usage": True,
@@ -192,7 +192,7 @@ async def response_completion(
         "messages": current_messages,
         "top_p": req.top_p,
         "temperature": req.temperature,
-        "max_tokens": req.max_output_tokens,
+        "max_tokens": req.max_tokens,
     }
     if req.tools:
         request_kwargs["tools"] = req.tools
