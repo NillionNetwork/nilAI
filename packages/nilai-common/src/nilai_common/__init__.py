@@ -1,7 +1,9 @@
 from nilai_common.api_model import (
     AttestationReport,
+    BaseCompletionRequest,
     ChatRequest,
-    SignedChatCompletion,
+    ResponseRequest,
+    SignedCompletion,
     Choice,
     HealthCheckResponse,
     ModelEndpoint,
@@ -26,8 +28,10 @@ from openai.types.completion_usage import CompletionUsage as Usage
 __all__ = [
     "Message",
     "MessageAdapter",
+    "BaseCompletionRequest",
     "ChatRequest",
-    "SignedChatCompletion",
+    "ResponseRequest",
+    "SignedCompletion",
     "Choice",
     "ModelMetadata",
     "Usage",

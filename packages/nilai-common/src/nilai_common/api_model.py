@@ -192,19 +192,22 @@ class WebSearchContext(BaseModel):
 
 
 # ---------- Request/response models ----------
-class ChatRequest(BaseModel):
+class BaseCompletionRequest(BaseModel):
     model: str
-    messages: List[Message] = Field(..., min_length=1)
     temperature: Optional[float] = Field(default=None, ge=0.0, le=5.0)
     top_p: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     max_tokens: Optional[int] = Field(default=None, ge=1, le=100000)
-    stream: Optional[bool] = False
+    stream: bool = False
     tools: Optional[Iterable[ChatCompletionToolParam]] = None
-    nilrag: Optional[dict] = {}
-    web_search: Optional[bool] = Field(
+    nilrag: dict = Field(default_factory=dict)
+    web_search: bool = Field(
         default=False,
         description="Enable web search to enhance context with current information",
     )
+
+
+class ChatRequest(BaseCompletionRequest):
+    messages: List[Message] = Field(..., min_length=1)
 
     def model_post_init(self, __context) -> None:
         # Process messages after model initialization
@@ -276,7 +279,40 @@ class ChatRequest(BaseModel):
             content.append({"type": "text", "text": prefix + system_content})
 
 
-class SignedChatCompletion(ChatCompletion):
+class ResponseRequest(BaseCompletionRequest):
+    input: Union[str, List[Message]] = Field(..., description="Input text or messages for the model")
+    instructions: Optional[str] = Field(default=None, description="Instructions for the model")
+    modalities: List[Literal["text", "audio", "image"]] = Field(
+        default=["text"],
+        description="List of modalities to support in the response"
+    )
+    max_tokens: Optional[int] = Field(
+        default=None, ge=1, le=100000, alias="max_output_tokens"
+    )
+
+    def to_chat_request(self) -> ChatRequest:
+        messages: List[Message] = []
+        
+        if self.instructions:
+            messages.append(MessageAdapter.new_message(role="system", content=self.instructions))
+
+        if isinstance(self.input, str):
+            messages.append(MessageAdapter.new_message(role="user", content=self.input))
+        else:
+            messages.extend(self.input)
+        
+        return ChatRequest(
+            messages=messages,
+            **self.model_dump(exclude={"input", "instructions", "modalities"})
+        )
+
+    def has_multimodal_content(self) -> bool:
+        if isinstance(self.input, str):
+            return False
+        return any([MessageAdapter(raw=m).is_multimodal_part() for m in self.input])
+
+
+class SignedCompletion(ChatCompletion):
     signature: str
     sources: Optional[List[Source]] = Field(
         default=None, description="Sources used for web search when enabled"

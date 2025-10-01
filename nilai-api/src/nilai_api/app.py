@@ -5,7 +5,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from fastapi import Depends, FastAPI
 from nilai_api.auth import get_auth_info
 from nilai_api.rate_limiting import setup_redis_conn
-from nilai_api.routers import private, public
+from nilai_api.routers import private, public, chat, responses
 from nilai_api import config
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
@@ -70,6 +70,10 @@ app = FastAPI(
             "description": "AI-powered chat completion endpoint for generating conversational responses",
         },
         {
+            "name": "Responses",
+            "description": "OpenAI Responses API endpoint for stateful and multimodal interactions",
+        },
+        {
             "name": "Health",
             "description": "System health and status monitoring endpoint",
         },
@@ -88,6 +92,8 @@ app = FastAPI(
 
 app.include_router(public.router)
 app.include_router(private.router, dependencies=[Depends(get_auth_info)])
+app.include_router(chat.router, dependencies=[Depends(get_auth_info)])
+app.include_router(responses.router, dependencies=[Depends(get_auth_info)])
 
 app.add_middleware(
     CORSMiddleware,
