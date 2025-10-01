@@ -36,7 +36,6 @@ services:
       - TOOL_SUPPORT=true
     volumes:
       - hugging_face_models:/root/.cache/huggingface
-      - ./vllm_templates:/opt/vllm/templates:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s

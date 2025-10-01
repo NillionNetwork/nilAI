@@ -58,6 +58,11 @@ async def route_and_execute_tool_call(
 async def process_tool_calls(
     tool_calls: List[ChatCompletionMessageToolCall],
 ) -> List[Message]:
+    """Process a list of tool calls and return their corresponding tool messages.
+
+    Routes each tool call to its implementation and collects the results as
+    tool messages that can be appended to the conversation history.
+    """
     msgs: List[Message] = []
     for tc in tool_calls:
         msg = await route_and_execute_tool_call(tc)
@@ -75,14 +80,9 @@ def extract_tool_calls_from_response_message(
     normalized list of `ChatCompletionMessageToolCall` objects, using a
     best-effort parse of the content when `tool_calls` is empty.
     """
-    # Prefer native structured tool_calls if available
-    tool_calls: Optional[List[ChatCompletionMessageToolCall]] = getattr(
-        response_message, "tool_calls", None
-    )
-    if tool_calls:
-        return tool_calls
+    if response_message.tool_calls:
+        return cast(List[ChatCompletionMessageToolCall], response_message.tool_calls)
 
-    # Fallback: attempt to parse JSON-encoded tool call from content
     try:
         adapter = MessageAdapter(
             raw=cast(
@@ -92,7 +92,7 @@ def extract_tool_calls_from_response_message(
         )
         content: Optional[str] = adapter.extract_text()
     except Exception:
-        content = getattr(response_message, "content", None)  # type: ignore[assignment]
+        content = response_message.content
 
     if not content:
         return []
@@ -135,7 +135,7 @@ def extract_tool_calls_from_response_message(
     except Exception:
         return []
 
-    return [tool_call]  # type: ignore[return-value]
+    return [tool_call]
 
 
 async def handle_tool_workflow(
@@ -163,7 +163,7 @@ async def handle_tool_workflow(
     logger.info(f"[tools] extracted tool_calls: {tool_calls}")
 
     if not tool_calls:
-        return first_response, prompt_tokens, completion_tokens
+        return first_response, 0, 0
 
     assistant_tool_call_msg = MessageAdapter.new_assistant_tool_call_message(tool_calls)
     current_messages = [*current_messages, assistant_tool_call_msg]
@@ -181,7 +181,6 @@ async def handle_tool_workflow(
     }
 
     logger.info("[tools] performing follow-up completion with tool outputs")
-    logger.info(f"[tools] request_kwargs messages: {request_kwargs['messages']}")
     second: ChatCompletion = await client.chat.completions.create(**request_kwargs)  # type: ignore
     if second.usage:
         prompt_tokens += second.usage.prompt_tokens

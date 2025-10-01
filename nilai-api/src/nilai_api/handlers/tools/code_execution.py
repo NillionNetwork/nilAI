@@ -9,38 +9,17 @@ logger = logging.getLogger(__name__)
 
 
 def _run_in_sandbox_sync(code: str) -> str:
-    logger.info("Starting code execution in sandbox")
-    logger.debug(f"Code to execute: {code}")
-
+    """Execute Python code in an e2b sandbox and return the textual output or stdout if available."""
     try:
         with Sandbox.create() as sandbox:
-            logger.debug("Sandbox created successfully")
-            execution = sandbox.run_code(code)
-            logger.debug("Code execution completed")
-
-            if execution.logs and execution.logs.stdout:
-                output = "\n".join(execution.logs.stdout)
-                logger.debug(f"Captured stdout output: {output}")
-                return output
-
-            if hasattr(execution, "text") and execution.text:
-                logger.debug(f"Captured text output: {execution.text}")
-                return execution.text
-
-            try:
-                result = getattr(execution, "result", None)
-                if result is not None:
-                    output = str(result)
-                    logger.debug(f"Captured result output: {output}")
-                    return output
-            except Exception as e:
-                logger.warning(f"Error getting execution result: {e}")
-                pass
-
-            logger.debug("No output captured from code execution")
+            exec_ = sandbox.run_code(code)
+            if exec_.text:
+                return exec_.text
+            if getattr(exec_, "logs", None) and getattr(exec_.logs, "stdout", None):
+                return "\n".join(exec_.logs.stdout)
             return ""
     except Exception as e:
-        logger.error(f"Error executing code in sandbox: {e}")
+        logger.error("Error executing code in sandbox: %s", e)
         raise
 
 

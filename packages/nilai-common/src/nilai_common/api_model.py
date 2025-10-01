@@ -22,7 +22,7 @@ from openai.types.chat import (
 
 from openai.types.chat.chat_completion_message_tool_call import (
     ChatCompletionMessageToolCall,
-    Function as ChatToolFunction,
+    Function,
 )
 
 from openai.types.chat.chat_completion_content_part_text_param import (
@@ -34,9 +34,7 @@ from openai.types.chat.chat_completion_content_part_image_param import (
 from openai.types.chat.chat_completion import Choice as OpenaAIChoice
 from pydantic import BaseModel, Field
 
-
-# Ensure symbol is referenced to satisfy linters (and re-export via __init__)
-_CHAT_TOOL_FUNCTION_EXPORT = ChatToolFunction
+ChatToolFunction: TypeAlias = Function
 
 # ---------- Aliases from the OpenAI SDK ----------
 ImageContent: TypeAlias = ChatCompletionContentPartImageParam
@@ -258,6 +256,7 @@ class ChatRequest(BaseModel):
     max_tokens: Optional[int] = Field(default=None, ge=1, le=100000)
     stream: Optional[bool] = False
     tools: Optional[Iterable[ChatCompletionToolParam]] = None
+    tool_choice: Optional[Union[str, dict]] = "auto"
     nilrag: Optional[dict] = {}
     web_search: Optional[bool] = Field(
         default=False,
