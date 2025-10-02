@@ -316,7 +316,7 @@ def test_chat_completion_stream_includes_sources(
         assert response.status_code == 200
         data_lines = [
             line
-            for line in response.iter_lines(decode_unicode=True)
+            for line in response.iter_lines()
             if line and line.startswith("data: ")
         ]
 
