@@ -15,7 +15,10 @@ from nilai_api.db.logs import QueryLogManager
 from nilai_api.db.users import UserManager
 from nilai_api.rate_limiting import RateLimit
 from nilai_api.state import state
-from nilai_api.routers.common_rate_limit import concurrent_rate_limit, web_search_rate_limit
+from nilai_api.routers.common_rate_limit import (
+    concurrent_rate_limit,
+    web_search_rate_limit,
+)
 
 from nilai_api.handlers.nildb.handler import get_prompt_from_nildb
 
@@ -55,7 +58,7 @@ async def response_completion(
     request_id = str(uuid.uuid4())
     t_start = time.monotonic()
     logger.info(f"[response] call start request_id={request_id}")
-    
+
     model_name = req.model
     endpoint = await state.get_model(model_name)
     if endpoint is None:
@@ -85,9 +88,9 @@ async def response_completion(
     )
 
     client = AsyncOpenAI(base_url=model_url, api_key="<not-needed>")
-    
+
     chat_request = req.to_chat_request()
-    
+
     if auth_info.prompt_document:
         try:
             nildb_prompt: str = await get_prompt_from_nildb(auth_info.prompt_document)
@@ -122,6 +125,7 @@ async def response_completion(
         )
 
     if req.stream:
+
         async def response_completion_stream_generator() -> AsyncGenerator[str, None]:
             try:
                 logger.info(f"[response] stream start request_id={request_id}")
@@ -178,14 +182,16 @@ async def response_completion(
                 )
 
             except Exception as e:
-                logger.error(f"[response] stream error request_id={request_id} error={e}")
+                logger.error(
+                    f"[response] stream error request_id={request_id} error={e}"
+                )
                 return
 
         return StreamingResponse(
             response_completion_stream_generator(),
             media_type="text/event-stream",
         )
-    
+
     current_messages = messages
     request_kwargs = {
         "model": req.model,
@@ -196,7 +202,7 @@ async def response_completion(
     }
     if req.tools:
         request_kwargs["tools"] = req.tools
-    
+
     logger.info(f"[response] call start request_id={request_id}")
     logger.info(f"[response] call message: {current_messages}")
     t_call = time.monotonic()
@@ -205,7 +211,7 @@ async def response_completion(
         f"[response] call done request_id={request_id} duration_ms={(time.monotonic() - t_call) * 1000:.0f}"
     )
     logger.info(f"[response] call response: {response}")
-    
+
     model_response = SignedCompletion(
         **response.model_dump(),
         signature="",
@@ -220,7 +226,7 @@ async def response_completion(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Model response does not contain usage statistics",
         )
-    
+
     await UserManager.update_token_usage(
         auth_info.user.userid,
         prompt_tokens=model_response.usage.prompt_tokens,
@@ -243,4 +249,3 @@ async def response_completion(
         f"[response] done request_id={request_id} prompt_tokens={model_response.usage.prompt_tokens} completion_tokens={model_response.usage.completion_tokens} total_ms={(time.monotonic() - t_start) * 1000:.0f}"
     )
     return model_response
-
