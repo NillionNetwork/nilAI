@@ -321,9 +321,9 @@ def test_chat_completion_stream_includes_sources(
         ]
 
     assert data_lines, "Expected SSE data from stream response"
-    first_payload = json.loads(data_lines[0][len("data: "):])
+    first_payload = json.loads(data_lines[0][len("data: ") :])
     assert "sources" not in first_payload
-    final_payload = json.loads(data_lines[-1][len("data: "):])
+    final_payload = json.loads(data_lines[-1][len("data: ") :])
     assert "sources" in final_payload
     assert len(final_payload["sources"]) == 1
     assert final_payload["sources"][0]["source"] == "https://example.com"

@@ -1,5 +1,4 @@
 # Fast API and serving
-import asyncio
 import json
 import logging
 import time
@@ -307,16 +306,21 @@ async def chat_completion(
         logger.info(f"[chat] web_search messages: {messages}")
 
     if req.stream:
-        # Forwarding Streamed Responses
+
         async def chat_completion_stream_generator() -> AsyncGenerator[str, None]:
+            t_call = time.monotonic()
+            last_seen_usage = None
+            buffered_payload = None
+            prompt_token_usage = 0
+            completion_token_usage = 0
+
             try:
                 logger.info(f"[chat] stream start request_id={request_id}")
-                t_call = time.monotonic()
-                current_messages = messages
+
                 request_kwargs = {
                     "model": req.model,
-                    "messages": current_messages,  # type: ignore
-                    "stream": True,  # type: ignore
+                    "messages": messages,
+                    "stream": True,
                     "top_p": req.top_p,
                     "temperature": req.temperature,
                     "max_tokens": req.max_tokens,
@@ -328,42 +332,44 @@ async def chat_completion(
                     },
                 }
                 if req.tools:
-                    request_kwargs["tools"] = req.tools  # type: ignore
+                    request_kwargs["tools"] = req.tools
 
-                response = await client.chat.completions.create(**request_kwargs)  # type: ignore
-                prompt_token_usage: int = 0
-                completion_token_usage: int = 0
-                sources_appended = False
+                response = await client.chat.completions.create(**request_kwargs)
+
                 async for chunk in response:
-                    chunk_payload = chunk.model_dump(exclude_unset=True)
-                    if (
-                        sources
-                        and not sources_appended
-                        and getattr(chunk, "choices", None)
-                        and all(
-                            getattr(choice, "finish_reason", None) is not None
-                            for choice in chunk.choices
-                        )
-                    ):
-                        chunk_payload["sources"] = [
-                            source.model_dump(mode="json") for source in sources
-                        ]
-                        sources_appended = True
+                    payload = chunk.model_dump(exclude_unset=True)
 
-                    data = json.dumps(chunk_payload)
-                    yield f"data: {data}\n\n"
-                    await asyncio.sleep(0)
+                    if chunk.usage is not None:
+                        last_seen_usage = payload.get("usage", last_seen_usage)
+                        if last_seen_usage:
+                            prompt_token_usage = last_seen_usage.get(
+                                "prompt_tokens", prompt_token_usage
+                            )
+                            completion_token_usage = last_seen_usage.get(
+                                "completion_tokens", completion_token_usage
+                            )
 
-                    prompt_token_usage = (
-                        chunk.usage.prompt_tokens
-                        if chunk.usage is not None
-                        else prompt_token_usage
-                    )
-                    completion_token_usage = (
-                        chunk.usage.completion_tokens
-                        if chunk.usage is not None
-                        else completion_token_usage
-                    )
+                    try:
+                        stop_condition = payload["choices"][0].get("finish_reason")
+                    except Exception:
+                        stop_condition = None
+
+                    if stop_condition == "stop":
+                        if buffered_payload is not None:
+                            yield f"data: {json.dumps(buffered_payload)}\n\n"
+                            buffered_payload = None
+
+                        if sources:
+                            payload["sources"] = [
+                                s.model_dump(mode="json") for s in sources
+                            ]
+
+                        yield f"data: {json.dumps(payload)}\n\n"
+                        continue
+
+                    if buffered_payload is not None:
+                        yield f"data: {json.dumps(buffered_payload)}\n"
+                    buffered_payload = payload
 
                 await UserManager.update_token_usage(
                     auth_info.user.userid,
@@ -378,18 +384,26 @@ async def chat_completion(
                     web_search_calls=len(sources) if sources else 0,
                 )
                 logger.info(
-                    f"[chat] stream done request_id={request_id} prompt_tokens={prompt_token_usage} completion_tokens={completion_token_usage} duration_ms={(time.monotonic() - t_call) * 1000:.0f} total_ms={(time.monotonic() - t_start) * 1000:.0f}"
+                    "[chat] stream done request_id=%s prompt_tokens=%d completion_tokens=%d "
+                    "duration_ms=%.0f total_ms=%.0f",
+                    request_id,
+                    prompt_token_usage,
+                    completion_token_usage,
+                    (time.monotonic() - t_call) * 1000,
+                    (time.monotonic() - t_start) * 1000,
                 )
 
             except Exception as e:
-                logger.error(f"[chat] stream error request_id={request_id} error={e}")
-                return
+                logger.error(
+                    "[chat] stream error request_id=%s error=%s", request_id, e
+                )
+                yield f"data: {json.dumps({'error': 'stream_failed', 'message': str(e)})}\n\n"
 
-        # Return the streaming response
         return StreamingResponse(
             chat_completion_stream_generator(),
-            media_type="text/event-stream",  # Ensure client interprets as Server-Sent Events
+            media_type="text/event-stream",
         )
+
     current_messages = messages
     request_kwargs = {
         "model": req.model,
