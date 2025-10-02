@@ -368,7 +368,7 @@ async def chat_completion(
                         continue
 
                     if buffered_payload is not None:
-                        yield f"data: {json.dumps(buffered_payload)}\n"
+                        yield f"data: {json.dumps(buffered_payload)}\n\n"
                     buffered_payload = payload
 
                 await UserManager.update_token_usage(
