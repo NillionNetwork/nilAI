@@ -315,9 +315,7 @@ def test_chat_completion_stream_includes_sources(
     ) as response:
         assert response.status_code == 200
         data_lines = [
-            line
-            for line in response.iter_lines()
-            if line and line.startswith("data: ")
+            line for line in response.iter_lines() if line and line.startswith("data: ")
         ]
 
     assert data_lines, "Expected SSE data from stream response"
