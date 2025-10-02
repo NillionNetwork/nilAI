@@ -1,5 +1,6 @@
 # Fast API and serving
 import asyncio
+import json
 import logging
 import time
 import uuid
@@ -332,17 +333,35 @@ async def chat_completion(
                 response = await client.chat.completions.create(**request_kwargs)  # type: ignore
                 prompt_token_usage: int = 0
                 completion_token_usage: int = 0
+                sources_appended = False
                 async for chunk in response:
-                    data = chunk.model_dump_json(exclude_unset=True)
+                    chunk_payload = chunk.model_dump(exclude_unset=True)
+                    if (
+                        sources
+                        and not sources_appended
+                        and getattr(chunk, "choices", None)
+                        and all(
+                            getattr(choice, "finish_reason", None) is not None
+                            for choice in chunk.choices
+                        )
+                    ):
+                        chunk_payload["sources"] = [
+                            source.model_dump(mode="json") for source in sources
+                        ]
+                        sources_appended = True
+
+                    data = json.dumps(chunk_payload)
                     yield f"data: {data}\n\n"
                     await asyncio.sleep(0)
 
                     prompt_token_usage = (
-                        chunk.usage.prompt_tokens if chunk.usage else prompt_token_usage
+                        chunk.usage.prompt_tokens
+                        if chunk.usage is not None
+                        else prompt_token_usage
                     )
                     completion_token_usage = (
                         chunk.usage.completion_tokens
-                        if chunk.usage
+                        if chunk.usage is not None
                         else completion_token_usage
                     )
 
