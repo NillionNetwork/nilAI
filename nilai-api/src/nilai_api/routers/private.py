@@ -47,6 +47,18 @@ async def get_prompt_store_delegation(
 
 @router.get("/v1/usage", tags=["Usage"])
 async def get_usage(auth_info: AuthenticationInfo = Depends(get_auth_info)) -> Usage:
+    """
+    Retrieve the current token usage for the authenticated user.
+
+    - **user**: Authenticated user information (through HTTP Bearer header)
+    - **Returns**: Usage statistics for the user's token consumption
+
+    ### Example
+    ```python
+    # Retrieves token usage for the logged-in user
+    usage = await get_usage(user)
+    ```
+    """
     return Usage(
         prompt_tokens=auth_info.user.prompt_tokens,
         completion_tokens=auth_info.user.completion_tokens,
@@ -60,6 +72,21 @@ async def get_attestation(
     nonce: Optional[Nonce] = None,
     auth_info: AuthenticationInfo = Depends(get_auth_info),
 ) -> AttestationReport:
+    """
+    Generate a cryptographic attestation report.
+
+    - **attestation_request**: Attestation request containing a nonce
+    - **user**: Authenticated user information (through HTTP Bearer header)
+    - **Returns**: Attestation details for service verification
+
+    ### Attestation Details
+    - `verifying_key`: Public key for cryptographic verification
+    - `cpu_attestation`: CPU environment verification
+    - `gpu_attestation`: GPU environment verification
+
+    ### Security Note
+    Provides cryptographic proof of the service's integrity and environment.
+    """
     attestation_report = await get_attestation_report(nonce)
     attestation_report.verifying_key = state.b64_public_key
     return attestation_report
@@ -69,4 +96,16 @@ async def get_attestation(
 async def get_models(
     auth_info: AuthenticationInfo = Depends(get_auth_info),
 ) -> List[ModelMetadata]:
+    """
+    List all available models in the system.
+
+    - **user**: Authenticated user information (through HTTP Bearer header)
+    - **Returns**: Dictionary of available models
+
+    ### Example
+    ```python
+    # Retrieves list of available models
+    models = await get_models(user)
+    ```
+    """
     return [endpoint.metadata for endpoint in (await state.models).values()]
