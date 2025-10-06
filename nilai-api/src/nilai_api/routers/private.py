@@ -309,8 +309,6 @@ async def chat_completion(
 
         async def chat_completion_stream_generator() -> AsyncGenerator[str, None]:
             t_call = time.monotonic()
-            last_seen_usage = None
-            buffered_payload = None
             prompt_token_usage = 0
             completion_token_usage = 0
 
@@ -327,7 +325,7 @@ async def chat_completion(
                     "extra_body": {
                         "stream_options": {
                             "include_usage": True,
-                            "continuous_usage_stats": True,
+                            "continuous_usage_stats": False,
                         }
                     },
                 }
@@ -337,39 +335,18 @@ async def chat_completion(
                 response = await client.chat.completions.create(**request_kwargs)
 
                 async for chunk in response:
+                    if chunk.usage is not None:
+                        prompt_token_usage = chunk.usage.prompt_tokens
+                        completion_token_usage = chunk.usage.completion_tokens
+
                     payload = chunk.model_dump(exclude_unset=True)
 
-                    if chunk.usage is not None:
-                        last_seen_usage = payload.get("usage", last_seen_usage)
-                        if last_seen_usage:
-                            prompt_token_usage = last_seen_usage.get(
-                                "prompt_tokens", prompt_token_usage
-                            )
-                            completion_token_usage = last_seen_usage.get(
-                                "completion_tokens", completion_token_usage
-                            )
+                    if chunk.usage is not None and sources:
+                        payload["sources"] = [
+                            s.model_dump(mode="json") for s in sources
+                        ]
 
-                    try:
-                        stop_condition = payload["choices"][0].get("finish_reason")
-                    except Exception:
-                        stop_condition = None
-
-                    if stop_condition == "stop":
-                        if buffered_payload is not None:
-                            yield f"data: {json.dumps(buffered_payload)}\n\n"
-                            buffered_payload = None
-
-                        if sources:
-                            payload["sources"] = [
-                                s.model_dump(mode="json") for s in sources
-                            ]
-
-                        yield f"data: {json.dumps(payload)}\n\n"
-                        continue
-
-                    if buffered_payload is not None:
-                        yield f"data: {json.dumps(buffered_payload)}\n\n"
-                    buffered_payload = payload
+                    yield f"data: {json.dumps(payload)}\n\n"
 
                 await UserManager.update_token_usage(
                     auth_info.user.userid,
