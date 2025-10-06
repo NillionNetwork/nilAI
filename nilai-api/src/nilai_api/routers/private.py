@@ -1,5 +1,5 @@
 # Fast API and serving
-import asyncio
+import json
 import logging
 import time
 import uuid
@@ -306,45 +306,47 @@ async def chat_completion(
         logger.info(f"[chat] web_search messages: {messages}")
 
     if req.stream:
-        # Forwarding Streamed Responses
+
         async def chat_completion_stream_generator() -> AsyncGenerator[str, None]:
+            t_call = time.monotonic()
+            prompt_token_usage = 0
+            completion_token_usage = 0
+
             try:
                 logger.info(f"[chat] stream start request_id={request_id}")
-                t_call = time.monotonic()
-                current_messages = messages
+
                 request_kwargs = {
                     "model": req.model,
-                    "messages": current_messages,  # type: ignore
-                    "stream": True,  # type: ignore
+                    "messages": messages,
+                    "stream": True,
                     "top_p": req.top_p,
                     "temperature": req.temperature,
                     "max_tokens": req.max_tokens,
                     "extra_body": {
                         "stream_options": {
                             "include_usage": True,
-                            "continuous_usage_stats": True,
+                            "continuous_usage_stats": False,
                         }
                     },
                 }
                 if req.tools:
-                    request_kwargs["tools"] = req.tools  # type: ignore
+                    request_kwargs["tools"] = req.tools
 
-                response = await client.chat.completions.create(**request_kwargs)  # type: ignore
-                prompt_token_usage: int = 0
-                completion_token_usage: int = 0
+                response = await client.chat.completions.create(**request_kwargs)
+
                 async for chunk in response:
-                    data = chunk.model_dump_json(exclude_unset=True)
-                    yield f"data: {data}\n\n"
-                    await asyncio.sleep(0)
+                    if chunk.usage is not None:
+                        prompt_token_usage = chunk.usage.prompt_tokens
+                        completion_token_usage = chunk.usage.completion_tokens
 
-                    prompt_token_usage = (
-                        chunk.usage.prompt_tokens if chunk.usage else prompt_token_usage
-                    )
-                    completion_token_usage = (
-                        chunk.usage.completion_tokens
-                        if chunk.usage
-                        else completion_token_usage
-                    )
+                    payload = chunk.model_dump(exclude_unset=True)
+
+                    if chunk.usage is not None and sources:
+                        payload["sources"] = [
+                            s.model_dump(mode="json") for s in sources
+                        ]
+
+                    yield f"data: {json.dumps(payload)}\n\n"
 
                 await UserManager.update_token_usage(
                     auth_info.user.userid,
@@ -359,18 +361,26 @@ async def chat_completion(
                     web_search_calls=len(sources) if sources else 0,
                 )
                 logger.info(
-                    f"[chat] stream done request_id={request_id} prompt_tokens={prompt_token_usage} completion_tokens={completion_token_usage} duration_ms={(time.monotonic() - t_call) * 1000:.0f} total_ms={(time.monotonic() - t_start) * 1000:.0f}"
+                    "[chat] stream done request_id=%s prompt_tokens=%d completion_tokens=%d "
+                    "duration_ms=%.0f total_ms=%.0f",
+                    request_id,
+                    prompt_token_usage,
+                    completion_token_usage,
+                    (time.monotonic() - t_call) * 1000,
+                    (time.monotonic() - t_start) * 1000,
                 )
 
             except Exception as e:
-                logger.error(f"[chat] stream error request_id={request_id} error={e}")
-                return
+                logger.error(
+                    "[chat] stream error request_id=%s error=%s", request_id, e
+                )
+                yield f"data: {json.dumps({'error': 'stream_failed', 'message': str(e)})}\n\n"
 
-        # Return the streaming response
         return StreamingResponse(
             chat_completion_stream_generator(),
-            media_type="text/event-stream",  # Ensure client interprets as Server-Sent Events
+            media_type="text/event-stream",
         )
+
     current_messages = messages
     request_kwargs = {
         "model": req.model,

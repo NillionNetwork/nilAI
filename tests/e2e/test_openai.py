@@ -251,9 +251,6 @@ def test_streaming_chat_completion(client, model):
             if chunk.usage:
                 had_usage = True
                 print(f"Model {model} usage: {chunk.usage}")
-
-            # Limit processing to avoid long tests
-            if chunk_count >= 20:
                 break
         assert had_usage, f"No usage data received for {model} streaming request"
         assert chunk_count > 0, f"No chunks received for {model} streaming request"
@@ -459,6 +456,7 @@ def test_function_calling_with_streaming(client, model):
             if chunk.usage:
                 had_usage = True
                 print(f"Model {model} usage: {chunk.usage}")
+                break
 
         assert had_tool_call, f"No tool calls received for {model} streaming request"
         assert had_usage, f"No usage data received for {model} streaming request"

@@ -1,11 +1,12 @@
 import asyncio
+import json
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
 
 from nilai_api.db.users import RateLimits, UserModel
-from nilai_common import AttestationReport
+from nilai_common import AttestationReport, Source
 
 from nilai_api.state import state
 from ... import model_endpoint, model_metadata, response as RESPONSE
@@ -221,3 +222,106 @@ def test_chat_completion(mock_user, mock_state, mock_user_manager, mocker, clien
         "completion_tokens_details": None,
         "prompt_tokens_details": None,
     }
+
+
+def test_chat_completion_stream_includes_sources(
+    mock_user, mock_state, mock_user_manager, mocker, client
+):
+    source = Source(source="https://example.com", content="Example result")
+
+    mock_web_search_result = MagicMock()
+    mock_web_search_result.messages = [
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": "Tell me something new."},
+    ]
+    mock_web_search_result.sources = [source]
+
+    mocker.patch(
+        "nilai_api.routers.private.handle_web_search",
+        new=AsyncMock(return_value=mock_web_search_result),
+    )
+
+    class MockChunk:
+        def __init__(self, data, usage=None):
+            self._data = data
+            self.usage = usage
+
+        def model_dump(self, exclude_unset=True):
+            return self._data
+
+    class MockUsage:
+        def __init__(self, prompt_tokens: int, completion_tokens: int):
+            self.prompt_tokens = prompt_tokens
+            self.completion_tokens = completion_tokens
+
+    first_chunk = MockChunk(
+        data={
+            "id": "stream-1",
+            "object": "chat.completion.chunk",
+            "model": "meta-llama/Llama-3.2-1B-Instruct",
+            "created": 0,
+            "choices": [{"delta": {"content": "Hello"}, "index": 0}],
+        }
+    )
+
+    final_chunk = MockChunk(
+        data={
+            "id": "stream-1",
+            "object": "chat.completion.chunk",
+            "model": "meta-llama/Llama-3.2-1B-Instruct",
+            "created": 0,
+            "choices": [
+                {"delta": {}, "finish_reason": "stop", "index": 0},
+            ],
+            "usage": {
+                "prompt_tokens": 5,
+                "completion_tokens": 7,
+                "total_tokens": 12,
+            },
+        },
+        usage=MockUsage(prompt_tokens=5, completion_tokens=7),
+    )
+
+    async def chunk_generator():
+        yield first_chunk
+        yield final_chunk
+
+    mock_chat_completions = MagicMock()
+    mock_chat_completions.create = AsyncMock(return_value=chunk_generator())
+    mock_chat = MagicMock()
+    mock_chat.completions = mock_chat_completions
+    mock_async_openai_instance = MagicMock()
+    mock_async_openai_instance.chat = mock_chat
+
+    mocker.patch(
+        "nilai_api.routers.private.AsyncOpenAI",
+        return_value=mock_async_openai_instance,
+    )
+
+    payload = {
+        "model": "meta-llama/Llama-3.2-1B-Instruct",
+        "messages": [
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": "Tell me something new."},
+        ],
+        "stream": True,
+        "web_search": True,
+    }
+
+    headers = {"Authorization": "Bearer test-api-key"}
+
+    with client.stream(
+        "POST", "/v1/chat/completions", json=payload, headers=headers
+    ) as response:
+        assert response.status_code == 200
+        data_lines = [
+            line for line in response.iter_lines() if line and line.startswith("data: ")
+        ]
+
+    assert data_lines, "Expected SSE data from stream response"
+    first_payload = json.loads(data_lines[0][len("data: ") :])
+    assert "sources" not in first_payload
+    final_payload = json.loads(data_lines[-1][len("data: ") :])
+    assert "sources" in final_payload
+    assert len(final_payload["sources"]) == 1
+    assert final_payload["sources"][0]["source"] == "https://example.com"
