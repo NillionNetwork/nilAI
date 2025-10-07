@@ -11,6 +11,7 @@ from nilai_api.handlers.nildb.api_model import (
 )
 from nilai_api.handlers.nildb.handler import get_nildb_delegation_token
 from nilai_api.routers.endpoints.chat import chat_completion_router
+from nilai_api.routers.endpoints.responses import responses_router
 from nilai_api.state import state
 
 from nilai_common import (
@@ -25,6 +26,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 router.include_router(chat_completion_router)
+router.include_router(responses_router)
 
 
 @router.get("/v1/delegation")

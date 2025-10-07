@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Annotated, List, Optional, Any
+from typing import Annotated, List
 from pydantic import BaseModel, Field
 
 class ResultContent(BaseModel):

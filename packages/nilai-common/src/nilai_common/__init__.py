@@ -23,6 +23,9 @@ from nilai_common.api_models import (
     Message,
     MessageAdapter,
     Response,
+    ResponseRequest,
+    InputItemAdapter,
+    SignedResponse,
 )
 from nilai_common.config import SETTINGS, MODEL_SETTINGS
 from nilai_common.discovery import ModelServiceDiscovery
@@ -57,4 +60,7 @@ __all__ = [
     "WebSearchContext",
     "ResultContent",
     "Response",
+    "ResponseRequest",
+    "InputItemAdapter",
+    "SignedResponse",
 ]

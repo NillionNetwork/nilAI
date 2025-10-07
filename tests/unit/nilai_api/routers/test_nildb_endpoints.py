@@ -141,7 +141,7 @@ class TestNilDBEndpoints:
     @pytest.mark.asyncio
     async def test_chat_completion_with_prompt_document_injection(self):
         """Test chat completion with prompt document injection"""
-        from nilai_api.routers.private import chat_completion
+        from nilai_api.routers.endpoints.chat import chat_completion
         from nilai_common import ChatRequest
 
         mock_prompt_document = PromptDocument(
@@ -242,7 +242,7 @@ class TestNilDBEndpoints:
     @pytest.mark.asyncio
     async def test_chat_completion_prompt_document_extraction_error(self):
         """Test chat completion when prompt document extraction fails"""
-        from nilai_api.routers.private import chat_completion
+        from nilai_api.routers.endpoints.chat import chat_completion
         from nilai_common import ChatRequest
 
         mock_prompt_document = PromptDocument(
@@ -288,7 +288,7 @@ class TestNilDBEndpoints:
     @pytest.mark.asyncio
     async def test_chat_completion_without_prompt_document(self):
         """Test chat completion when no prompt document is present"""
-        from nilai_api.routers.private import chat_completion
+        from nilai_api.routers.endpoints.chat import chat_completion
         from nilai_common import ChatRequest
 
         mock_user = MagicMock()
