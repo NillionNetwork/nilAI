@@ -24,9 +24,9 @@ from nilai_api.state import state
 # Import the new Response API models we created
 from nilai_common import (
     ResponseRequest,
-    InputItemAdapter,
     SignedResponse,
     Source,
+    ResponseCompletedEvent
 )
 
 logger = logging.getLogger(__name__)
@@ -62,15 +62,15 @@ async def responses_web_search_rate_limit(request: Request) -> bool:
 @responses_router.post("/v1/responses", tags=["Responses"], response_model=None)
 async def create_response(
     req: ResponseRequest = Body(
-        ResponseRequest(
-            model="openai/gpt-oss-20b",
-            instructions="You are a helpful assistant.",
-            input=[
-                InputItemAdapter.new_message_item(role="user", content="What is your name?"),
+        {
+            "model": "openai/gpt-oss-20b",
+            "instructions": "You are a helpful assistant.",
+            "input": [
+                {"role": "user", "content": "What is your name?"},
             ],
-            stream=False,
-            web_search=False
-        )
+            "stream": False,
+            "web_search": False,
+        }
     ),
     _rate_limit=Depends(
         RateLimit(
@@ -161,12 +161,15 @@ async def create_response(
                 async for event in stream:
                     payload = event.model_dump(exclude_unset=True)
 
-                    if event.event == "response.completed" and event.data.usage:
-                        usage = event.data.usage
-                        prompt_token_usage = usage.input_tokens
-                        completion_token_usage = usage.output_tokens
+                    if isinstance(event, ResponseCompletedEvent):
+                        if event.response and event.response.usage:
+                            usage = event.response.usage
+                            prompt_token_usage = usage.input_tokens
+                            completion_token_usage = usage.output_tokens
 
                         if sources:
+                            if 'data' not in payload:
+                                payload['data'] = {}
                             payload["data"]["sources"] = [s.model_dump(mode="json") for s in sources]
                     
                     yield f"data: {json.dumps(payload)}\n\n"

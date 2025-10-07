@@ -32,9 +32,10 @@ from nilai_common.api_models.chat_completion_model import (
 
 from nilai_common.api_models.responses_model import (
     Response,
+    ResponseCompletedEvent,
     ResponseRequest,
-    InputItemAdapter,
     SignedResponse,
+    ToolChoice,
 )
 
 __all__ = [
@@ -65,8 +66,9 @@ __all__ = [
     "ImageContent",
     "TextContent",
     "Response",
+    "ResponseCompletedEvent",
     "ResponseRequest",
-    "InputItemAdapter",
     "SignedResponse",
+    "ToolChoice",
 ]
 
