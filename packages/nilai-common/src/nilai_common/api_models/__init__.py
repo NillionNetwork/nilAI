@@ -36,6 +36,7 @@ from nilai_common.api_models.responses_model import (
     ResponseRequest,
     SignedResponse,
     ToolChoice,
+    WebSearchEnhancedInput,
 )
 
 __all__ = [
@@ -70,5 +71,6 @@ __all__ = [
     "ResponseRequest",
     "SignedResponse",
     "ToolChoice",
+    "WebSearchEnhancedInput",
 ]
 

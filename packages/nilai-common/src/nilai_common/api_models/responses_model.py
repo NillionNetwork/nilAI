@@ -54,6 +54,42 @@ class ResponseRequest(BaseModel):
         
         return False
 
+    def get_last_user_query(self) -> Optional[str]:
+        if isinstance(self.input, str):
+            return self.input
+        
+        if isinstance(self.input, list):
+            for item in reversed(self.input):
+                if isinstance(item, dict):
+                    role = item.get("role")
+                    if role == "user":
+                        content = item.get("content")
+                        if isinstance(content, str):
+                            return content.strip() or None
+                        elif isinstance(content, list):
+                            text_parts = []
+                            for part in content:
+                                if isinstance(part, dict) and part.get("type") == "text":
+                                    text = part.get("text")
+                                    if isinstance(text, str) and text.strip():
+                                        text_parts.append(text.strip())
+                            if text_parts:
+                                return "\n".join(text_parts)
+        
+        return None
+
+    def ensure_instructions(self, additional_instructions: str) -> None:
+        if self.instructions:
+            self.instructions = self.instructions + "\n\n" + additional_instructions
+        else:
+            self.instructions = additional_instructions
+
+
+class WebSearchEnhancedInput(BaseModel):
+    input: Union[str, ResponseInputParam]
+    instructions: Optional[str]
+    sources: List[Source]
+
 
 class SignedResponse(Response):
     """

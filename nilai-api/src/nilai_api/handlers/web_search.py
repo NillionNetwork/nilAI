@@ -20,6 +20,8 @@ from nilai_common.api_models import (
     TopicResponse,
     Topic,
     TopicQuery,
+    ResponseRequest,
+    WebSearchEnhancedInput,
 )
 
 logger = logging.getLogger(__name__)
@@ -506,3 +508,152 @@ async def enhance_messages_with_multi_web_search(
     req.ensure_system_content(web_search_content)
 
     return WebSearchEnhancedMessages(messages=req.messages, sources=all_sources)
+
+
+async def enhance_input_with_web_search(
+    req: ResponseRequest, query: str
+) -> WebSearchEnhancedInput:
+    ctx = await perform_web_search_async(query)
+    query_source = Source(source=WEB_SEARCH_QUERY_SOURCE, content=query)
+
+    web_search_instructions = (
+        f'You have access to the following web search results for the query: "{query}"\n\n'
+        "Use this information to provide accurate and up-to-date answers. "
+        "Cite the sources when appropriate.\n\n"
+        "Web Search Results:\n"
+        f"{ctx.prompt}\n\n"
+        "Please provide a comprehensive answer based on the search results above."
+    )
+
+    req.ensure_instructions(web_search_instructions)
+
+    return WebSearchEnhancedInput(
+        input=req.input,
+        instructions=req.instructions,
+        sources=[query_source] + ctx.sources,
+    )
+
+
+async def enhance_input_with_multi_web_search(
+    req: ResponseRequest,
+    topic_queries: List[TopicQuery],
+    contexts: List[WebSearchContext],
+) -> WebSearchEnhancedInput:
+    if not topic_queries or not contexts:
+        return WebSearchEnhancedInput(
+            input=req.input, instructions=req.instructions, sources=[]
+        )
+
+    sections: List[str] = []
+    all_sources: List[Source] = []
+
+    for idx, (topic_query, context) in enumerate(zip(topic_queries, contexts), start=1):
+        topic = topic_query.topic.strip()
+        query = topic_query.query.strip()
+        if not query:
+            continue
+
+        all_sources.append(Source(source=WEB_SEARCH_QUERY_SOURCE, content=query))
+
+        header = f'Topic {idx}: {topic}\nQuery: "{query}"\n\nWeb Search Results:\n'
+        block = context.prompt.strip() if context.prompt else "(no results)"
+        sections.append(header + block)
+        all_sources.extend(context.sources)
+
+    if not sections:
+        return WebSearchEnhancedInput(
+            input=req.input, instructions=req.instructions, sources=[]
+        )
+
+    web_search_instructions = (
+        "You have access to the following topic-specific web search results.\n\n"
+        "Use this information to provide accurate and up-to-date answers. "
+        "Cite sources when appropriate.\n\n"
+        + "\n\n".join(sections)
+        + "\n\nPlease provide a comprehensive answer based on the relevant search results above."
+    )
+
+    req.ensure_instructions(web_search_instructions)
+
+    return WebSearchEnhancedInput(
+        input=req.input, instructions=req.instructions, sources=all_sources
+    )
+
+
+async def handle_web_search_for_responses(
+    req: ResponseRequest, model_name: str, client: Any
+) -> WebSearchEnhancedInput:
+    logger.info("Handle web search for responses start")
+    logger.debug(
+        "Handle web search for responses model=%s",
+        model_name,
+    )
+    user_query = req.get_last_user_query()
+    if not user_query:
+        logger.info("No user query found")
+        return WebSearchEnhancedInput(
+            input=req.input, instructions=req.instructions, sources=[]
+        )
+
+    try:
+        topics = await analyze_web_search_topics(user_query, model_name, client)
+        topics_to_search = [t for t in topics if t.needs_search][:3]
+
+        if not topics_to_search:
+            logger.info(
+                "No topics require web search; falling back to single-query enrichment"
+            )
+            concise_query = await generate_search_query_from_llm(
+                user_query, model_name, client
+            )
+            return await enhance_input_with_web_search(req, concise_query)
+
+        async def _generate_query(topic_obj: Topic) -> TopicQuery | None:
+            topic_str = topic_obj.topic.strip()
+            if not topic_str:
+                return None
+            try:
+                query = await generate_search_query_from_llm(
+                    user_query, model_name, client, topic=topic_str
+                )
+                return TopicQuery(topic=topic_str, query=query)
+            except Exception:
+                logger.exception("Failed generating query for topic '%s'", topic_str)
+                return None
+
+        query_generation_tasks = [_generate_query(t) for t in topics_to_search]
+        generated_results = await asyncio.gather(*query_generation_tasks)
+        topic_queries: List[TopicQuery] = [res for res in generated_results if res]
+
+        if not topic_queries:
+            logger.info(
+                "No valid topic queries generated; falling back to single query"
+            )
+            concise_query = await generate_search_query_from_llm(
+                user_query, model_name, client
+            )
+            return await enhance_input_with_web_search(req, concise_query)
+
+        async def _search(q: str) -> WebSearchContext:
+            try:
+                return await perform_web_search_async(q)
+            except Exception:
+                logger.exception("Search failed for query '%s'", q)
+                return WebSearchContext(prompt="", sources=[])
+
+        search_tasks = [_search(tq.query) for tq in topic_queries]
+        contexts = await asyncio.gather(*search_tasks)
+
+        return await enhance_input_with_multi_web_search(req, topic_queries, contexts)
+
+    except HTTPException:
+        logger.exception("Web search provider error")
+        return WebSearchEnhancedInput(
+            input=req.input, instructions=req.instructions, sources=[]
+        )
+
+    except Exception:
+        logger.exception("Unexpected error during web search handling")
+        return WebSearchEnhancedInput(
+            input=req.input, instructions=req.instructions, sources=[]
+        )

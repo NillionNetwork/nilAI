@@ -17,7 +17,7 @@ from nilai_api.db.users import UserManager
 from nilai_api.handlers.nildb.handler import get_prompt_from_nildb
 # from nilai_api.handlers.nilrag import handle_nilrag_for_responses # Assumes an adapted handler
 # from nilai_api.handlers.tools.responses_tool_router import handle_responses_tool_workflow # Assumes an adapted handler
-# from nilai_api.handlers.web_search import handle_web_search_for_responses # Assumes an adapted handler
+from nilai_api.handlers.web_search import handle_web_search_for_responses
 from nilai_api.rate_limiting import RateLimit
 from nilai_api.state import state
 
@@ -85,6 +85,42 @@ async def create_response(
     
     This endpoint provides a more flexible and powerful way to interact with models,
     supporting complex inputs and a structured event stream.
+    
+    - **req**: Response request containing input and model specifications
+    - **Returns**: Full response with model output, usage statistics, and cryptographic signature
+    
+    ### Request Requirements
+    - Must include non-empty input (string or structured input)
+    - Must specify a model
+    - Supports optional instructions to guide the model's behavior
+    - Optional web_search parameter to enhance context with current information
+    
+    ### Response Components
+    - Model-generated text completion
+    - Token usage metrics
+    - Cryptographically signed response for verification
+    
+    ### Processing Steps
+    1. Validate input request parameters
+    2. If web_search is enabled, perform web search and enhance context
+    3. Prepare input for model processing
+    4. Generate AI model response
+    5. Track and update token usage
+    6. Cryptographically sign the response
+    
+    ### Web Search Feature
+    When web_search=True, the system will:
+    - Extract the user's query from the input
+    - Perform a web search using Brave API
+    - Enhance the context with current information
+    - Add search results to instructions for better responses
+    
+    ### Potential HTTP Errors
+    - **400 Bad Request**:
+      - Missing or empty input
+      - No model specified
+    - **500 Internal Server Error**:
+      - Model fails to generate a response
     """
     if not req.input:
         raise HTTPException(
@@ -132,14 +168,16 @@ async def create_response(
             )
 
     input_items = req.input
+    instructions = req.instructions
     sources: Optional[List[Source]] = None
 
     if req.web_search:
         logger.info(f"[responses] web_search start request_id={request_id}")
         t_ws = time.monotonic()
-        # web_search_result = await handle_web_search_for_responses(req, model_name, client)
-        # input_items = web_search_result.input_items
-        # sources = web_search_result.sources
+        web_search_result = await handle_web_search_for_responses(req, model_name, client)
+        input_items = web_search_result.input
+        instructions = web_search_result.instructions
+        sources = web_search_result.sources
         logger.info(
             f"[responses] web_search done request_id={request_id} sources={len(sources) if sources else 0} duration_ms={(time.monotonic() - t_ws) * 1000:.0f}"
         )
@@ -154,6 +192,7 @@ async def create_response(
                 logger.info(f"[responses] stream start request_id={request_id}")
                 request_kwargs = req.model_dump(exclude_unset=True, exclude={"web_search"})
                 request_kwargs["input"] = input_items
+                request_kwargs["instructions"] = instructions
                 request_kwargs["stream"] = True
 
                 stream = await client.responses.create(**request_kwargs)
@@ -196,6 +235,7 @@ async def create_response(
     # --- Non-Streaming Logic ---
     request_kwargs = req.model_dump(exclude_unset=True, exclude={"web_search", "stream"})
     request_kwargs["input"] = input_items
+    request_kwargs["instructions"] = instructions
 
     logger.info(f"[responses] call start request_id={request_id}")
     t_call = time.monotonic()
@@ -205,8 +245,7 @@ async def create_response(
         f"[responses] call done request_id={request_id} duration_ms={(time.monotonic() - t_call) * 1000:.0f}"
     )
 
-    # FIX 2: Handle the case where tool workflow is disabled to prevent NameError.
-    # Initialize variables for the non-tool-call path.
+
     final_response = response
     agg_prompt_tokens = 0
     agg_completion_tokens = 0
