@@ -1,4 +1,4 @@
-from nilai_common.api_models import (
+from nilai_common.api_models.common_model import (
     AttestationReport,
     HealthCheckResponse,
     ModelEndpoint,
@@ -11,6 +11,10 @@ from nilai_common.api_models import (
     ResultContent,
     TopicResponse,
     Topic,
+    TopicQuery,
+)
+
+from nilai_common.api_models.chat_completion_model import (
     ChatRequest,
     SignedChatCompletion,
     Choice,
@@ -22,15 +26,28 @@ from nilai_common.api_models import (
     WebSearchContext,
     Message,
     MessageAdapter,
+    ImageContent,
+    TextContent,
+)
+
+from nilai_common.api_models.responses_model import (
     Response,
 )
-from nilai_common.config import SETTINGS, MODEL_SETTINGS
-from nilai_common.discovery import ModelServiceDiscovery
-from openai.types.completion_usage import CompletionUsage as Usage
 
 __all__ = [
-    "Message",
-    "MessageAdapter",
+    "AttestationReport",
+    "HealthCheckResponse",
+    "ModelEndpoint",
+    "ModelMetadata",
+    "Nonce",
+    "AMDAttestationToken",
+    "NVAttestationToken",
+    "SearchResult",
+    "Source",
+    "ResultContent",
+    "TopicResponse",
+    "Topic",
+    "TopicQuery",
     "ChatRequest",
     "SignedChatCompletion",
     "Choice",
@@ -38,23 +55,12 @@ __all__ = [
     "ChatCompletionMessage",
     "ChatCompletionMessageToolCall",
     "ChatToolFunction",
-    "ModelMetadata",
-    "Usage",
-    "AttestationReport",
-    "HealthCheckResponse",
-    "ModelEndpoint",
-    "ModelServiceDiscovery",
-    "Nonce",
-    "AMDAttestationToken",
-    "NVAttestationToken",
-    "SETTINGS",
-    "MODEL_SETTINGS",
-    "SearchResult",
-    "Source",
-    "TopicResponse",
-    "Topic",
     "WebSearchEnhancedMessages",
     "WebSearchContext",
-    "ResultContent",
+    "Message",
+    "MessageAdapter",
+    "ImageContent",
+    "TextContent",
     "Response",
 ]
+

@@ -10,7 +10,7 @@ from nilai_api.handlers.nildb.api_model import (
     PromptDelegationToken,
 )
 from nilai_api.handlers.nildb.handler import get_nildb_delegation_token
-from nilai_api.routers.endpoints.chat import chat_completion_router as chat_router
+from nilai_api.routers.endpoints.chat import chat_completion_router
 from nilai_api.state import state
 
 from nilai_common import (
