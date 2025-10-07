@@ -9,7 +9,7 @@ import trafilatura
 from fastapi import HTTPException, status
 
 from nilai_api.config import CONFIG
-from nilai_common.api_model import (
+from nilai_common.api_models import (
     ChatRequest,
     MessageAdapter,
     SearchResult,

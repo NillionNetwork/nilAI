@@ -6,7 +6,7 @@ from nilai_api.handlers.web_search import (
     enhance_messages_with_web_search,
 )
 from nilai_common import MessageAdapter, ChatRequest
-from nilai_common.api_model import (
+from nilai_common.api_models import (
     WebSearchContext,
     Source,
 )
