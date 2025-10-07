@@ -360,7 +360,7 @@ def test_model_tools_request(client, model):
         "messages": [
             {
                 "role": "system",
-                "content": "You are a helpful assistant that provides accurate and concise information.",
+                "content": "You are a helpful assistant. When a user asks a question that requires calculation, use the execute_python tool to find the answer. After the tool provides its result, you must use that result to formulate a clear, final answer to the user's original question. Do not include any code or JSON in your final response.",
             },
             {"role": "user", "content": "What is the weather like in Paris today?"},
         ],
@@ -403,7 +403,7 @@ def test_model_tools_request(client, model):
         message = response_json["choices"][0].get("message", {})
 
         # Check if the model used the tool
-        if "tool_calls" in message:
+        if message.get("tool_calls"):
             tool_calls = message.get("tool_calls", [])
             print(f"\nModel {model} tool calls: {json.dumps(tool_calls, indent=2)}")
             assert len(tool_calls) > 0, f"Tool calls array is empty for {model}"

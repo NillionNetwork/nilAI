@@ -8,6 +8,7 @@ from typing import AsyncGenerator, Optional, Union, List, Tuple
 from nilai_api.attestation import get_attestation_report
 from nilai_api.handlers.nilrag import handle_nilrag
 from nilai_api.handlers.web_search import handle_web_search
+from nilai_api.handlers.tools.tool_router import handle_tool_workflow
 
 from fastapi import APIRouter, Body, Depends, HTTPException, status, Request
 from fastapi.responses import StreamingResponse
@@ -157,7 +158,7 @@ async def chat_completion_web_search_rate_limit(request: Request) -> bool:
         chat_request = ChatRequest(**body)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid request body")
-    return getattr(chat_request, "web_search", False)
+    return bool(chat_request.web_search)
 
 
 @router.post("/v1/chat/completions", tags=["Chat"], response_model=None)
@@ -391,6 +392,8 @@ async def chat_completion(
     }
     if req.tools:
         request_kwargs["tools"] = req.tools  # type: ignore
+        request_kwargs["tool_choice"] = req.tool_choice
+
     logger.info(f"[chat] call start request_id={request_id}")
     logger.info(f"[chat] call message: {current_messages}")
     t_call = time.monotonic()
@@ -399,11 +402,20 @@ async def chat_completion(
         f"[chat] call done request_id={request_id} duration_ms={(time.monotonic() - t_call) * 1000:.0f}"
     )
     logger.info(f"[chat] call response: {response}")
+
+    # Handle tool workflow fully inside tools.router
+    (
+        final_completion,
+        agg_prompt_tokens,
+        agg_completion_tokens,
+    ) = await handle_tool_workflow(client, req, current_messages, response)
+    logger.info(f"[chat] call final_completion: {final_completion}")
     model_response = SignedChatCompletion(
-        **response.model_dump(),
+        **final_completion.model_dump(),
         signature="",
         sources=sources,
     )
+
     logger.info(
         f"[chat] model_response request_id={request_id} duration_ms={(time.monotonic() - t_call) * 1000:.0f}"
     )
@@ -413,7 +425,21 @@ async def chat_completion(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Model response does not contain usage statistics",
         )
-    # Update token usage
+
+    if agg_prompt_tokens or agg_completion_tokens:
+        total_prompt_tokens = response.usage.prompt_tokens
+        total_completion_tokens = response.usage.completion_tokens
+
+        total_prompt_tokens += agg_prompt_tokens
+        total_completion_tokens += agg_completion_tokens
+
+        model_response.usage.prompt_tokens = total_prompt_tokens
+        model_response.usage.completion_tokens = total_completion_tokens
+        model_response.usage.total_tokens = (
+            total_prompt_tokens + total_completion_tokens
+        )
+
+    # Update token usage in DB
     await UserManager.update_token_usage(
         auth_info.user.userid,
         prompt_tokens=model_response.usage.prompt_tokens,

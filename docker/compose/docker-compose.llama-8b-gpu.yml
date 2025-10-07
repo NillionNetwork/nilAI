@@ -20,13 +20,14 @@ services:
         condition: service_healthy
     command: >
       --model meta-llama/Llama-3.1-8B-Instruct
-      --gpu-memory-utilization 0.20
+      --gpu-memory-utilization 0.95
       --max-model-len 10000
       --max-num-batched-tokens 10000
       --tensor-parallel-size 1
-      --enable-auto-tool-choice
       --tool-call-parser llama3_json
       --uvicorn-log-level warning
+      --enable-auto-tool-choice
+      --chat-template /opt/vllm/templates/llama3.1_tool_json.jinja
     environment:
       - SVC_HOST=llama_8b_gpu
       - SVC_PORT=8000
@@ -34,7 +35,7 @@ services:
       - ETCD_PORT=2379
       - TOOL_SUPPORT=true
     volumes:
-      - hugging_face_models:/root/.cache/huggingface  # cache models
+      - hugging_face_models:/root/.cache/huggingface
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s

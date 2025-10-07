@@ -10,6 +10,7 @@ FROM vllm/vllm-openai:v0.10.1
 # ENV EXEC_PATH=nilai_models.models.${MODEL_NAME}:app
 
 COPY --link . /daemon/
+COPY --link vllm_templates /opt/vllm/templates
 
 WORKDIR /daemon/nilai-models/
 

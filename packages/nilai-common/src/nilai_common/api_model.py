@@ -19,6 +19,12 @@ from openai.types.chat import (
     ChatCompletionToolParam,
     ChatCompletionMessage,
 )
+
+from openai.types.chat.chat_completion_message_tool_call import (
+    ChatCompletionMessageToolCall,
+    Function,
+)
+
 from openai.types.chat.chat_completion_content_part_text_param import (
     ChatCompletionContentPartTextParam,
 )
@@ -28,6 +34,7 @@ from openai.types.chat.chat_completion_content_part_image_param import (
 from openai.types.chat.chat_completion import Choice as OpenaAIChoice
 from pydantic import BaseModel, Field
 
+ChatToolFunction: TypeAlias = Function
 
 # ---------- Aliases from the OpenAI SDK ----------
 ImageContent: TypeAlias = ChatCompletionContentPartImageParam
@@ -142,6 +149,55 @@ class MessageAdapter(BaseModel):
         return message
 
     @staticmethod
+    def new_tool_message(
+        name: str,
+        content: str,
+        tool_call_id: str,
+    ) -> Message:
+        """Create a tool role message compatible with OpenAI SDK types.
+
+        Example shape:
+        {
+          "role": "tool",
+          "name": "execute_python",
+          "content": "...",
+          "tool_call_id": "call_abc123"
+        }
+        """
+        message: Message = cast(
+            Message,
+            {
+                "role": "tool",
+                "name": name,
+                "content": content,
+                "tool_call_id": tool_call_id,
+            },
+        )
+        return message
+
+    @staticmethod
+    def new_assistant_tool_call_message(
+        tool_calls: List[ChatCompletionMessageToolCall],
+    ) -> Message:
+        """Create an assistant message carrying tool_calls.
+
+        Shape example:
+        {
+          "role": "assistant",
+          "tool_calls": [...],
+          "content": None,
+        }
+        """
+        return cast(
+            Message,
+            {
+                "role": "assistant",
+                "tool_calls": [tc.model_dump(exclude_unset=True) for tc in tool_calls],
+                "content": None,
+            },
+        )
+
+    @staticmethod
     def new_completion_message(content: str) -> ChatCompletionMessage:
         message: ChatCompletionMessage = cast(
             ChatCompletionMessage, {"role": "assistant", "content": content}
@@ -200,6 +256,7 @@ class ChatRequest(BaseModel):
     max_tokens: Optional[int] = Field(default=None, ge=1, le=100000)
     stream: Optional[bool] = False
     tools: Optional[Iterable[ChatCompletionToolParam]] = None
+    tool_choice: Optional[Union[str, dict]] = "auto"
     nilrag: Optional[dict] = {}
     web_search: Optional[bool] = Field(
         default=False,
