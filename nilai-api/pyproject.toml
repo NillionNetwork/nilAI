@@ -36,7 +36,10 @@ dependencies = [
     "pyyaml>=6.0.1",
     "trafilatura>=1.7.0",
     "secretvaults",
+<<<<<<< HEAD
     "e2b-code-interpreter>=1.0.3",
+=======
+>>>>>>> a4d2f92 (feat: first working version of payments for nilAI)
     "nilauth-credit-middleware>=0.1.0",
 ]
 
