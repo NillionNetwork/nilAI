@@ -299,7 +299,9 @@ class TestNilDBEndpoints:
             mock_get_prompt.side_effect = Exception("Unable to extract prompt")
 
             with pytest.raises(HTTPException) as exc_info:
-                await chat_completion(req=request, auth_info=mock_auth_info)
+                await chat_completion(
+                    req=request, auth_info=mock_auth_info, meter=mock_meter
+                )
 
             assert exc_info.value.status_code == status.HTTP_403_FORBIDDEN
             assert (
