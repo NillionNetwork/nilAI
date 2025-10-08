@@ -1,3 +1,5 @@
+from openai.types.responses import ResponseCompletedEvent
+
 from nilai_common.api_models.common_model import (
     AttestationReport,
     HealthCheckResponse,
@@ -32,7 +34,6 @@ from nilai_common.api_models.chat_completion_model import (
 
 from nilai_common.api_models.responses_model import (
     Response,
-    ResponseCompletedEvent,
     ResponseRequest,
     SignedResponse,
     ToolChoice,
@@ -73,4 +74,3 @@ __all__ = [
     "ToolChoice",
     "WebSearchEnhancedInput",
 ]
-

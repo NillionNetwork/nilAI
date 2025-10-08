@@ -59,7 +59,7 @@ async def responses_web_search_rate_limit(request: Request) -> bool:
     return bool(response_request.web_search)
 
 
-@responses_router.post("/v1/responses", tags=["Responses"], response_model=None)
+@responses_router.post("/v1/responses", tags=["Responses"], response_model=SignedResponse)
 async def create_response(
     req: ResponseRequest = Body(
         {
@@ -190,10 +190,23 @@ async def create_response(
 
             try:
                 logger.info(f"[responses] stream start request_id={request_id}")
-                request_kwargs = req.model_dump(exclude_unset=True, exclude={"web_search"})
-                request_kwargs["input"] = input_items
-                request_kwargs["instructions"] = instructions
-                request_kwargs["stream"] = True
+                request_kwargs = {
+                    "model": req.model,
+                    "input": input_items,
+                    "instructions": instructions,
+                    "stream": True,
+                    "top_p": req.top_p,
+                    "temperature": req.temperature,
+                    "max_output_tokens": req.max_output_tokens,
+                    "extra_body": {
+                        "stream_options": {
+                            "include_usage": True,
+                            "continuous_usage_stats": False,
+                        }
+                    },
+                }
+                if req.tools:
+                    request_kwargs["tools"] = req.tools
 
                 stream = await client.responses.create(**request_kwargs)
 
@@ -205,6 +218,7 @@ async def create_response(
                             usage = event.response.usage
                             prompt_token_usage = usage.input_tokens
                             completion_token_usage = usage.output_tokens
+                            payload["response"]["usage"] = usage.model_dump(mode="json")
 
                         if sources:
                             if 'data' not in payload:
@@ -233,9 +247,16 @@ async def create_response(
         return StreamingResponse(response_stream_generator(), media_type="text/event-stream")
 
     # --- Non-Streaming Logic ---
-    request_kwargs = req.model_dump(exclude_unset=True, exclude={"web_search", "stream"})
-    request_kwargs["input"] = input_items
-    request_kwargs["instructions"] = instructions
+    request_kwargs = {
+        "model": req.model,
+        "input": input_items,
+        "instructions": instructions,
+        "top_p": req.top_p,
+        "temperature": req.temperature,
+        "max_output_tokens": req.max_output_tokens,
+    }
+    if req.tools:
+        request_kwargs["tools"] = req.tools
 
     logger.info(f"[responses] call start request_id={request_id}")
     t_call = time.monotonic()
