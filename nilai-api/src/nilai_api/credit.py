@@ -12,8 +12,11 @@ from nilauth_credit_middleware import (
 
 from nilai_api.config import CONFIG
 
+<<<<<<< HEAD
 from nuc.envelope import NucTokenEnvelope
 
+=======
+>>>>>>> a4d2f92 (feat: first working version of payments for nilAI)
 logger = logging.getLogger(__name__)
 
 
@@ -94,7 +97,11 @@ CreditClientSingleton.configure(
 
 def user_id_extractor() -> Callable[[Request], Awaitable[str]]:
     if CONFIG.auth.auth_strategy == "nuc":
+<<<<<<< HEAD
         return from_nuc_bearer_root_token()
+=======
+        return UserIdExtractors.from_nuc_bearer_token()
+>>>>>>> a4d2f92 (feat: first working version of payments for nilAI)
     else:
         extractor = UserIdExtractors.from_header("Authorization")
 
@@ -109,6 +116,7 @@ def user_id_extractor() -> Callable[[Request], Awaitable[str]]:
         return wrapper
 
 
+<<<<<<< HEAD
 def from_nuc_bearer_root_token() -> Callable[[Request], Awaitable[str]]:
     """Extract user ID from a NUC root token"""
 
@@ -127,6 +135,8 @@ def from_nuc_bearer_root_token() -> Callable[[Request], Awaitable[str]]:
     return extractor
 
 
+=======
+>>>>>>> a4d2f92 (feat: first working version of payments for nilAI)
 def llm_cost_calculator(llm_cost_dict: LLMCostDict):
     async def calculator(request: Request, response_data: dict) -> float:
         model_name = getattr(request, "model", "default")
