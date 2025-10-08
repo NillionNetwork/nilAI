@@ -6,6 +6,7 @@ import uuid
 from base64 import b64encode
 from typing import AsyncGenerator, Optional, Union, List, Tuple
 from nilai_api.attestation import get_attestation_report
+from nilai_api.credit import LLMMeter, LLMUsage
 from nilai_api.handlers.nilrag import handle_nilrag
 from nilai_api.handlers.web_search import handle_web_search
 from nilai_api.handlers.tools.tool_router import handle_tool_workflow
@@ -41,7 +42,7 @@ from nilai_common import (
     Usage,
 )
 
-
+from nilauth_credit_middleware import MeteringContext
 from openai import AsyncOpenAI
 
 
@@ -181,6 +182,7 @@ async def chat_completion(
         )
     ),
     auth_info: AuthenticationInfo = Depends(get_auth_info),
+    meter: MeteringContext = Depends(LLMMeter),
 ) -> Union[SignedChatCompletion, StreamingResponse]:
     """
     Generate a chat completion response from the AI model.
@@ -354,6 +356,15 @@ async def chat_completion(
                     prompt_tokens=prompt_token_usage,
                     completion_tokens=completion_token_usage,
                 )
+                meter.set_response(
+                    {
+                        "usage": LLMUsage(
+                            prompt_tokens=prompt_token_usage,
+                            completion_tokens=completion_token_usage,
+                            web_searches=len(sources) if sources else 0,
+                        )
+                    }
+                )
                 await QueryLogManager.log_query(
                     auth_info.user.userid,
                     model=req.model,
@@ -445,7 +456,15 @@ async def chat_completion(
         prompt_tokens=model_response.usage.prompt_tokens,
         completion_tokens=model_response.usage.completion_tokens,
     )
-
+    meter.set_response(
+        {
+            "usage": LLMUsage(
+                prompt_tokens=model_response.usage.prompt_tokens,
+                completion_tokens=model_response.usage.completion_tokens,
+                web_searches=len(sources) if sources else 0,
+            )
+        }
+    )
     await QueryLogManager.log_query(
         auth_info.user.userid,
         model=req.model,

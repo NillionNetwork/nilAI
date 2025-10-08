@@ -158,6 +158,10 @@ class TestNilDBEndpoints:
             user=mock_user, token_rate_limit=None, prompt_document=mock_prompt_document
         )
 
+        # Mock metering context
+        mock_meter = MagicMock()
+        mock_meter.set_response = MagicMock()
+
         request = ChatRequest(
             model="test-model", messages=[{"role": "user", "content": "Hello"}]
         )
@@ -231,7 +235,9 @@ class TestNilDBEndpoints:
             # Note: We can't easily test the full endpoint without setting up the FastAPI app
             # But we can test that get_prompt_from_nildb is called
             try:
-                await chat_completion(req=request, auth_info=mock_auth_info)
+                await chat_completion(
+                    req=request, auth_info=mock_auth_info, meter=mock_meter
+                )
             except Exception as e:
                 # Expected to fail due to incomplete mocking, but we should still see the prompt call
                 print("The exception is: ", str(e))
@@ -259,6 +265,10 @@ class TestNilDBEndpoints:
             user=mock_user, token_rate_limit=None, prompt_document=mock_prompt_document
         )
 
+        # Mock metering context
+        mock_meter = MagicMock()
+        mock_meter.set_response = MagicMock()
+
         request = ChatRequest(
             model="test-model", messages=[{"role": "user", "content": "Hello"}]
         )
@@ -277,7 +287,9 @@ class TestNilDBEndpoints:
             mock_get_prompt.side_effect = Exception("Unable to extract prompt")
 
             with pytest.raises(HTTPException) as exc_info:
-                await chat_completion(req=request, auth_info=mock_auth_info)
+                await chat_completion(
+                    req=request, auth_info=mock_auth_info, meter=mock_meter
+                )
 
             assert exc_info.value.status_code == status.HTTP_403_FORBIDDEN
             assert (
@@ -302,6 +314,10 @@ class TestNilDBEndpoints:
             token_rate_limit=None,
             prompt_document=None,  # No prompt document
         )
+
+        # Mock metering context
+        mock_meter = MagicMock()
+        mock_meter.set_response = MagicMock()
 
         request = ChatRequest(
             model="test-model", messages=[{"role": "user", "content": "Hello"}]
@@ -371,7 +387,9 @@ class TestNilDBEndpoints:
 
             # Call the function
             try:
-                await chat_completion(req=request, auth_info=mock_auth_info)
+                await chat_completion(
+                    req=request, auth_info=mock_auth_info, meter=mock_meter
+                )
             except Exception:
                 # Expected to fail due to incomplete mocking
                 pass
