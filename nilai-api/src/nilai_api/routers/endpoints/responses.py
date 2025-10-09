@@ -15,8 +15,8 @@ from nilai_api.crypto import sign_message
 from nilai_api.db.logs import QueryLogManager
 from nilai_api.db.users import UserManager
 from nilai_api.handlers.nildb.handler import get_prompt_from_nildb
-# from nilai_api.handlers.nilrag import handle_nilrag_for_responses # Assumes an adapted handler
-# from nilai_api.handlers.tools.responses_tool_router import handle_responses_tool_workflow # Assumes an adapted handler
+#from nilai_api.handlers.nilrag import handle_nilrag_for_responses
+from nilai_api.handlers.tools.responses_tool_router import handle_responses_tool_workflow
 from nilai_api.handlers.web_search import handle_web_search_for_responses
 from nilai_api.rate_limiting import RateLimit
 from nilai_api.state import state
@@ -257,6 +257,7 @@ async def create_response(
     }
     if req.tools:
         request_kwargs["tools"] = req.tools
+        request_kwargs["tool_choice"] = req.tool_choice
 
     logger.info(f"[responses] call start request_id={request_id}")
     t_call = time.monotonic()
@@ -267,16 +268,11 @@ async def create_response(
     )
 
 
-    final_response = response
-    agg_prompt_tokens = 0
-    agg_completion_tokens = 0
-
-    # If you enable tool workflow, it will overwrite the variables above.
-    # (
-    #    final_response,
-    #    agg_prompt_tokens,
-    #    agg_completion_tokens,
-    # ) = await handle_responses_tool_workflow(client, req, input_items, response)
+    (
+        final_response,
+        agg_prompt_tokens,
+        agg_completion_tokens,
+    ) = await handle_responses_tool_workflow(client, req, input_items, response)
     
     model_response = SignedResponse(
         **final_response.model_dump(),
