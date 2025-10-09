@@ -12,6 +12,8 @@ from nilauth_credit_middleware import (
 
 from nilai_api.config import CONFIG
 
+from nuc.envelope import NucTokenEnvelope
+
 logger = logging.getLogger(__name__)
 
 
@@ -107,6 +109,24 @@ def user_id_extractor() -> Callable[[Request], Awaitable[str]]:
         return wrapper
 
 
+def from_nuc_bearer_root_token() -> Callable[[Request], Awaitable[str]]:
+    """Extract user ID from a NUC root token"""
+
+    async def extractor(request: Request) -> str:
+        auth_header: str | None = request.headers.get("Authorization", None)
+        if not auth_header or not auth_header.startswith("Bearer "):
+            raise ValueError("No Bearer token found")
+
+        # Remove the Bearer prefix
+        token_str: str = auth_header.replace("Bearer ", "")
+        # Parse the token
+        token = NucTokenEnvelope.parse(token_str)
+        # Returns the issuer of the root token from an invocation token
+        return str(token.proofs[-1].token.issuer)
+
+    return extractor
+
+
 def llm_cost_calculator(llm_cost_dict: LLMCostDict):
     async def calculator(request: Request, response_data: dict) -> float:
         model_name = getattr(request, "model", "default")
@@ -125,7 +145,7 @@ def llm_cost_calculator(llm_cost_dict: LLMCostDict):
 
 
 LLMMeter = create_metering_dependency(
-    user_id_extractor=user_id_extractor(),
+    user_id_extractor=from_nuc_bearer_root_token(),
     estimated_cost=2.0,
     cost_calculator=llm_cost_calculator(MyCostDictionary),
 )
