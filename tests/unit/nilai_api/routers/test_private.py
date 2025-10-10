@@ -192,7 +192,7 @@ def test_chat_completion(mock_user, mock_state, mock_user_manager, mocker, clien
     data.pop("signature")
     data.pop("sources", None)
     response_data = ChatCompletion(**data)
-    # Patch nilai_api.routers.private.AsyncOpenAI to return a mock instance with chat.completions.create as an AsyncMock
+    # Patch nilai_api.routers.endpoints.chat.AsyncOpenAI to return a mock instance with chat.completions.create as an AsyncMock
     mock_chat_completions = MagicMock()
     mock_chat_completions.create = mocker.AsyncMock(return_value=response_data)
     mock_chat = MagicMock()
@@ -200,7 +200,11 @@ def test_chat_completion(mock_user, mock_state, mock_user_manager, mocker, clien
     mock_async_openai_instance = MagicMock()
     mock_async_openai_instance.chat = mock_chat
     mocker.patch(
-        "nilai_api.routers.private.AsyncOpenAI", return_value=mock_async_openai_instance
+        "nilai_api.routers.endpoints.chat.AsyncOpenAI", return_value=mock_async_openai_instance
+    )
+    mocker.patch(
+        "nilai_api.routers.endpoints.chat.handle_tool_workflow",
+        return_value=(response_data, 0, 0)
     )
     response = client.post(
         "/v1/chat/completions",
@@ -237,7 +241,7 @@ def test_chat_completion_stream_includes_sources(
     mock_web_search_result.sources = [source]
 
     mocker.patch(
-        "nilai_api.routers.private.handle_web_search",
+        "nilai_api.routers.endpoints.chat.handle_web_search",
         new=AsyncMock(return_value=mock_web_search_result),
     )
 
@@ -294,7 +298,7 @@ def test_chat_completion_stream_includes_sources(
     mock_async_openai_instance.chat = mock_chat
 
     mocker.patch(
-        "nilai_api.routers.private.AsyncOpenAI",
+        "nilai_api.routers.endpoints.chat.AsyncOpenAI",
         return_value=mock_async_openai_instance,
     )
 
