@@ -561,18 +561,6 @@ wheels = [
 ]
 
 [[package]]
-name = "debtcollector"
-version = "3.0.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "wrapt" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/31/e2/a45b5a620145937529c840df5e499c267997e85de40df27d54424a158d3c/debtcollector-3.0.0.tar.gz", hash = "sha256:2a8917d25b0e1f1d0d365d3c1c6ecfc7a522b1e9716e8a1a4a915126f7ccea6f", size = 31322, upload-time = "2024-02-22T15:39:20.674Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/9c/ca/863ed8fa66d6f986de6ad7feccc5df96e37400845b1eeb29889a70feea99/debtcollector-3.0.0-py3-none-any.whl", hash = "sha256:46f9dacbe8ce49c47ebf2bf2ec878d50c9443dfae97cc7b8054be684e54c3e91", size = 23035, upload-time = "2024-02-22T15:39:18.99Z" },
-]
-
-[[package]]
 name = "distlib"
 version = "0.3.9"
 source = { registry = "https://pypi.org/simple" }
@@ -688,20 +676,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/48/ce/13508a1ec3f8bb981ae4ca79ea40384becc868bfae97fd1c942bb3a001b1/email_validator-2.2.0.tar.gz", hash = "sha256:cb690f344c617a714f22e66ae771445a1ceb46821152df8e165c5f9a364582b7", size = 48967, upload-time = "2024-06-20T11:30:30.034Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d7/ee/bf0adb559ad3c786f12bcbc9296b3f5675f529199bef03e2df281fa1fadb/email_validator-2.2.0-py3-none-any.whl", hash = "sha256:561977c2d73ce3611850a06fa56b414621e0c8faa9d66f2611407d87465da631", size = 33521, upload-time = "2024-06-20T11:30:28.248Z" },
-]
-
-[[package]]
-name = "etcd3gw"
-version = "2.4.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "futurist" },
-    { name = "pbr" },
-    { name = "requests" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/00/56/db0e19678af91d9213cf21c72e7d82a3494d6fc7da16d61c6ba578fd8648/etcd3gw-2.4.2.tar.gz", hash = "sha256:6c6e9e42b810ee9a9455dd342de989f1fab637a94daa4fc34cacb248a54473fa", size = 29840, upload-time = "2024-08-27T16:21:35.772Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/35/11/79f09e0d1195d455bdf0542d4fec4ddc80a4f496d090244bba9fc7113834/etcd3gw-2.4.2-py3-none-any.whl", hash = "sha256:b907bd2dc702eabbeba3f9c15666e94e92961bfe685429a0e415ce44097f5c22", size = 24092, upload-time = "2024-08-27T16:21:34.556Z" },
 ]
 
 [[package]]
@@ -950,18 +924,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/45/d8/8425e6ba5fcec61a1d16e41b1b71d2bf9344f1fe48012c2b48b9620feae5/fsspec-2025.3.2.tar.gz", hash = "sha256:e52c77ef398680bbd6a98c0e628fbc469491282981209907bbc8aea76a04fdc6", size = 299281, upload-time = "2025-03-31T15:27:08.524Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/44/4b/e0cfc1a6f17e990f3e64b7d941ddc4acdc7b19d6edd51abf495f32b1a9e4/fsspec-2025.3.2-py3-none-any.whl", hash = "sha256:2daf8dc3d1dfa65b6aa37748d112773a7a08416f6c70d96b264c96476ecaf711", size = 194435, upload-time = "2025-03-31T15:27:07.028Z" },
-]
-
-[[package]]
-name = "futurist"
-version = "3.1.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "debtcollector" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/45/9b/15b4c90b43e65e5c4bb69b7e63e151148657f4b5a9aafe537211c6e7558f/futurist-3.1.0.tar.gz", hash = "sha256:15242c8b2639f58021e34af0c81c8fb20a6f653e0f2de45ff569b9f96138449e", size = 45178, upload-time = "2025-02-24T10:45:38.368Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/48/39/49b4cbcecd17290974b38244f983a0f3e7cfde6b3f710f30958ca7312b27/futurist-3.1.0-py3-none-any.whl", hash = "sha256:a0733cd6f8ba8e173913336527a82843118980c19959645252eed1d8682e9dc1", size = 37119, upload-time = "2025-02-24T10:45:36.578Z" },
 ]
 
 [[package]]
@@ -1619,17 +1581,17 @@ name = "nilai-common"
 version = "0.1.0"
 source = { editable = "packages/nilai-common" }
 dependencies = [
-    { name = "etcd3gw" },
     { name = "openai" },
     { name = "pydantic" },
+    { name = "redis" },
     { name = "tenacity" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "etcd3gw", specifier = ">=2.4.2" },
     { name = "openai", specifier = ">=1.59.9" },
     { name = "pydantic", specifier = ">=2.10.1" },
+    { name = "redis", specifier = ">=5.0.0" },
     { name = "tenacity", specifier = ">=9.0.0" },
 ]
 
@@ -1911,18 +1873,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/ca/bc/f35b8446f4531a7cb215605d100cd88b7ac6f44ab3fc94870c120ab3adbf/pathspec-0.12.1.tar.gz", hash = "sha256:a482d51503a1ab33b1c67a6c3813a26953dbdc71c31dacaef9a838c4e29f5712", size = 51043, upload-time = "2023-12-10T22:30:45Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/cc/20/ff623b09d963f88bfde16306a54e12ee5ea43e9b597108672ff3a408aad6/pathspec-0.12.1-py3-none-any.whl", hash = "sha256:a0d503e138a4c123b27490a4f7beda6a01c6f288df0e4a8b79c7eb0dc7b4cc08", size = 31191, upload-time = "2023-12-10T22:30:43.14Z" },
-]
-
-[[package]]
-name = "pbr"
-version = "6.1.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "setuptools" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/01/d2/510cc0d218e753ba62a1bc1434651db3cd797a9716a0a66cc714cb4f0935/pbr-6.1.1.tar.gz", hash = "sha256:93ea72ce6989eb2eed99d0f75721474f69ad88128afdef5ac377eb797c4bf76b", size = 125702, upload-time = "2025-02-04T14:28:06.514Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/47/ac/684d71315abc7b1214d59304e23a982472967f6bf4bde5a98f1503f648dc/pbr-6.1.1-py2.py3-none-any.whl", hash = "sha256:38d4daea5d9fa63b3f626131b9d34947fd0c8be9b05a29276870580050a25a76", size = 108997, upload-time = "2025-02-04T14:28:03.168Z" },
 ]
 
 [[package]]
