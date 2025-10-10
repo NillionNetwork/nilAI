@@ -3,7 +3,7 @@ from unittest.mock import patch, MagicMock
 from datetime import datetime, timezone, timedelta
 from fastapi import HTTPException
 
-from nilai_api.auth.strategies import api_key_strategy, jwt_strategy, nuc_strategy
+from nilai_api.auth.strategies import api_key_strategy, nuc_strategy
 from nilai_api.auth.common import AuthenticationInfo, PromptDocument
 from nilai_api.db.users import RateLimits, UserModel
 
@@ -60,50 +60,6 @@ class TestAuthStrategies:
             assert "Missing or invalid API key" in str(exc_info.value.detail)
 
     @pytest.mark.asyncio
-    async def test_jwt_strategy_existing_user(self, mock_user_model):
-        """Test JWT authentication with existing user"""
-        with (
-            patch("nilai_api.auth.strategies.validate_jwt") as mock_validate,
-            patch("nilai_api.auth.strategies.UserManager.check_api_key") as mock_check,
-        ):
-            mock_jwt_result = MagicMock()
-            mock_jwt_result.user_address = "test-address"
-            mock_jwt_result.pub_key = "test-pub-key"
-            mock_validate.return_value = mock_jwt_result
-            mock_check.return_value = mock_user_model
-
-            result = await jwt_strategy("jwt-token")
-
-            assert isinstance(result, AuthenticationInfo)
-            assert result.user.name == "Test User"
-            assert result.token_rate_limit is None
-            assert result.prompt_document is None
-
-    @pytest.mark.asyncio
-    async def test_jwt_strategy_new_user(self):
-        """Test JWT authentication creating new user"""
-        with (
-            patch("nilai_api.auth.strategies.validate_jwt") as mock_validate,
-            patch("nilai_api.auth.strategies.UserManager.check_api_key") as mock_check,
-            patch(
-                "nilai_api.auth.strategies.UserManager.insert_user_model"
-            ) as mock_insert,
-        ):
-            mock_jwt_result = MagicMock()
-            mock_jwt_result.user_address = "new-user-address"
-            mock_jwt_result.pub_key = "new-user-pub-key"
-            mock_validate.return_value = mock_jwt_result
-            mock_check.return_value = None
-            mock_insert.return_value = None
-
-            result = await jwt_strategy("jwt-token")
-
-            assert isinstance(result, AuthenticationInfo)
-            assert result.token_rate_limit is None
-            assert result.prompt_document is None
-            mock_insert.assert_called_once()
-
-    @pytest.mark.asyncio
     async def test_nuc_strategy_existing_user_with_prompt_document(
         self, mock_user_model, mock_prompt_document
     ):
@@ -135,7 +91,7 @@ class TestAuthStrategies:
     @pytest.mark.asyncio
     async def test_nuc_strategy_new_user_with_token_limits(self, mock_prompt_document):
         """Test NUC authentication creating new user with token limits"""
-        from nuc_helpers.usage import TokenRateLimits, TokenRateLimit
+        from nilai_api.auth.nuc_helpers.usage import TokenRateLimits, TokenRateLimit
 
         mock_token_limits = TokenRateLimits(
             limits=[
@@ -261,21 +217,6 @@ class TestAuthStrategies:
         with patch("nilai_api.auth.strategies.UserManager.check_api_key") as mock_check:
             mock_check.return_value = mock_user_model
             result = await api_key_strategy("test-key")
-            assert hasattr(result, "prompt_document")
-            assert result.prompt_document is None
-
-        # Test JWT strategy
-        with (
-            patch("nilai_api.auth.strategies.validate_jwt") as mock_validate,
-            patch("nilai_api.auth.strategies.UserManager.check_api_key") as mock_check,
-        ):
-            mock_jwt_result = MagicMock()
-            mock_jwt_result.user_address = "test-address"
-            mock_jwt_result.pub_key = "test-pub-key"
-            mock_validate.return_value = mock_jwt_result
-            mock_check.return_value = mock_user_model
-
-            result = await jwt_strategy("jwt-token")
             assert hasattr(result, "prompt_document")
             assert result.prompt_document is None
 

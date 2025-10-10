@@ -9,8 +9,8 @@ from nilai_api.auth.common import AuthenticationError
 
 from nilai_common.logger import setup_logger
 
-from nuc_helpers.usage import TokenRateLimits
-from nuc_helpers.nildb_document import PromptDocument
+from nilai_api.auth.nuc_helpers.usage import TokenRateLimits
+from nilai_api.auth.nuc_helpers.nildb_document import PromptDocument
 
 logger = setup_logger(__name__)
 

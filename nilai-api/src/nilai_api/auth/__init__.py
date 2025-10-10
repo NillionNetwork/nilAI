@@ -8,7 +8,7 @@ from nilai_api.db.users import UserManager
 from nilai_api.auth.strategies import AuthenticationStrategy
 
 from nuc.validate import ValidationException
-from nuc_helpers.usage import UsageLimitError
+from nilai_api.auth.nuc_helpers.usage import UsageLimitError
 
 from nilai_api.auth.common import (
     AuthenticationInfo,
