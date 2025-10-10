@@ -1,4 +1,4 @@
-from nuc_helpers import (
+from nilai_api.auth.nuc_helpers import (
     get_wallet_and_private_key,
     pay_for_subscription,
     get_root_token,

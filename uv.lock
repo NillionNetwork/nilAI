@@ -11,11 +11,8 @@ resolution-markers = [
 members = [
     "nilai",
     "nilai-api",
-    "nilai-auth-client",
-    "nilai-auth-server",
     "nilai-common",
     "nilai-models",
-    "nuc-helpers",
 ]
 
 [[package]]
@@ -2074,7 +2071,6 @@ dependencies = [
     { name = "nilai-api" },
     { name = "nilai-common" },
     { name = "nilai-models" },
-    { name = "nuc-helpers" },
 ]
 
 [package.dev-dependencies]
@@ -2097,7 +2093,6 @@ requires-dist = [
     { name = "nilai-api", editable = "nilai-api" },
     { name = "nilai-common", editable = "packages/nilai-common" },
     { name = "nilai-models", editable = "nilai-models" },
-    { name = "nuc-helpers", editable = "nilai-auth/nuc-helpers" },
 ]
 
 [package.metadata.requires-dev]
@@ -2134,7 +2129,6 @@ dependencies = [
     { name = "nilauth-credit-middleware" },
     { name = "nilrag" },
     { name = "nuc" },
-    { name = "nuc-helpers" },
     { name = "openai" },
     { name = "prometheus-fastapi-instrumentator" },
     { name = "pydantic" },
@@ -2166,7 +2160,6 @@ requires-dist = [
     { name = "nilauth-credit-middleware", specifier = "==0.1.1" },
     { name = "nilrag", specifier = ">=0.1.11" },
     { name = "nuc", specifier = ">=0.1.0" },
-    { name = "nuc-helpers", editable = "nilai-auth/nuc-helpers" },
     { name = "openai", specifier = ">=1.99.2" },
     { name = "prometheus-fastapi-instrumentator", specifier = ">=7.0.2" },
     { name = "pydantic", specifier = ">=2.0.0" },
@@ -2180,40 +2173,6 @@ requires-dist = [
     { name = "trafilatura", specifier = ">=1.7.0" },
     { name = "uvicorn", specifier = ">=0.32.1" },
     { name = "web3", specifier = ">=7.8.0" },
-]
-
-[[package]]
-name = "nilai-auth-client"
-version = "0.1.0"
-source = { editable = "nilai-auth/nilai-auth-client" }
-dependencies = [
-    { name = "nuc-helpers" },
-    { name = "openai" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "nuc-helpers", editable = "nilai-auth/nuc-helpers" },
-    { name = "openai", specifier = ">=1.70.0" },
-]
-
-[[package]]
-name = "nilai-auth-server"
-version = "0.1.0"
-source = { editable = "nilai-auth/nilai-auth-server" }
-dependencies = [
-    { name = "fastapi", extra = ["standard"] },
-    { name = "gunicorn" },
-    { name = "nuc-helpers" },
-    { name = "uvicorn" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "fastapi", extras = ["standard"], specifier = ">=0.115.5" },
-    { name = "gunicorn", specifier = ">=23.0.0" },
-    { name = "nuc-helpers", editable = "nilai-auth/nuc-helpers" },
-    { name = "uvicorn", specifier = ">=0.34.0" },
 ]
 
 [[package]]
@@ -2317,27 +2276,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/e9/58/acfdbdd6dc8e8575a1bc2ade9eedf7d33d99ac428573df5a46a4f4b76949/nuc-0.1.0.tar.gz", hash = "sha256:6a715bf07a8adf2901b68c9597ba44ae28506c3fb0fa03530c092bc0f8ba22f0", size = 29586, upload-time = "2025-07-01T14:46:55.774Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/80/ba/a99b12ee5132976d974fe65f9dbeaaafe4183a8558859c72bd271f87e25c/nuc-0.1.0-py3-none-any.whl", hash = "sha256:6845133866f2d41592be74ca2a41295d09d7a6d89886a5a1181dceefd4fe5a65", size = 22513, upload-time = "2025-07-01T14:46:54.685Z" },
-]
-
-[[package]]
-name = "nuc-helpers"
-version = "0.1.0"
-source = { editable = "nilai-auth/nuc-helpers" }
-dependencies = [
-    { name = "cosmpy" },
-    { name = "httpx" },
-    { name = "nuc" },
-    { name = "pydantic" },
-    { name = "secp256k1" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "cosmpy", specifier = "==0.9.2" },
-    { name = "httpx", specifier = ">=0.28.1" },
-    { name = "nuc", specifier = ">=0.1.0" },
-    { name = "pydantic", specifier = ">=2.11.2" },
-    { name = "secp256k1", specifier = ">=0.14.0" },
 ]
 
 [[package]]

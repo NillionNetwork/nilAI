@@ -5,8 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 authors = [
     { name = "José Cabrero-Holgueras", email = "jose.cabrero@nillion.com" },
-    { name = "Manuel Santos", email = "manuel.santos@nillion.com" },
-    { name = "Dimitris Mouris", email = "dimitris@nillion.com" }
+    { name = "Baptiste Lefort", email = "baptiste.lefort@nillion.com" }
 ]
 requires-python = ">=3.12"
 dependencies = [
@@ -25,7 +24,6 @@ dependencies = [
     "redis>=6.4.0",
     "web3>=7.8.0",
     "click>=8.1.8",
-    "nuc-helpers",
     "nuc>=0.1.0",
     "pyyaml>=6.0.1",
     "trafilatura>=1.7.0",
@@ -47,5 +45,6 @@ build-backend = "hatchling.build"
 
 [tool.uv.sources]
 nilai-common = { workspace = true }
-nuc-helpers = { workspace = true }
+
+# TODO: Remove this once the secretvaults package is released with the fix
 secretvaults = { git = "https://github.com/jcabrero/secretvaults-py", rev = "main" }

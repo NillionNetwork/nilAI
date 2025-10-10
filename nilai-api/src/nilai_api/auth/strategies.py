@@ -2,7 +2,6 @@ from typing import Callable, Awaitable, Optional
 from datetime import datetime, timezone
 
 from nilai_api.db.users import UserManager, UserModel, UserData
-from nilai_api.auth.jwt import validate_jwt
 from nilai_api.auth.nuc import (
     validate_nuc,
     get_token_rate_limit,
@@ -82,32 +81,6 @@ async def api_key_strategy(api_key: str) -> AuthenticationInfo:
 
 
 @allow_token(CONFIG.docs.token)
-async def jwt_strategy(jwt_creds: str) -> AuthenticationInfo:
-    result = validate_jwt(jwt_creds)
-    user_model: Optional[UserModel] = await UserManager.check_api_key(
-        result.user_address
-    )
-    if user_model:
-        return AuthenticationInfo(
-            user=UserData.from_sqlalchemy(user_model),
-            token_rate_limit=None,
-            prompt_document=None,
-        )
-    else:
-        user_model = UserModel(
-            userid=result.user_address,
-            name=result.pub_key,
-            apikey=result.user_address,
-        )
-        await UserManager.insert_user_model(user_model)
-        return AuthenticationInfo(
-            user=UserData.from_sqlalchemy(user_model),
-            token_rate_limit=None,
-            prompt_document=None,
-        )
-
-
-@allow_token(CONFIG.docs.token)
 async def nuc_strategy(nuc_token) -> AuthenticationInfo:
     """
     Validate a NUC token and return the user model
@@ -139,7 +112,6 @@ async def nuc_strategy(nuc_token) -> AuthenticationInfo:
 
 class AuthenticationStrategy(Enum):
     API_KEY = (api_key_strategy, "API Key")
-    JWT = (jwt_strategy, "JWT")
     NUC = (nuc_strategy, "NUC")
 
     async def __call__(self, *args, **kwargs) -> AuthenticationInfo:
