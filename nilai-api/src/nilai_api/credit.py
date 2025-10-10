@@ -94,7 +94,7 @@ CreditClientSingleton.configure(
 
 def user_id_extractor() -> Callable[[Request], Awaitable[str]]:
     if CONFIG.auth.auth_strategy == "nuc":
-        return UserIdExtractors.from_nuc_bearer_token()
+        return from_nuc_bearer_root_token()
     else:
         extractor = UserIdExtractors.from_header("Authorization")
 
@@ -145,7 +145,7 @@ def llm_cost_calculator(llm_cost_dict: LLMCostDict):
 
 
 LLMMeter = create_metering_dependency(
-    user_id_extractor=from_nuc_bearer_root_token(),
+    user_id_extractor=user_id_extractor(),
     estimated_cost=2.0,
     cost_calculator=llm_cost_calculator(MyCostDictionary),
 )
