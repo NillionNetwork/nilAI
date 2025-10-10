@@ -8,10 +8,19 @@ from fastapi import HTTPException, status
 from sentence_transformers import SentenceTransformer
 
 logger = logging.getLogger(__name__)
+embeddings_model = None
 
-embeddings_model = SentenceTransformer(
-    "sentence-transformers/all-MiniLM-L6-v2", device="cpu"
-)  # FIXME: Use a GPU model and move to a separate container
+
+def get_embeddings_model():
+    """
+    Lazy load the embeddings model on CPU.
+    """
+    global embeddings_model
+    if embeddings_model is None:
+        embeddings_model = SentenceTransformer(
+            "sentence-transformers/all-MiniLM-L6-v2", device="cpu"
+        )  # FIXME: Use a GPU model and move to a separate container
+    return embeddings_model
 
 
 def generate_embeddings_huggingface(
@@ -26,6 +35,7 @@ def generate_embeddings_huggingface(
     Returns:
         numpy.ndarray: Array of embeddings for the input text
     """
+    embeddings_model = get_embeddings_model()
     embeddings = embeddings_model.encode(chunks_or_query, convert_to_tensor=False)
     return embeddings
 

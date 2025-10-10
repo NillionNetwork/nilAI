@@ -1,45 +1,44 @@
 # nilai/models/model.py
 import asyncio
-import signal
 import logging
+import signal
+
 import httpx
 
-from nilai_common import (  # Model service discovery and host settings
-    SETTINGS,
+from nilai_common import (
     MODEL_SETTINGS,
-    ModelServiceDiscovery,
+    SETTINGS,
     ModelEndpoint,
     ModelMetadata,
+    ModelServiceDiscovery,
 )
 
 logger = logging.getLogger(__name__)
 
 
 async def get_metadata():
-    """Fetch model metadata from model
-    service and return as ModelMetadata object"""
+    """Fetch model metadata from model service and return as ModelMetadata object."""
     current_retries = 0
     while True:
         url = None
         try:
             url = f"http://{SETTINGS.host}:{SETTINGS.port}/v1/models"
-            # Request model metadata from localhost:8000/v1/models
             async with httpx.AsyncClient() as client:
                 response = await client.get(url)
                 response.raise_for_status()
                 response_data = response.json()
                 model_name = response_data["data"][0]["id"]
                 return ModelMetadata(
-                    id=model_name,  # Unique identifier
-                    name=model_name,  # Human-readable name
-                    version="1.0",  # Model version
+                    id=model_name,
+                    name=model_name,
+                    version="1.0",
                     description="",
-                    author="",  # Model creators
-                    license="Apache 2.0",  # Usage license
-                    source=f"https://huggingface.co/{model_name}",  # Model source
-                    supported_features=["chat_completion"],  # Capabilities
-                    tool_support=SETTINGS.tool_support,  # Tool support
-                    multimodal_support=SETTINGS.multimodal_support,  # Multimodal support
+                    author="",
+                    license="Apache 2.0",
+                    source=f"https://huggingface.co/{model_name}",
+                    supported_features=["chat_completion"],
+                    tool_support=SETTINGS.tool_support,
+                    multimodal_support=SETTINGS.multimodal_support,
                 )
 
         except Exception as e:
@@ -49,8 +48,7 @@ async def get_metadata():
                 logger.warning(f"Failed to fetch model metadata from {url}: {e}")
             current_retries += 1
             if (
-                MODEL_SETTINGS.num_retries
-                != -1  # If num_retries == -1 then we do infinite number of retries
+                MODEL_SETTINGS.num_retries != -1
                 and current_retries >= MODEL_SETTINGS.num_retries
             ):
                 raise e
@@ -58,7 +56,8 @@ async def get_metadata():
 
 
 async def run_service(discovery_service, model_endpoint):
-    """Runs the model service and keeps it alive"""
+    """Register model with discovery service and keep it alive."""
+    lease = None
     try:
         logger.info(f"Registering model: {model_endpoint.metadata.id}")
         lease = await discovery_service.register_model(model_endpoint, prefix="/models")
@@ -73,50 +72,62 @@ async def run_service(discovery_service, model_endpoint):
         logger.error(f"Service error: {e}")
         raise
     finally:
-        try:
-            await discovery_service.unregister_model(model_endpoint.metadata.id)
-            logger.info(f"Model unregistered: {model_endpoint.metadata.id}")
-        except Exception as e:
-            logger.error(f"Error unregistering model: {e}")
+        if lease:
+            try:
+                await discovery_service.unregister_model(model_endpoint.metadata.id)
+                logger.info(f"Model unregistered: {model_endpoint.metadata.id}")
+            except Exception as e:
+                logger.error(f"Error unregistering model: {e}")
 
 
 async def main():
-    discovery_service = None
-    model_endpoint = None
+    """Main entry point for model daemon."""
+    logging.basicConfig(level=logging.INFO)
 
-    try:
-        # Initialize discovery service
-        discovery_service = ModelServiceDiscovery(
-            host=SETTINGS.etcd_host, port=SETTINGS.etcd_port
-        )
+    # Initialize discovery service
+    discovery_service = ModelServiceDiscovery(
+        host=SETTINGS.etcd_host, port=SETTINGS.etcd_port
+    )
 
-        metadata = await get_metadata()
-        model_endpoint = ModelEndpoint(
-            url=f"http://{SETTINGS.host}:{SETTINGS.port}", metadata=metadata
-        )
+    # Fetch metadata and create endpoint
+    metadata = await get_metadata()
+    model_endpoint = ModelEndpoint(
+        url=f"http://{SETTINGS.host}:{SETTINGS.port}", metadata=metadata
+    )
 
-        # Setup signal handlers
-        loop = asyncio.get_running_loop()
-        for sig in (signal.SIGTERM, signal.SIGINT):
-            loop.add_signal_handler(sig, lambda: asyncio.create_task(shutdown()))
+    # Create service task
+    service_task = asyncio.create_task(run_service(discovery_service, model_endpoint))
 
-        # Run service
-        await run_service(discovery_service, model_endpoint)
-
-    except Exception as e:
-        logger.error(f"Failed to initialize model service: {e}")
-        raise
-
-
-async def shutdown():
-    """Cleanup and shutdown"""
-    tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
-    [task.cancel() for task in tasks]
-    await asyncio.gather(*tasks, return_exceptions=True)
+    # Setup signal handling
+    stop_event = asyncio.Event()
     loop = asyncio.get_running_loop()
-    loop.stop()
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        try:
+            loop.add_signal_handler(sig, stop_event.set)
+        except NotImplementedError:
+            # Windows doesn't support add_signal_handler
+            pass
+
+    # Wait for either shutdown signal or service completion
+    wait_task = asyncio.create_task(stop_event.wait())
+
+    done, _ = await asyncio.wait(
+        {wait_task, service_task}, return_when=asyncio.FIRST_COMPLETED
+    )
+
+    # Handle shutdown
+    if wait_task in done:
+        logger.info("Stop signal received; shutting down daemon")
+        service_task.cancel()
+        try:
+            await service_task
+        except asyncio.CancelledError:
+            pass
+    else:
+        # Service completed (possibly with error)
+        wait_task.cancel()
+        await service_task  # Re-raise any exception
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
     asyncio.run(main())
