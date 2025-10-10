@@ -1,17 +1,5 @@
 services:
-  prometheus:
-    volumes:
-      - ${FILES}/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus_data:/prometheus/data
-  grafana:
-      env_file:
-        - .env.mainnet
-      volumes:
-      - ${FILES}/grafana/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
-      - ${FILES}/grafana/filesystem.yml:/etc/grafana/provisioning/dashboards/filesystem.yml
-      - ${FILES}/grafana/grafana.ini:/etc/grafana/grafana.ini
-      - ${FILES}/grafana/nuc-query-data.json:/var/lib/grafana/dashboards/nuc-query-data.json
-      - ${FILES}/grafana/query-data.json:/var/lib/grafana/dashboards/query-data.json
+
   api:
     env_file:
       - .env.mainnet
@@ -29,15 +17,5 @@ services:
       - .env.mainnet
     volumes:
       - ${FILES}/caddy/caddyfile:/etc/caddy/Caddyfile
-  attestation:
-    env_file:
-      - .env.mainnet
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
     #volumes:
     #  - /dev/sev-guest:/dev/sev-guest # for AMD SEV
