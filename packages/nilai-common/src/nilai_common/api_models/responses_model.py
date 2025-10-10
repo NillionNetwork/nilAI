@@ -5,9 +5,14 @@ from typing_extensions import Literal, TypeAlias
 
 from pydantic import BaseModel, Field
 
-from openai.types.responses import Response, ResponseInputParam, ToolParam, ResponseFunctionToolCall
+from openai.types.responses import (
+    Response,
+    ResponseInputParam,
+    ToolParam,
+    ResponseFunctionToolCall as OpenAIResponseFunctionToolCall,
+    ResponseFunctionToolCallOutputItem,
+)
 from openai.types.responses.response_includable import ResponseIncludable
-from openai.types.responses.response_input_param import FunctionCallOutput
 from openai.types.responses.tool_choice_options import ToolChoiceOptions
 from openai.types.responses.tool_choice_allowed_param import ToolChoiceAllowedParam
 from openai.types.responses.tool_choice_types_param import ToolChoiceTypesParam
@@ -17,6 +22,13 @@ from openai.types.responses.tool_choice_custom_param import ToolChoiceCustomPara
 from openai.types.responses.response_prompt_param import ResponsePromptParam
 from openai.types.responses.response_text_config_param import ResponseTextConfigParam
 from openai.types.responses.response_conversation_param import ResponseConversationParam
+from openai.types.responses.response_input_param import (
+    ResponseInputItemParam,
+)
+from openai.types.responses.easy_input_message_param import EasyInputMessageParam
+from openai.types.responses.response_function_tool_call_param import (
+    ResponseFunctionToolCallParam,
+)
 from openai.types.shared_params.metadata import Metadata
 from openai.types.shared_params.reasoning import Reasoning
 from openai.types.shared_params.responses_model import ResponsesModel
@@ -33,6 +45,28 @@ ToolChoice: TypeAlias = Union[
 ]
 
 Conversation: TypeAlias = Union[str, ResponseConversationParam]
+
+ResponseFunctionToolCall: TypeAlias = OpenAIResponseFunctionToolCall
+FunctionCallOutput: TypeAlias = ResponseFunctionToolCallOutputItem
+
+__all__ = [
+    "Response",
+    "ResponseInputParam",
+    "ToolParam",
+    "ResponseInputItemParam",
+    "EasyInputMessageParam",
+    "ResponseFunctionToolCallParam",
+    "ResponseFunctionToolCall",
+    "FunctionCallOutput",
+    "ResponseFunctionToolCallOutputItem",
+    "ToolChoice",
+    "Conversation",
+    "StreamOptions",
+    "ResponseRequest",
+    "WebSearchEnhancedInput",
+    "SignedResponse",
+]
+
 
 class StreamOptions(BaseModel):
     include_obfuscation: Optional[bool] = None
@@ -75,7 +109,9 @@ class ResponseRequest(BaseModel):
 
     prompt_cache_key: Optional[str] = None
     safety_identifier: Optional[str] = None
-    service_tier: Optional[Literal["auto", "default", "flex", "scale", "priority"]] = None
+    service_tier: Optional[Literal["auto", "default", "flex", "scale", "priority"]] = (
+        None
+    )
     store: Optional[bool] = None
     truncation: Optional[Literal["auto", "disabled"]] = None
     user: Optional[str] = None
@@ -90,21 +126,24 @@ class ResponseRequest(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
-    def has_multimodal_content(self) -> bool:  
-        if isinstance(self.input, str):  
-            return False  
-    
-        if isinstance(self.input, list):  
-            for item in self.input:  
-                if isinstance(item, dict):  
-                    if item.get("type") == "input_image":  
-                        return True  
-                    
-                    content = item.get("content")  
-                    if isinstance(content, list):  
-                        for part in content:  
-                            if isinstance(part, dict) and part.get("type") == "input_image":  
-                                return True  
+    def has_multimodal_content(self) -> bool:
+        if isinstance(self.input, str):
+            return False
+
+        if isinstance(self.input, list):
+            for item in self.input:
+                if isinstance(item, dict):
+                    if item.get("type") == "input_image":
+                        return True
+
+                    content = item.get("content")
+                    if isinstance(content, list):
+                        for part in content:
+                            if (
+                                isinstance(part, dict)
+                                and part.get("type") == "input_image"
+                            ):
+                                return True
         return False
 
     def get_last_user_query(self) -> Optional[str]:
@@ -122,7 +161,10 @@ class ResponseRequest(BaseModel):
                         elif isinstance(content, list):
                             text_parts = []
                             for part in content:
-                                if isinstance(part, dict) and part.get("type") == "input_text":
+                                if (
+                                    isinstance(part, dict)
+                                    and part.get("type") == "input_text"
+                                ):
                                     text = part.get("text")
                                     if isinstance(text, str) and text.strip():
                                         text_parts.append(text.strip())
@@ -147,6 +189,7 @@ class SignedResponse(Response):
     """
     An extension of the official Response object.
     """
+
     signature: str
     sources: Optional[List[Source]] = Field(
         default=None, description="Sources used for web search when enabled"

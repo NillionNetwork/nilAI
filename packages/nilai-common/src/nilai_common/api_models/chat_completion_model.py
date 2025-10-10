@@ -240,4 +240,3 @@ class SignedChatCompletion(ChatCompletion):
     sources: Optional[List[Source]] = Field(
         default=None, description="Sources used for web search when enabled"
     )
-

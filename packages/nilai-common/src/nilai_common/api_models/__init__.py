@@ -40,7 +40,11 @@ from nilai_common.api_models.responses_model import (
     WebSearchEnhancedInput,
     ResponseFunctionToolCall,
     FunctionCallOutput,
+    ResponseFunctionToolCallOutputItem,
     ResponseInputParam,
+    ResponseInputItemParam,
+    EasyInputMessageParam,
+    ResponseFunctionToolCallParam,
 )
 
 __all__ = [
@@ -78,5 +82,9 @@ __all__ = [
     "WebSearchEnhancedInput",
     "ResponseFunctionToolCall",
     "FunctionCallOutput",
+    "ResponseFunctionToolCallOutputItem",
     "ResponseInputParam",
+    "ResponseInputItemParam",
+    "EasyInputMessageParam",
+    "ResponseFunctionToolCallParam",
 ]

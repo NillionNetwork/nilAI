@@ -28,7 +28,11 @@ from nilai_common.api_models import (
     SignedResponse,
     ResponseFunctionToolCall,
     FunctionCallOutput,
+    ResponseFunctionToolCallOutputItem,
     ResponseInputParam,
+    ResponseInputItemParam,
+    EasyInputMessageParam,
+    ResponseFunctionToolCallParam,
 )
 from nilai_common.config import SETTINGS, MODEL_SETTINGS
 from nilai_common.discovery import ModelServiceDiscovery
@@ -68,5 +72,9 @@ __all__ = [
     "SignedResponse",
     "ResponseFunctionToolCall",
     "FunctionCallOutput",
+    "ResponseFunctionToolCallOutputItem",
     "ResponseInputParam",
+    "ResponseInputItemParam",
+    "EasyInputMessageParam",
+    "ResponseFunctionToolCallParam",
 ]

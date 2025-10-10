@@ -4,6 +4,7 @@ import uuid
 from typing import Annotated, List
 from pydantic import BaseModel, Field
 
+
 class ResultContent(BaseModel):
     text: str
     truncated: bool = False
@@ -89,4 +90,3 @@ class AttestationReport(BaseModel):
     verifying_key: Annotated[str, Field(description="PEM encoded public key")]
     cpu_attestation: AMDAttestationToken
     gpu_attestation: NVAttestationToken
-

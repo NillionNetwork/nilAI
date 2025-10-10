@@ -15,19 +15,16 @@ from nilai_api.crypto import sign_message
 from nilai_api.db.logs import QueryLogManager
 from nilai_api.db.users import UserManager
 from nilai_api.handlers.nildb.handler import get_prompt_from_nildb
-#from nilai_api.handlers.nilrag import handle_nilrag_for_responses
-from nilai_api.handlers.tools.responses_tool_router import handle_responses_tool_workflow
+
+# from nilai_api.handlers.nilrag import handle_nilrag_for_responses
+from nilai_api.handlers.tools.responses_tool_router import (
+    handle_responses_tool_workflow,
+)
 from nilai_api.handlers.web_search import handle_web_search_for_responses
 from nilai_api.rate_limiting import RateLimit
 from nilai_api.state import state
 
-# Import the new Response API models we created
-from nilai_common import (
-    ResponseRequest,
-    SignedResponse,
-    Source,
-    ResponseCompletedEvent
-)
+from nilai_common import ResponseRequest, SignedResponse, Source, ResponseCompletedEvent
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +56,9 @@ async def responses_web_search_rate_limit(request: Request) -> bool:
     return bool(response_request.web_search)
 
 
-@responses_router.post("/v1/responses", tags=["Responses"], response_model=SignedResponse)
+@responses_router.post(
+    "/v1/responses", tags=["Responses"], response_model=SignedResponse
+)
 async def create_response(
     req: ResponseRequest = Body(
         {
@@ -82,24 +81,24 @@ async def create_response(
 ) -> Union[SignedResponse, StreamingResponse]:
     """
     Generate a response from the AI model using the Responses API.
-    
+
     This endpoint provides a more flexible and powerful way to interact with models,
     supporting complex inputs and a structured event stream.
-    
+
     - **req**: Response request containing input and model specifications
     - **Returns**: Full response with model output, usage statistics, and cryptographic signature
-    
+
     ### Request Requirements
     - Must include non-empty input (string or structured input)
     - Must specify a model
     - Supports optional instructions to guide the model's behavior
     - Optional web_search parameter to enhance context with current information
-    
+
     ### Response Components
     - Model-generated text completion
     - Token usage metrics
     - Cryptographically signed response for verification
-    
+
     ### Processing Steps
     1. Validate input request parameters
     2. If web_search is enabled, perform web search and enhance context
@@ -107,14 +106,14 @@ async def create_response(
     4. Generate AI model response
     5. Track and update token usage
     6. Cryptographically sign the response
-    
+
     ### Web Search Feature
     When web_search=True, the system will:
     - Extract the user's query from the input
     - Perform a web search using Brave API
     - Enhance the context with current information
     - Add search results to instructions for better responses
-    
+
     ### Potential HTTP Errors
     - **400 Bad Request**:
       - Missing or empty input
@@ -174,7 +173,9 @@ async def create_response(
     if req.web_search:
         logger.info(f"[responses] web_search start request_id={request_id}")
         t_ws = time.monotonic()
-        web_search_result = await handle_web_search_for_responses(req, model_name, client)
+        web_search_result = await handle_web_search_for_responses(
+            req, model_name, client
+        )
         input_items = web_search_result.input
         instructions = web_search_result.instructions
         sources = web_search_result.sources
@@ -183,6 +184,7 @@ async def create_response(
         )
 
     if req.stream:
+
         async def response_stream_generator() -> AsyncGenerator[str, None]:
             t_call = time.monotonic()
             prompt_token_usage = 0
@@ -221,32 +223,45 @@ async def create_response(
                             payload["response"]["usage"] = usage.model_dump(mode="json")
 
                         if sources:
-                            if 'data' not in payload:
-                                payload['data'] = {}
-                            payload["data"]["sources"] = [s.model_dump(mode="json") for s in sources]
-                    
+                            if "data" not in payload:
+                                payload["data"] = {}
+                            payload["data"]["sources"] = [
+                                s.model_dump(mode="json") for s in sources
+                            ]
+
                     yield f"data: {json.dumps(payload)}\n\n"
 
                 await UserManager.update_token_usage(
-                    auth_info.user.userid, prompt_tokens=prompt_token_usage, completion_tokens=completion_token_usage
+                    auth_info.user.userid,
+                    prompt_tokens=prompt_token_usage,
+                    completion_tokens=completion_token_usage,
                 )
                 await QueryLogManager.log_query(
-                    auth_info.user.userid, model=req.model, prompt_tokens=prompt_token_usage,
-                    completion_tokens=completion_token_usage, web_search_calls=len(sources) if sources else 0,
+                    auth_info.user.userid,
+                    model=req.model,
+                    prompt_tokens=prompt_token_usage,
+                    completion_tokens=completion_token_usage,
+                    web_search_calls=len(sources) if sources else 0,
                 )
                 logger.info(
                     "[responses] stream done request_id=%s prompt_tokens=%d completion_tokens=%d duration_ms=%.0f total_ms=%.0f",
-                    request_id, prompt_token_usage, completion_token_usage,
-                    (time.monotonic() - t_call) * 1000, (time.monotonic() - t_start) * 1000,
+                    request_id,
+                    prompt_token_usage,
+                    completion_token_usage,
+                    (time.monotonic() - t_call) * 1000,
+                    (time.monotonic() - t_start) * 1000,
                 )
 
             except Exception as e:
-                logger.error("[responses] stream error request_id=%s error=%s", request_id, e)
+                logger.error(
+                    "[responses] stream error request_id=%s error=%s", request_id, e
+                )
                 yield f"data: {json.dumps({'error': 'stream_failed', 'message': str(e)})}\n\n"
 
-        return StreamingResponse(response_stream_generator(), media_type="text/event-stream")
+        return StreamingResponse(
+            response_stream_generator(), media_type="text/event-stream"
+        )
 
-    # --- Non-Streaming Logic ---
     request_kwargs = {
         "model": req.model,
         "input": input_items,
@@ -261,19 +276,18 @@ async def create_response(
 
     logger.info(f"[responses] call start request_id={request_id}")
     t_call = time.monotonic()
-    
+
     response = await client.responses.create(**request_kwargs)
     logger.info(
         f"[responses] call done request_id={request_id} duration_ms={(time.monotonic() - t_call) * 1000:.0f}"
     )
-
 
     (
         final_response,
         agg_prompt_tokens,
         agg_completion_tokens,
     ) = await handle_responses_tool_workflow(client, req, input_items, response)
-    
+
     model_response = SignedResponse(
         **final_response.model_dump(),
         signature="",
@@ -285,7 +299,7 @@ async def create_response(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Model response does not contain usage statistics",
         )
-    
+
     if agg_prompt_tokens or agg_completion_tokens:
         model_response.usage.input_tokens += agg_prompt_tokens
         model_response.usage.output_tokens += agg_completion_tokens
@@ -294,11 +308,16 @@ async def create_response(
     completion_tokens = model_response.usage.output_tokens
 
     await UserManager.update_token_usage(
-        auth_info.user.userid, prompt_tokens=prompt_tokens, completion_tokens=completion_tokens
+        auth_info.user.userid,
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
     )
     await QueryLogManager.log_query(
-        auth_info.user.userid, model=req.model, prompt_tokens=prompt_tokens,
-        completion_tokens=completion_tokens, web_search_calls=len(sources) if sources else 0,
+        auth_info.user.userid,
+        model=req.model,
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+        web_search_calls=len(sources) if sources else 0,
     )
 
     response_json = model_response.model_dump_json()
