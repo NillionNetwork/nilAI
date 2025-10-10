@@ -108,16 +108,11 @@ services:
     depends_on:
       nilauth-postgres:
         condition: service_healthy
-<<<<<<< HEAD
     healthcheck:
       test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health" ]
       interval: 30s
       retries: 3
       start_period: 15s
       timeout: 10s
-=======
-
-
->>>>>>> a4d2f92 (feat: first working version of payments for nilAI)
 volumes:
   postgres_data:

@@ -2199,7 +2199,7 @@ requires-dist = [
     { name = "gunicorn", specifier = ">=23.0.0" },
     { name = "httpx", specifier = ">=0.27.2" },
     { name = "nilai-common", editable = "packages/nilai-common" },
-    { name = "nilauth-credit-middleware", specifier = "==0.1.0" },
+    { name = "nilauth-credit-middleware", specifier = "==0.1.1" },
     { name = "nilrag", specifier = ">=0.1.11" },
     { name = "nuc", specifier = ">=0.1.0" },
     { name = "openai", specifier = ">=1.59.9" },
@@ -2252,7 +2252,7 @@ requires-dist = [
 
 [[package]]
 name = "nilauth-credit-middleware"
-version = "0.1.0"
+version = "0.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "fastapi", extra = ["standard"] },
@@ -2260,9 +2260,9 @@ dependencies = [
     { name = "nuc" },
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/5b/fb/80ed54d67512ee09091e0f25463885862f2d8b9d419ff3cc9c23bfc8d877/nilauth_credit_middleware-0.1.0.tar.gz", hash = "sha256:f576b44f4ce7b207a193822fff959291a2f8607a8bb57ae0908dadd7147a6bb3", size = 9348, upload-time = "2025-10-07T10:45:55.786Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/9f/cf/7716fa5f4aca83ef39d6f9f8bebc1d80d194c52c9ce6e75ee6bd1f401217/nilauth_credit_middleware-0.1.1.tar.gz", hash = "sha256:ae32c4c1e6bc083c8a7581d72a6da271ce9c0f0f9271a1694acb81ccd0a4a8bd", size = 10259, upload-time = "2025-10-16T11:15:03.918Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a3/35/8013609f465862e3247f8e82c710d26e09b7fd2ac2404699c8ad74d88733/nilauth_credit_middleware-0.1.0-py3-none-any.whl", hash = "sha256:63e87275796851005a6177685f5116063e4fcf95e5f7151a39920db173cb1af3", size = 13858, upload-time = "2025-10-07T10:45:54.439Z" },
+    { url = "https://files.pythonhosted.org/packages/a7/b5/6e4090ae2ae8848d12e43f82d8d995cd1dff9de8e947cf5fb2b8a72a828e/nilauth_credit_middleware-0.1.1-py3-none-any.whl", hash = "sha256:10a0fda4ac11f51b9a5dd7b3a8fbabc0b28ff92a170a7729ac11eb15c7b37887", size = 14919, upload-time = "2025-10-16T11:15:02.201Z" },
 ]
 
 [[package]]
