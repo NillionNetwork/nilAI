@@ -1,22 +1,20 @@
 from __future__ import annotations
 
 import json
+import asyncio
 import logging
-from typing import Dict, List, Optional, Tuple, Union, cast
+from typing import List, Tuple, Union
 
 from openai import AsyncOpenAI
-
-from openai.types.responses import (
-    Response, 
-    ResponseFunctionToolCall, 
-    ResponseFunctionToolCallOutputItem
+from nilai_common import (
+    ResponseRequest,
+    Response,
+    ResponseFunctionToolCall,
+    ResponseInputParam,
+    FunctionCallOutput,
 )
 
-from openai.types.responses.response_function_tool_call import ResponseFunctionToolCall
-from openai.types.responses.response_output_item import ResponseOutputItem
-
-from nilai_common import ResponseRequest
-
+# Assuming a code execution module exists
 from . import code_execution
 
 logger = logging.getLogger(__name__)
@@ -24,36 +22,44 @@ logger = logging.getLogger(__name__)
 
 async def route_and_execute_tool_call(
     tool_call: ResponseFunctionToolCall,
-) -> ResponseFunctionToolCallOutputItem: # <--- Update return type hint
+) -> FunctionCallOutput:
+    """
+    Executes a function tool call and returns a correctly formatted FunctionCallOutput
+    object.
+    """
     func_name = tool_call.name
     arguments = tool_call.arguments or "{}"
+
+    output_json_string = json.dumps({"error": f"Tool '{func_name}' not implemented"})
 
     if func_name == "execute_python":
         try:
             args = json.loads(arguments)
-        except Exception:
-            args = {}
-        code = args.get("code", "")
-        result = await code_execution.execute_python(code)
-        logger.info(f"[responses_tool] execute_python result: {result}")
-        # Return the correct object type
-        return ResponseFunctionToolCallOutputItem(tool_call_id=tool_call.call_id, output=result)
+            code = args.get("code", "")
+            result = await code_execution.execute_python(code)
 
-    # Return the correct object type for the "not implemented" case
-    return ResponseFunctionToolCallOutputItem(
-        tool_call_id=tool_call.call_id,
-        output=f"Tool '{func_name}' not implemented",
+            output_json_string = json.dumps({"result": str(result).strip()})
+            logger.info(f"[responses_tool] execute_python result: {result.strip()}")
+        except json.JSONDecodeError:
+            output_json_string = json.dumps(
+                {"error": "Invalid JSON in tool call arguments."}
+            )
+        except Exception as e:
+            output_json_string = json.dumps({"error": f"Error executing tool: {e}"})
+
+    return FunctionCallOutput(
+        call_id=tool_call.call_id,
+        output=output_json_string,
+        type="function_call_output",
     )
-
 
 
 async def process_tool_calls(
     tool_calls: List[ResponseFunctionToolCall],
-) -> List[ResponseFunctionToolCallOutputItem]: # <--- Update this type hint
-    results: List[ResponseFunctionToolCallOutputItem] = []
-    for tc in tool_calls:
-        result = await route_and_execute_tool_call(tc)
-        results.append(result)
+) -> List[FunctionCallOutput]:
+    """Processes a list of tool calls and returns them as FunctionCallOutput objects."""
+    tasks = [route_and_execute_tool_call(tc) for tc in tool_calls]
+    results = await asyncio.gather(*tasks)
     return results
 
 
@@ -63,8 +69,6 @@ def extract_function_tool_calls_from_response(
     """Extracts all function tool call items from a Response object's output."""
     if not response.output:
         return []
-
-    # Use isinstance for a robust, type-safe check.
     return [
         item for item in response.output if isinstance(item, ResponseFunctionToolCall)
     ]
@@ -73,9 +77,13 @@ def extract_function_tool_calls_from_response(
 async def handle_responses_tool_workflow(
     client: AsyncOpenAI,
     req: ResponseRequest,
-    input_items: Union[str, ResponseInputParam],
+    input_items: Union[str, List[ResponseInputParam]],
     first_response: Response,
 ) -> Tuple[Response, int, int]:
+    """
+    Manages a tool-use workflow by rebuilding the conversation
+    history with the full context for each turn.
+    """
     logger.info("[responses_tool] evaluating tool workflow for response")
 
     prompt_tokens = first_response.usage.input_tokens if first_response.usage else 0
@@ -87,33 +95,18 @@ async def handle_responses_tool_workflow(
     logger.info(f"[responses_tool] extracted tool_calls: {tool_calls}")
 
     if not tool_calls:
-        return first_response, 0, 0
+        return first_response, prompt_tokens, completion_tokens
 
     tool_results = await process_tool_calls(tool_calls)
+    logger.info(f"[responses_tool] tool_results: {tool_results}")
 
-    new_input_items: List = []
+    new_input_items: List[ResponseInputParam] = []
     if isinstance(input_items, str):
-        new_input_items = [{"role": "user", "content": input_items}]
+        new_input_items.append({"role": "user", "content": input_items})
     elif isinstance(input_items, list):
         new_input_items = list(input_items)
 
-    assistant_message = {
-        "role": "assistant",
-        "content": None,
-        "tool_calls": [
-            {
-                "id": tc.call_id,
-                "type": "function",
-                "function": {
-                    "name": tc.name,
-                    "arguments": tc.arguments or "{}",
-                },
-            }
-            for tc in tool_calls
-        ],
-    }
-    new_input_items.append(assistant_message)
-
+    new_input_items.extend(tool_calls)
     new_input_items.extend(tool_results)
 
     request_kwargs = {
@@ -123,14 +116,17 @@ async def handle_responses_tool_workflow(
         "top_p": req.top_p,
         "temperature": req.temperature,
         "max_output_tokens": req.max_output_tokens,
-        "tool_choice": "none",
+        "tool_choice": "auto",
     }
+    
+    if req.tools:
+        request_kwargs["tools"] = req.tools
 
     logger.info("[responses_tool] performing follow-up response with tool outputs")
-    second: Response = await client.responses.create(**request_kwargs)
-    if second.usage:
-        prompt_tokens += second.usage.input_tokens
-        completion_tokens += second.usage.output_tokens
+    second_response: Response = await client.responses.create(**request_kwargs)
 
-    return second, prompt_tokens, completion_tokens
+    if second_response.usage:
+        prompt_tokens += second_response.usage.input_tokens
+        completion_tokens += second_response.usage.output_tokens
 
+    return second_response, prompt_tokens, completion_tokens

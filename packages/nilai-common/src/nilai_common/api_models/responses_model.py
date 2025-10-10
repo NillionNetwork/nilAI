@@ -5,8 +5,9 @@ from typing_extensions import Literal, TypeAlias
 
 from pydantic import BaseModel, Field
 
-from openai.types.responses import Response, ResponseInputParam, ToolParam
+from openai.types.responses import Response, ResponseInputParam, ToolParam, ResponseFunctionToolCall
 from openai.types.responses.response_includable import ResponseIncludable
+from openai.types.responses.response_input_param import FunctionCallOutput
 from openai.types.responses.tool_choice_options import ToolChoiceOptions
 from openai.types.responses.tool_choice_allowed_param import ToolChoiceAllowedParam
 from openai.types.responses.tool_choice_types_param import ToolChoiceTypesParam

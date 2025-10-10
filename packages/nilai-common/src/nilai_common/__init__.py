@@ -26,6 +26,9 @@ from nilai_common.api_models import (
     ResponseCompletedEvent,
     ResponseRequest,
     SignedResponse,
+    ResponseFunctionToolCall,
+    FunctionCallOutput,
+    ResponseInputParam,
 )
 from nilai_common.config import SETTINGS, MODEL_SETTINGS
 from nilai_common.discovery import ModelServiceDiscovery
@@ -63,4 +66,7 @@ __all__ = [
     "ResponseCompletedEvent",
     "ResponseRequest",
     "SignedResponse",
+    "ResponseFunctionToolCall",
+    "FunctionCallOutput",
+    "ResponseInputParam",
 ]
