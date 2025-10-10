@@ -5,7 +5,12 @@ from typing import Tuple
 import httpx
 
 # Importing the types
-from nuc_helpers.types import RootToken, DelegationToken, InvocationToken, ChainId
+from nilai_api.auth.nuc_helpers.types import (
+    RootToken,
+    DelegationToken,
+    InvocationToken,
+    ChainId,
+)
 
 # Importing the secp256k1 library dependencies
 from secp256k1 import PrivateKey as NilAuthPrivateKey, PublicKey as NilAuthPublicKey

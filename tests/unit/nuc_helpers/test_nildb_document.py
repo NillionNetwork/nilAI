@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch, MagicMock
 from nuc.token import Did
-from nuc_helpers.nildb_document import PromptDocument
+from nilai_api.auth.nuc_helpers.nildb_document import PromptDocument
 from ..nuc_helpers import DummyDecodedNucToken, DummyNucTokenEnvelope
 
 

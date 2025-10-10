@@ -1,6 +1,10 @@
 import unittest
 from unittest.mock import patch
-from nuc_helpers.usage import TokenRateLimits, UsageLimitError, UsageLimitKind
+from nilai_api.auth.nuc_helpers.usage import (
+    TokenRateLimits,
+    UsageLimitError,
+    UsageLimitKind,
+)
 from ..nuc_helpers import DummyDecodedNucToken, DummyNucTokenEnvelope
 
 from datetime import datetime, timedelta, timezone
