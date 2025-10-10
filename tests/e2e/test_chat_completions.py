@@ -1,14 +1,16 @@
 """
-Test suite for nilAI OpenAI client
+Test suite for nilAI Chat Completions endpoint using OpenAI client
 
 This test suite uses the OpenAI client to make requests to the nilAI API.
 
 To run the tests, use the following command:
 
-pytest tests/e2e/test_openai.py
+pytest tests/e2e/test_chat_completions.py
 """
 
 import json
+import os
+import re
 import httpx
 import pytest
 from openai import OpenAI
@@ -950,4 +952,78 @@ def test_web_search_queueing_next_second_e2e(client):
     for t, error in rate_limited_responses:
         assert isinstance(error, openai.RateLimitError), (
             "Rate limited responses should be RateLimitError"
+        )
+
+
+@pytest.mark.skipif(
+    not os.environ.get("E2B_API_KEY"),
+    reason="Requires E2B_API_KEY for code execution sandbox",
+)
+@pytest.mark.parametrize("model", test_models)
+def test_execute_python_sha256_e2e(client, model):
+    expected = "75cc238b167a05ab7336d773cb096735d459df2f0df9c8df949b1c44075df8a5"
+
+    system_msg = (
+        "You are a helpful assistant. When a user asks a question that requires code execution, "
+        "use the execute_python tool to find the answer. After the tool provides its result, "
+        "you must use that result to formulate a clear, final answer to the user's original question. "
+        "Do not include any code or JSON in your final response."
+    )
+    user_msg = "Execute this exact Python code and return the result: import hashlib; print(hashlib.sha256('Nillion'.encode()).hexdigest())"
+
+    trials = 3
+    escaped_expected = re.escape(expected)
+    pattern = rf"\b{escaped_expected}\b"
+    last_completion = None
+    last_content = ""
+
+    for _ in range(trials):
+        completion = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_msg},
+                {"role": "user", "content": user_msg},
+            ],
+            temperature=0,
+            tools=[
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "execute_python",
+                        "description": "Executes a snippet of Python code in a secure sandbox and returns the standard output.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "code": {
+                                    "type": "string",
+                                    "description": "The Python code to be executed.",
+                                }
+                            },
+                            "required": ["code"],
+                            "additionalProperties": False,
+                        },
+                        "strict": True,
+                    },
+                }
+            ],
+        )
+        last_completion = completion
+
+        if not completion.choices:
+            continue
+
+        content = completion.choices[0].message.content or ""
+        last_content = content
+        normalized_content = re.sub(r"\s+", " ", content)
+
+        if re.search(pattern, normalized_content):
+            break
+    else:
+        pytest.fail(
+            (
+                "Expected exact SHA-256 hash not found after retries.\n"
+                f"Got: {last_content[:200]}...\n"
+                f"Expected: {expected}\n"
+                f"Full: {last_completion.model_dump_json() if last_completion else '<no completion>'}"
+            )
         )

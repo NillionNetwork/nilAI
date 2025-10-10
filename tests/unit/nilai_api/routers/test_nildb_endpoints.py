@@ -8,6 +8,7 @@ from nilai_api.handlers.nildb.api_model import (
     PromptDelegationToken,
 )
 from datetime import datetime, timezone
+from nilai_common import ResponseRequest
 
 
 class TestNilDBEndpoints:
@@ -163,19 +164,26 @@ class TestNilDBEndpoints:
         )
 
         with (
-            patch("nilai_api.routers.private.get_prompt_from_nildb") as mock_get_prompt,
-            patch("nilai_api.routers.private.AsyncOpenAI") as mock_openai_client,
-            patch("nilai_api.routers.private.state.get_model") as mock_get_model,
-            patch("nilai_api.routers.private.handle_nilrag") as mock_handle_nilrag,
             patch(
-                "nilai_api.routers.private.handle_web_search"
+                "nilai_api.routers.endpoints.chat.get_prompt_from_nildb"
+            ) as mock_get_prompt,
+            patch("nilai_api.routers.endpoints.chat.AsyncOpenAI") as mock_openai_client,
+            patch("nilai_api.routers.endpoints.chat.state.get_model") as mock_get_model,
+            patch(
+                "nilai_api.routers.endpoints.chat.handle_nilrag"
+            ) as mock_handle_nilrag,
+            patch(
+                "nilai_api.routers.endpoints.chat.handle_web_search"
             ) as mock_handle_web_search,
             patch(
-                "nilai_api.routers.private.UserManager.update_token_usage"
+                "nilai_api.routers.endpoints.chat.UserManager.update_token_usage"
             ) as mock_update_usage,
             patch(
-                "nilai_api.routers.private.QueryLogManager.log_query"
+                "nilai_api.routers.endpoints.chat.QueryLogManager.log_query"
             ) as mock_log_query,
+            patch(
+                "nilai_api.routers.endpoints.chat.handle_tool_workflow"
+            ) as mock_handle_tool_workflow,
         ):
             mock_get_prompt.return_value = "System prompt from nilDB"
 
@@ -219,6 +227,9 @@ class TestNilDBEndpoints:
                     "total_tokens": 15,
                 },
             }
+            mock_response.usage = MagicMock()
+            mock_response.usage.prompt_tokens = 10
+            mock_response.usage.completion_tokens = 5
             # Make the create method itself an AsyncMock that returns the response
             mock_client_instance.chat.completions.create = AsyncMock(
                 return_value=mock_response
@@ -226,16 +237,11 @@ class TestNilDBEndpoints:
             mock_client_instance.close = AsyncMock()
             mock_openai_client.return_value = mock_client_instance
 
-            #
+            # Mock handle_tool_workflow to return the response and token counts
+            mock_handle_tool_workflow.return_value = (mock_response, 0, 0)
+
             # Call the function (this will test the prompt injection logic)
-            # Note: We can't easily test the full endpoint without setting up the FastAPI app
-            # But we can test that get_prompt_from_nildb is called
-            try:
-                await chat_completion(req=request, auth_info=mock_auth_info)
-            except Exception as e:
-                # Expected to fail due to incomplete mocking, but we should still see the prompt call
-                print("The exception is: ", str(e))
-                raise e
+            await chat_completion(req=request, auth_info=mock_auth_info)
 
             mock_get_prompt.assert_called_once_with(mock_prompt_document)
 
@@ -264,8 +270,10 @@ class TestNilDBEndpoints:
         )
 
         with (
-            patch("nilai_api.routers.private.get_prompt_from_nildb") as mock_get_prompt,
-            patch("nilai_api.routers.private.state.get_model") as mock_get_model,
+            patch(
+                "nilai_api.routers.endpoints.chat.get_prompt_from_nildb"
+            ) as mock_get_prompt,
+            patch("nilai_api.routers.endpoints.chat.state.get_model") as mock_get_model,
         ):
             # Mock state.get_model() to return a ModelEndpoint
             mock_model_endpoint = MagicMock()
@@ -300,7 +308,7 @@ class TestNilDBEndpoints:
         mock_auth_info = AuthenticationInfo(
             user=mock_user,
             token_rate_limit=None,
-            prompt_document=None,  # No prompt document
+            prompt_document=None,
         )
 
         request = ChatRequest(
@@ -308,19 +316,26 @@ class TestNilDBEndpoints:
         )
 
         with (
-            patch("nilai_api.routers.private.get_prompt_from_nildb") as mock_get_prompt,
-            patch("nilai_api.routers.private.AsyncOpenAI") as mock_openai_client,
-            patch("nilai_api.routers.private.state.get_model") as mock_get_model,
-            patch("nilai_api.routers.private.handle_nilrag") as mock_handle_nilrag,
             patch(
-                "nilai_api.routers.private.handle_web_search"
+                "nilai_api.routers.endpoints.chat.get_prompt_from_nildb"
+            ) as mock_get_prompt,
+            patch("nilai_api.routers.endpoints.chat.AsyncOpenAI") as mock_openai_client,
+            patch("nilai_api.routers.endpoints.chat.state.get_model") as mock_get_model,
+            patch(
+                "nilai_api.routers.endpoints.chat.handle_nilrag"
+            ) as mock_handle_nilrag,
+            patch(
+                "nilai_api.routers.endpoints.chat.handle_web_search"
             ) as mock_handle_web_search,
             patch(
-                "nilai_api.routers.private.UserManager.update_token_usage"
+                "nilai_api.routers.endpoints.chat.UserManager.update_token_usage"
             ) as mock_update_usage,
             patch(
-                "nilai_api.routers.private.QueryLogManager.log_query"
+                "nilai_api.routers.endpoints.chat.QueryLogManager.log_query"
             ) as mock_log_query,
+            patch(
+                "nilai_api.routers.endpoints.chat.handle_tool_workflow"
+            ) as mock_handle_tool_workflow,
         ):
             # Mock state.get_model() to return a ModelEndpoint
             mock_model_endpoint = MagicMock()
@@ -362,6 +377,9 @@ class TestNilDBEndpoints:
                     "total_tokens": 15,
                 },
             }
+            mock_response.usage = MagicMock()
+            mock_response.usage.prompt_tokens = 10
+            mock_response.usage.completion_tokens = 5
             # Make the create method itself an AsyncMock that returns the response
             mock_client_instance.chat.completions.create = AsyncMock(
                 return_value=mock_response
@@ -369,14 +387,225 @@ class TestNilDBEndpoints:
             mock_client_instance.close = AsyncMock()
             mock_openai_client.return_value = mock_client_instance
 
+            # Mock handle_tool_workflow to return the response and token counts
+            mock_handle_tool_workflow.return_value = (mock_response, 0, 0)
+
             # Call the function
-            try:
-                await chat_completion(req=request, auth_info=mock_auth_info)
-            except Exception:
-                # Expected to fail due to incomplete mocking
-                pass
+            await chat_completion(req=request, auth_info=mock_auth_info)
 
             # Should not call get_prompt_from_nildb when no prompt document
+            mock_get_prompt.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_responses_with_prompt_document_injection(self):
+        """Test responses endpoint with prompt document injection"""
+        from nilai_api.routers.endpoints.responses import create_response
+
+        mock_prompt_document = PromptDocument(
+            document_id="test-doc-123", owner_did="did:nil:" + "1" * 66
+        )
+
+        mock_user = MagicMock()
+        mock_user.userid = "test-user-id"
+        mock_user.name = "Test User"
+        mock_user.apikey = "test-api-key"
+        mock_user.rate_limits = RateLimits().get_effective_limits()
+
+        mock_auth_info = AuthenticationInfo(
+            user=mock_user, token_rate_limit=None, prompt_document=mock_prompt_document
+        )
+
+        request = ResponseRequest(model="test-model", input="Hello")
+
+        response_payload = {
+            "id": "test-response-id",
+            "object": "response",
+            "model": "test-model",
+            "created_at": 123456.0,
+            "status": "completed",
+            "output": [],
+            "parallel_tool_calls": False,
+            "tool_choice": "auto",
+            "tools": [],
+            "usage": {
+                "input_tokens": 10,
+                "input_tokens_details": {"cached_tokens": 0},
+                "output_tokens": 5,
+                "output_tokens_details": {"reasoning_tokens": 0},
+                "total_tokens": 15,
+            },
+        }
+
+        with (
+            patch(
+                "nilai_api.routers.endpoints.responses.get_prompt_from_nildb"
+            ) as mock_get_prompt,
+            patch(
+                "nilai_api.routers.endpoints.responses.AsyncOpenAI"
+            ) as mock_openai_client,
+            patch(
+                "nilai_api.routers.endpoints.responses.state.get_model"
+            ) as mock_get_model,
+            patch(
+                "nilai_api.routers.endpoints.responses.UserManager.update_token_usage"
+            ) as mock_update_usage,
+            patch(
+                "nilai_api.routers.endpoints.responses.QueryLogManager.log_query"
+            ) as mock_log_query,
+            patch(
+                "nilai_api.routers.endpoints.responses.handle_responses_tool_workflow"
+            ) as mock_handle_tool_workflow,
+        ):
+            mock_get_prompt.return_value = "System prompt from nilDB"
+
+            mock_model_endpoint = MagicMock()
+            mock_model_endpoint.url = "http://test-model-endpoint"
+            mock_model_endpoint.metadata.tool_support = True
+            mock_model_endpoint.metadata.multimodal_support = True
+            mock_get_model.return_value = mock_model_endpoint
+
+            mock_update_usage.return_value = None
+            mock_log_query.return_value = None
+
+            mock_client_instance = MagicMock()
+            mock_response = MagicMock()
+            mock_response.model_dump.return_value = response_payload
+            mock_client_instance.responses.create = AsyncMock(
+                return_value=mock_response
+            )
+            mock_openai_client.return_value = mock_client_instance
+
+            mock_handle_tool_workflow.return_value = (mock_response, 0, 0)
+
+            await create_response(req=request, auth_info=mock_auth_info)
+
+            mock_get_prompt.assert_called_once_with(mock_prompt_document)
+
+    @pytest.mark.asyncio
+    async def test_responses_prompt_document_extraction_error(self):
+        """Test responses endpoint when prompt document extraction fails"""
+        from nilai_api.routers.endpoints.responses import create_response
+
+        mock_prompt_document = PromptDocument(
+            document_id="test-doc-123", owner_did="did:nil:" + "1" * 66
+        )
+
+        mock_user = MagicMock()
+        mock_user.userid = "test-user-id"
+        mock_user.name = "Test User"
+        mock_user.apikey = "test-api-key"
+        mock_user.rate_limits = RateLimits().get_effective_limits()
+
+        mock_auth_info = AuthenticationInfo(
+            user=mock_user, token_rate_limit=None, prompt_document=mock_prompt_document
+        )
+
+        request = ResponseRequest(model="test-model", input="Hello")
+
+        with (
+            patch(
+                "nilai_api.routers.endpoints.responses.get_prompt_from_nildb"
+            ) as mock_get_prompt,
+            patch(
+                "nilai_api.routers.endpoints.responses.state.get_model"
+            ) as mock_get_model,
+        ):
+            mock_model_endpoint = MagicMock()
+            mock_model_endpoint.url = "http://test-model-endpoint"
+            mock_model_endpoint.metadata.tool_support = True
+            mock_model_endpoint.metadata.multimodal_support = True
+            mock_get_model.return_value = mock_model_endpoint
+
+            mock_get_prompt.side_effect = Exception("Unable to extract prompt")
+
+            with pytest.raises(HTTPException) as exc_info:
+                await create_response(req=request, auth_info=mock_auth_info)
+
+            assert exc_info.value.status_code == status.HTTP_403_FORBIDDEN
+            assert (
+                "Unable to extract prompt from nilDB: Unable to extract prompt"
+                in str(exc_info.value.detail)
+            )
+
+    @pytest.mark.asyncio
+    async def test_responses_without_prompt_document(self):
+        """Test responses endpoint when no prompt document is present"""
+        from nilai_api.routers.endpoints.responses import create_response
+
+        mock_user = MagicMock()
+        mock_user.userid = "test-user-id"
+        mock_user.name = "Test User"
+        mock_user.apikey = "test-api-key"
+        mock_user.rate_limits = RateLimits().get_effective_limits()
+
+        mock_auth_info = AuthenticationInfo(
+            user=mock_user,
+            token_rate_limit=None,
+            prompt_document=None,
+        )
+
+        request = ResponseRequest(model="test-model", input="Hello")
+
+        response_payload = {
+            "id": "test-response-id",
+            "object": "response",
+            "model": "test-model",
+            "created_at": 123456.0,
+            "status": "completed",
+            "output": [],
+            "parallel_tool_calls": False,
+            "tool_choice": "auto",
+            "tools": [],
+            "usage": {
+                "input_tokens": 10,
+                "input_tokens_details": {"cached_tokens": 0},
+                "output_tokens": 5,
+                "output_tokens_details": {"reasoning_tokens": 0},
+                "total_tokens": 15,
+            },
+        }
+
+        with (
+            patch(
+                "nilai_api.routers.endpoints.responses.get_prompt_from_nildb"
+            ) as mock_get_prompt,
+            patch(
+                "nilai_api.routers.endpoints.responses.AsyncOpenAI"
+            ) as mock_openai_client,
+            patch(
+                "nilai_api.routers.endpoints.responses.state.get_model"
+            ) as mock_get_model,
+            patch(
+                "nilai_api.routers.endpoints.responses.UserManager.update_token_usage"
+            ) as mock_update_usage,
+            patch(
+                "nilai_api.routers.endpoints.responses.QueryLogManager.log_query"
+            ) as mock_log_query,
+            patch(
+                "nilai_api.routers.endpoints.responses.handle_responses_tool_workflow"
+            ) as mock_handle_tool_workflow,
+        ):
+            mock_model_endpoint = MagicMock()
+            mock_model_endpoint.url = "http://test-model-endpoint"
+            mock_model_endpoint.metadata.tool_support = True
+            mock_model_endpoint.metadata.multimodal_support = True
+            mock_get_model.return_value = mock_model_endpoint
+
+            mock_update_usage.return_value = None
+            mock_log_query.return_value = None
+
+            mock_client_instance = MagicMock()
+            mock_response = MagicMock()
+            mock_response.model_dump.return_value = response_payload
+            mock_client_instance.responses.create = AsyncMock(
+                return_value=mock_response
+            )
+            mock_openai_client.return_value = mock_client_instance
+
+            mock_handle_tool_workflow.return_value = (mock_response, 0, 0)
+
+            await create_response(req=request, auth_info=mock_auth_info)
+
             mock_get_prompt.assert_not_called()
 
     def test_prompt_delegation_request_model_validation(self):
