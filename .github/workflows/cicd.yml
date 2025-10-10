@@ -106,7 +106,7 @@ jobs:
     runs-on: ${{ needs.start-runner.outputs.label }}
     strategy:
       matrix:
-        component: [vllm, attestation, api]
+        component: [vllm, api]
         include:
           - component: api
             build_args: "--target nilai --platform linux/amd64"
@@ -280,7 +280,7 @@ jobs:
     if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'release'
     strategy:
       matrix:
-        component: [vllm, attestation, api]
+        component: [vllm, api]
     steps:
       - name: Configure AWS credentials for ECR
         uses: aws-actions/configure-aws-credentials@v4

@@ -4,13 +4,13 @@ services:
     container_name: nilai-lmstudio-announcer
     restart: unless-stopped
     depends_on:
-      etcd:
+      redis:
         condition: service_healthy
     environment:
       - SVC_HOST=host.docker.internal
       - SVC_PORT=1234
-      - ETCD_HOST=etcd
-      - ETCD_PORT=2379
+      - ETCD_HOST=redis
+      - ETCD_PORT=6379
       - LMSTUDIO_SUPPORTED_FEATURES=chat_completion
     extra_hosts:
       - "host.docker.internal:host-gateway"

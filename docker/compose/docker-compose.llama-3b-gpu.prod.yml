@@ -1,5 +1,0 @@
-services:
-  llama_3b_gpu:
-    depends_on:
-      deepseek_14b_gpu:
-        condition: service_healthy

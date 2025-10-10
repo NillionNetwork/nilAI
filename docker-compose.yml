@@ -1,17 +1,4 @@
 services:
-  etcd:
-    container_name: etcd
-    image: 'bitnamilegacy/etcd'
-    environment:
-      - ALLOW_NONE_AUTHENTICATION=yes
-      - ETCD_ADVERTISE_CLIENT_URLS=http://etcd:2379
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "etcdctl", "endpoint", "health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 5s
   redis:
     container_name: redis
     image: 'redis:latest'
@@ -26,7 +13,7 @@ services:
     container_name: nilai-api
     image: nillion/nilai-api:latest
     depends_on:
-      etcd:
+      redis:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
@@ -39,7 +26,7 @@ services:
     container_name: nilai-nuc-api
     image: nillion/nilai-api:latest
     depends_on:
-      etcd:
+      redis:
         condition: service_healthy
       api:
         condition: service_healthy
