@@ -141,7 +141,7 @@ class TestNilDBEndpoints:
     @pytest.mark.asyncio
     async def test_chat_completion_with_prompt_document_injection(self):
         """Test chat completion with prompt document injection"""
-        from nilai_api.routers.private import chat_completion
+        from nilai_api.routers.endpoints.chat import chat_completion
         from nilai_common import ChatRequest
 
         mock_prompt_document = PromptDocument(
@@ -163,19 +163,26 @@ class TestNilDBEndpoints:
         )
 
         with (
-            patch("nilai_api.routers.private.get_prompt_from_nildb") as mock_get_prompt,
-            patch("nilai_api.routers.private.AsyncOpenAI") as mock_openai_client,
-            patch("nilai_api.routers.private.state.get_model") as mock_get_model,
-            patch("nilai_api.routers.private.handle_nilrag") as mock_handle_nilrag,
             patch(
-                "nilai_api.routers.private.handle_web_search"
+                "nilai_api.routers.endpoints.chat.get_prompt_from_nildb"
+            ) as mock_get_prompt,
+            patch("nilai_api.routers.endpoints.chat.AsyncOpenAI") as mock_openai_client,
+            patch("nilai_api.routers.endpoints.chat.state.get_model") as mock_get_model,
+            patch(
+                "nilai_api.routers.endpoints.chat.handle_nilrag"
+            ) as mock_handle_nilrag,
+            patch(
+                "nilai_api.routers.endpoints.chat.handle_web_search"
             ) as mock_handle_web_search,
             patch(
-                "nilai_api.routers.private.UserManager.update_token_usage"
+                "nilai_api.routers.endpoints.chat.UserManager.update_token_usage"
             ) as mock_update_usage,
             patch(
-                "nilai_api.routers.private.QueryLogManager.log_query"
+                "nilai_api.routers.endpoints.chat.QueryLogManager.log_query"
             ) as mock_log_query,
+            patch(
+                "nilai_api.routers.endpoints.chat.handle_tool_workflow"
+            ) as mock_handle_tool_workflow,
         ):
             mock_get_prompt.return_value = "System prompt from nilDB"
 
@@ -219,6 +226,9 @@ class TestNilDBEndpoints:
                     "total_tokens": 15,
                 },
             }
+            mock_response.usage = MagicMock()
+            mock_response.usage.prompt_tokens = 10
+            mock_response.usage.completion_tokens = 5
             # Make the create method itself an AsyncMock that returns the response
             mock_client_instance.chat.completions.create = AsyncMock(
                 return_value=mock_response
@@ -226,23 +236,18 @@ class TestNilDBEndpoints:
             mock_client_instance.close = AsyncMock()
             mock_openai_client.return_value = mock_client_instance
 
-            #
+            # Mock handle_tool_workflow to return the response and token counts
+            mock_handle_tool_workflow.return_value = (mock_response, 0, 0)
+
             # Call the function (this will test the prompt injection logic)
-            # Note: We can't easily test the full endpoint without setting up the FastAPI app
-            # But we can test that get_prompt_from_nildb is called
-            try:
-                await chat_completion(req=request, auth_info=mock_auth_info)
-            except Exception as e:
-                # Expected to fail due to incomplete mocking, but we should still see the prompt call
-                print("The exception is: ", str(e))
-                raise e
+            await chat_completion(req=request, auth_info=mock_auth_info)
 
             mock_get_prompt.assert_called_once_with(mock_prompt_document)
 
     @pytest.mark.asyncio
     async def test_chat_completion_prompt_document_extraction_error(self):
         """Test chat completion when prompt document extraction fails"""
-        from nilai_api.routers.private import chat_completion
+        from nilai_api.routers.endpoints.chat import chat_completion
         from nilai_common import ChatRequest
 
         mock_prompt_document = PromptDocument(
@@ -264,8 +269,10 @@ class TestNilDBEndpoints:
         )
 
         with (
-            patch("nilai_api.routers.private.get_prompt_from_nildb") as mock_get_prompt,
-            patch("nilai_api.routers.private.state.get_model") as mock_get_model,
+            patch(
+                "nilai_api.routers.endpoints.chat.get_prompt_from_nildb"
+            ) as mock_get_prompt,
+            patch("nilai_api.routers.endpoints.chat.state.get_model") as mock_get_model,
         ):
             # Mock state.get_model() to return a ModelEndpoint
             mock_model_endpoint = MagicMock()
@@ -288,7 +295,7 @@ class TestNilDBEndpoints:
     @pytest.mark.asyncio
     async def test_chat_completion_without_prompt_document(self):
         """Test chat completion when no prompt document is present"""
-        from nilai_api.routers.private import chat_completion
+        from nilai_api.routers.endpoints.chat import chat_completion
         from nilai_common import ChatRequest
 
         mock_user = MagicMock()
@@ -300,7 +307,7 @@ class TestNilDBEndpoints:
         mock_auth_info = AuthenticationInfo(
             user=mock_user,
             token_rate_limit=None,
-            prompt_document=None,  # No prompt document
+            prompt_document=None,
         )
 
         request = ChatRequest(
@@ -308,19 +315,26 @@ class TestNilDBEndpoints:
         )
 
         with (
-            patch("nilai_api.routers.private.get_prompt_from_nildb") as mock_get_prompt,
-            patch("nilai_api.routers.private.AsyncOpenAI") as mock_openai_client,
-            patch("nilai_api.routers.private.state.get_model") as mock_get_model,
-            patch("nilai_api.routers.private.handle_nilrag") as mock_handle_nilrag,
             patch(
-                "nilai_api.routers.private.handle_web_search"
+                "nilai_api.routers.endpoints.chat.get_prompt_from_nildb"
+            ) as mock_get_prompt,
+            patch("nilai_api.routers.endpoints.chat.AsyncOpenAI") as mock_openai_client,
+            patch("nilai_api.routers.endpoints.chat.state.get_model") as mock_get_model,
+            patch(
+                "nilai_api.routers.endpoints.chat.handle_nilrag"
+            ) as mock_handle_nilrag,
+            patch(
+                "nilai_api.routers.endpoints.chat.handle_web_search"
             ) as mock_handle_web_search,
             patch(
-                "nilai_api.routers.private.UserManager.update_token_usage"
+                "nilai_api.routers.endpoints.chat.UserManager.update_token_usage"
             ) as mock_update_usage,
             patch(
-                "nilai_api.routers.private.QueryLogManager.log_query"
+                "nilai_api.routers.endpoints.chat.QueryLogManager.log_query"
             ) as mock_log_query,
+            patch(
+                "nilai_api.routers.endpoints.chat.handle_tool_workflow"
+            ) as mock_handle_tool_workflow,
         ):
             # Mock state.get_model() to return a ModelEndpoint
             mock_model_endpoint = MagicMock()
@@ -362,6 +376,9 @@ class TestNilDBEndpoints:
                     "total_tokens": 15,
                 },
             }
+            mock_response.usage = MagicMock()
+            mock_response.usage.prompt_tokens = 10
+            mock_response.usage.completion_tokens = 5
             # Make the create method itself an AsyncMock that returns the response
             mock_client_instance.chat.completions.create = AsyncMock(
                 return_value=mock_response
@@ -369,12 +386,11 @@ class TestNilDBEndpoints:
             mock_client_instance.close = AsyncMock()
             mock_openai_client.return_value = mock_client_instance
 
+            # Mock handle_tool_workflow to return the response and token counts
+            mock_handle_tool_workflow.return_value = (mock_response, 0, 0)
+
             # Call the function
-            try:
-                await chat_completion(req=request, auth_info=mock_auth_info)
-            except Exception:
-                # Expected to fail due to incomplete mocking
-                pass
+            await chat_completion(req=request, auth_info=mock_auth_info)
 
             # Should not call get_prompt_from_nildb when no prompt document
             mock_get_prompt.assert_not_called()
