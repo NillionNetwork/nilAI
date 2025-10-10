@@ -16,7 +16,7 @@ services:
       - .env
     restart: unless-stopped
     depends_on:
-      etcd:
+      redis:
         condition: service_healthy
       gpt_20b_gpu:
         # Llama takes less time to initialize
@@ -37,8 +37,8 @@ services:
     environment:
       - SVC_HOST=llama_8b_gpu
       - SVC_PORT=8000
-      - ETCD_HOST=etcd
-      - ETCD_PORT=2379
+      - ETCD_HOST=redis
+      - ETCD_PORT=6379
       - TOOL_SUPPORT=true
     volumes:
       - hugging_face_models:/root/.cache/huggingface
@@ -65,7 +65,7 @@ services:
       - .env
     restart: unless-stopped
     depends_on:
-      etcd:
+      redis:
         condition: service_healthy
     command: >
       --model openai/gpt-oss-20b
@@ -77,8 +77,8 @@ services:
     environment:
       - SVC_HOST=gpt_20b_gpu
       - SVC_PORT=8000
-      - ETCD_HOST=etcd
-      - ETCD_PORT=2379
+      - ETCD_HOST=redis
+      - ETCD_PORT=6379
       - TOOL_SUPPORT=true
     volumes:
       - hugging_face_models:/root/.cache/huggingface  # cache models

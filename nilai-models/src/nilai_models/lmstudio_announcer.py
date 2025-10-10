@@ -76,37 +76,42 @@ async def _fetch_model_ids(
 async def _announce_model(
     metadata: ModelMetadata,
     base_url: str,
-    etcd_host: str,
-    etcd_port: int,
+    discovery_host: str,
+    discovery_port: int,
     lease_ttl: int,
     prefix: str,
 ):
-    """Register and maintain a model announcement in etcd."""
+    """Register and maintain a model announcement in Redis."""
     discovery = ModelServiceDiscovery(
-        host=etcd_host, port=etcd_port, lease_ttl=lease_ttl
+        host=discovery_host, port=discovery_port, lease_ttl=lease_ttl
     )
+    await discovery.initialize()
+
     endpoint = ModelEndpoint(url=base_url.rstrip("/"), metadata=metadata)
-    lease = None
+    key = None
 
     try:
-        lease = await discovery.register_model(endpoint, prefix=prefix)
+        key = await discovery.register_model(endpoint, prefix=prefix)
         logger.info(
-            "Registered model %s at %s (lease=%s)",
+            "Registered model %s at %s (key=%s)",
             metadata.id,
             endpoint.url,
-            getattr(lease, "id", "n/a"),
+            key,
         )
-        await discovery.keep_alive(lease)
+        await discovery.keep_alive(key, endpoint)
     except asyncio.CancelledError:
         logger.info("Shutdown requested for model %s", metadata.id)
         raise
     finally:
-        if lease:
+        if key:
             try:
                 await discovery.unregister_model(metadata.id)
                 logger.info("Unregistered model %s", metadata.id)
             except Exception as exc:
                 logger.error("Failed to unregister model %s: %s", metadata.id, exc)
+
+        # Close the discovery service connection
+        await discovery.close()
 
 
 def _create_metadata(
@@ -190,11 +195,11 @@ async def main():
     )
 
     logger.info(
-        "Announcing LMStudio models %s via %s with etcd at %s:%s",
+        "Announcing LMStudio models %s via %s with Redis at %s:%s",
         ", ".join(model_ids),
         registration_url,
-        SETTINGS.etcd_host,
-        SETTINGS.etcd_port,
+        SETTINGS.discovery_host,
+        SETTINGS.discovery_port,
     )
 
     # Create announcement tasks for all models
@@ -215,8 +220,8 @@ async def main():
                     multimodal_default,
                 ),
                 base_url=registration_url,
-                etcd_host=SETTINGS.etcd_host,
-                etcd_port=SETTINGS.etcd_port,
+                discovery_host=SETTINGS.discovery_host,
+                discovery_port=SETTINGS.discovery_port,
                 lease_ttl=lease_ttl,
                 prefix=discovery_prefix,
             )

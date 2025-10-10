@@ -4,12 +4,12 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
-
 from nilai_api.db.users import RateLimits, UserModel
+from nilai_api.state import state
 from nilai_common import AttestationReport, Source
 
-from nilai_api.state import state
-from ... import model_endpoint, model_metadata, response as RESPONSE
+from ... import model_endpoint, model_metadata
+from ... import response as RESPONSE
 
 
 @pytest.mark.asyncio
@@ -36,8 +36,8 @@ def mock_user():
 
 @pytest.fixture
 def mock_user_manager(mock_user, mocker):
-    from nilai_api.db.users import UserManager
     from nilai_api.db.logs import QueryLogManager
+    from nilai_api.db.users import UserManager
 
     mocker.patch.object(
         UserManager,
@@ -105,16 +105,16 @@ def mock_state(mocker):
 
     # Create a mock discovery service that returns the expected models
     mock_discovery_service = mocker.Mock()
+    mock_discovery_service.initialize = AsyncMock()
     mock_discovery_service.discover_models = AsyncMock(return_value=expected_models)
+    mock_discovery_service.get_model = AsyncMock(return_value=model_endpoint)
 
     # Create a mock AppState
     mocker.patch.object(state, "discovery_service", mock_discovery_service)
+    mocker.patch.object(state, "_discovery_initialized", False)
 
     # Patch other attributes
     mocker.patch.object(state, "b64_public_key", "test-verifying-key")
-
-    # Patch get_model method
-    mocker.patch.object(state, "get_model", return_value=model_endpoint)
 
     # Patch get_attestation method
     attestation_response = AttestationReport(

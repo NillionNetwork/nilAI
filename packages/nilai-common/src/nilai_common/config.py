@@ -5,8 +5,8 @@ from pydantic import BaseModel, Field
 class HostSettings(BaseModel):
     host: str = "localhost"
     port: int = 8000
-    etcd_host: str = "localhost"
-    etcd_port: int = 2379
+    discovery_host: str = "localhost"
+    discovery_port: int = 6379  # Redis port (changed from etcd's 2379)
     tool_support: bool = False
     multimodal_support: bool = False
     gunicorn_workers: int = 10
@@ -27,8 +27,10 @@ def to_bool(value: str) -> bool:
 SETTINGS: HostSettings = HostSettings(
     host=str(os.getenv("SVC_HOST", "localhost")),
     port=int(os.getenv("SVC_PORT", 8000)),
-    etcd_host=str(os.getenv("ETCD_HOST", "localhost")),
-    etcd_port=int(os.getenv("ETCD_PORT", 2379)),
+    discovery_host=str(os.getenv("ETCD_HOST", "localhost")),
+    discovery_port=int(
+        os.getenv("ETCD_PORT", 6379)
+    ),  # Redis port (changed from etcd's 2379)
     tool_support=to_bool(os.getenv("TOOL_SUPPORT", "False")),
     multimodal_support=to_bool(os.getenv("MULTIMODAL_SUPPORT", "False")),
     gunicorn_workers=int(os.getenv("NILAI_GUNICORN_WORKERS", 10)),
