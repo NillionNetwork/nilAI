@@ -18,7 +18,7 @@ services:
       - .env
     restart: unless-stopped
     depends_on:
-      etcd:
+      redis:
         condition: service_healthy
     command:
       [
@@ -44,8 +44,8 @@ services:
     environment:
       SVC_HOST: qwen2vl_2b_gpu
       SVC_PORT: "8000"
-      ETCD_HOST: etcd
-      ETCD_PORT: "2379"
+      ETCD_HOST: redis
+      ETCD_PORT: "6379"
       TOOL_SUPPORT: "true"
       MULTIMODAL_SUPPORT: "true"
       CUDA_LAUNCH_BLOCKING: "1"

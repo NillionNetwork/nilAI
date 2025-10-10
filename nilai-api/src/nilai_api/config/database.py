@@ -9,10 +9,10 @@ class DatabaseConfig(BaseModel):
     db: str = Field(description="Database name")
 
 
-class EtcdConfig(BaseModel):
-    host: str = Field(description="ETCD host")
-    port: int = Field(description="ETCD port")
+class DiscoveryConfig(BaseModel):
+    host: str = Field(default="localhost", description="Redis host for discovery")
+    port: int = Field(default=6379, description="Redis port for discovery")
 
 
 class RedisConfig(BaseModel):
-    url: str = Field(description="Redis URL")
+    url: str = Field(description="Redis URL for rate limiting")

@@ -16,7 +16,7 @@ services:
       - .env
     restart: unless-stopped
     depends_on:
-      etcd:
+      redis:
         condition: service_healthy
     command: >
       --model hugging-quants/Meta-Llama-3.1-70B-Instruct-AWQ-INT4
@@ -30,8 +30,8 @@ services:
     environment:
       - SVC_HOST=llama_70b_gpu
       - SVC_PORT=8000
-      - ETCD_HOST=etcd
-      - ETCD_PORT=2379
+      - ETCD_HOST=redis
+      - ETCD_PORT=6379
       - TOOL_SUPPORT=true
     volumes:
       - hugging_face_models:/root/.cache/huggingface  # cache models
