@@ -200,11 +200,12 @@ def test_chat_completion(mock_user, mock_state, mock_user_manager, mocker, clien
     mock_async_openai_instance = MagicMock()
     mock_async_openai_instance.chat = mock_chat
     mocker.patch(
-        "nilai_api.routers.endpoints.chat.AsyncOpenAI", return_value=mock_async_openai_instance
+        "nilai_api.routers.endpoints.chat.AsyncOpenAI",
+        return_value=mock_async_openai_instance,
     )
     mocker.patch(
         "nilai_api.routers.endpoints.chat.handle_tool_workflow",
-        return_value=(response_data, 0, 0)
+        return_value=(response_data, 0, 0),
     )
     response = client.post(
         "/v1/chat/completions",

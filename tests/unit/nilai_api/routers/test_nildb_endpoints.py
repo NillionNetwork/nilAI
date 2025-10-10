@@ -163,10 +163,14 @@ class TestNilDBEndpoints:
         )
 
         with (
-            patch("nilai_api.routers.endpoints.chat.get_prompt_from_nildb") as mock_get_prompt,
+            patch(
+                "nilai_api.routers.endpoints.chat.get_prompt_from_nildb"
+            ) as mock_get_prompt,
             patch("nilai_api.routers.endpoints.chat.AsyncOpenAI") as mock_openai_client,
             patch("nilai_api.routers.endpoints.chat.state.get_model") as mock_get_model,
-            patch("nilai_api.routers.endpoints.chat.handle_nilrag") as mock_handle_nilrag,
+            patch(
+                "nilai_api.routers.endpoints.chat.handle_nilrag"
+            ) as mock_handle_nilrag,
             patch(
                 "nilai_api.routers.endpoints.chat.handle_web_search"
             ) as mock_handle_web_search,
@@ -265,7 +269,9 @@ class TestNilDBEndpoints:
         )
 
         with (
-            patch("nilai_api.routers.endpoints.chat.get_prompt_from_nildb") as mock_get_prompt,
+            patch(
+                "nilai_api.routers.endpoints.chat.get_prompt_from_nildb"
+            ) as mock_get_prompt,
             patch("nilai_api.routers.endpoints.chat.state.get_model") as mock_get_model,
         ):
             # Mock state.get_model() to return a ModelEndpoint
@@ -309,10 +315,14 @@ class TestNilDBEndpoints:
         )
 
         with (
-            patch("nilai_api.routers.endpoints.chat.get_prompt_from_nildb") as mock_get_prompt,
+            patch(
+                "nilai_api.routers.endpoints.chat.get_prompt_from_nildb"
+            ) as mock_get_prompt,
             patch("nilai_api.routers.endpoints.chat.AsyncOpenAI") as mock_openai_client,
             patch("nilai_api.routers.endpoints.chat.state.get_model") as mock_get_model,
-            patch("nilai_api.routers.endpoints.chat.handle_nilrag") as mock_handle_nilrag,
+            patch(
+                "nilai_api.routers.endpoints.chat.handle_nilrag"
+            ) as mock_handle_nilrag,
             patch(
                 "nilai_api.routers.endpoints.chat.handle_web_search"
             ) as mock_handle_web_search,
