@@ -83,7 +83,7 @@ jobs:
           runners-per-machine: 3
           number-of-machines: 1
           ec2-image-id: ami-0174a246556e8750b
-          ec2-instance-type: g4dn.xlarge
+          ec2-instance-type: g6.xlarge
           subnet-id: subnet-0ec4c353621eabae2
           security-group-id: sg-03ee5c56e1f467aa0
           key-name: production-github-runner-key
@@ -149,7 +149,7 @@ jobs:
          sed -i 's/NILDB_COLLECTION=.*/NILDB_COLLECTION=${{ secrets.NILDB_COLLECTION }}/' .env
 
       - name: Compose docker-compose.yml
-        run: python3 ./scripts/docker-composer.py --dev -f docker/compose/docker-compose.llama-1b-gpu.ci.yml -o development-compose.yml
+        run: python3 ./scripts/docker-composer.py --dev -f docker/compose/docker-compose.gpt-20b-gpu.ci.yml -o development-compose.yml
 
       - name: GPU stack versions (non-fatal)
         shell: bash
