@@ -308,7 +308,7 @@ def test_create_response_stream_includes_sources(
         "web_search": True,
     }
 
-    headers = {"Authorization": "Bearer test-api-key"}
+    headers = {"Authorization": "Bearer test-api-key-stream-sources-unique"}
 
     with client.stream("POST", "/v1/responses", json=payload, headers=headers) as resp:
         assert resp.status_code == 200
