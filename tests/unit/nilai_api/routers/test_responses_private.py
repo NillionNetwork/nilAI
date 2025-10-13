@@ -50,7 +50,7 @@ def mock_user_manager(mock_user, mocker):
             "prompt_tokens": 100,
             "completion_tokens": 50,
             "total_tokens": 150,
-            "queries": 10,
+            "queries": 0,
         },
     )
     mocker.patch.object(UserManager, "update_token_usage")
@@ -63,7 +63,7 @@ def mock_user_manager(mock_user, mocker):
             "total_tokens": 150,
             "completion_tokens_details": None,
             "prompt_tokens_details": None,
-            "queries": 10,
+            "queries": 0,
         },
     )
     mocker.patch.object(
@@ -308,7 +308,7 @@ def test_create_response_stream_includes_sources(
         "web_search": True,
     }
 
-    headers = {"Authorization": "Bearer test-api-key-stream-sources-unique"}
+    headers = {"Authorization": "Bearer test-api-key"}
 
     with client.stream("POST", "/v1/responses", json=payload, headers=headers) as resp:
         assert resp.status_code == 200
