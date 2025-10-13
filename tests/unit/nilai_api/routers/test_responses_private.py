@@ -325,4 +325,3 @@ def test_create_response_stream_includes_sources(
     assert "sources" in final_payload["data"]
     assert len(final_payload["data"]["sources"]) == 1
     assert final_payload["data"]["sources"][0]["source"] == "https://example.com"
-

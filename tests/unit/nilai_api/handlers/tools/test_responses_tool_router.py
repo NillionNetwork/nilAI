@@ -133,18 +133,23 @@ async def test_handle_responses_tool_workflow_executes_and_uses_result(mocker):
     mock_responses.create = AsyncMock(return_value=second_response)
     mock_client.responses = mock_responses
 
-    final, prompt_tokens, completion_tokens = (
-        await responses_tool_router.handle_responses_tool_workflow(
-            mock_client,
-            req,
-            cast(Any, req.input),
-            first_response,
-        )
+    (
+        final,
+        prompt_tokens,
+        completion_tokens,
+    ) = await responses_tool_router.handle_responses_tool_workflow(
+        mock_client,
+        req,
+        cast(Any, req.input),
+        first_response,
     )
 
     mock_exec.assert_awaited_once_with("print(6*7)")
     assert final == second_response
-    assert prompt_tokens == first_response.usage.input_tokens + second_response.usage.input_tokens
+    assert (
+        prompt_tokens
+        == first_response.usage.input_tokens + second_response.usage.input_tokens
+    )
     assert (
         completion_tokens
         == first_response.usage.output_tokens + second_response.usage.output_tokens

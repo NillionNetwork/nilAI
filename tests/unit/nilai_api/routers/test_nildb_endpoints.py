@@ -440,10 +440,12 @@ class TestNilDBEndpoints:
             patch(
                 "nilai_api.routers.endpoints.responses.get_prompt_from_nildb"
             ) as mock_get_prompt,
-            patch("nilai_api.routers.endpoints.responses.AsyncOpenAI")
-            as mock_openai_client,
-            patch("nilai_api.routers.endpoints.responses.state.get_model")
-            as mock_get_model,
+            patch(
+                "nilai_api.routers.endpoints.responses.AsyncOpenAI"
+            ) as mock_openai_client,
+            patch(
+                "nilai_api.routers.endpoints.responses.state.get_model"
+            ) as mock_get_model,
             patch(
                 "nilai_api.routers.endpoints.responses.UserManager.update_token_usage"
             ) as mock_update_usage,
@@ -468,7 +470,9 @@ class TestNilDBEndpoints:
             mock_client_instance = MagicMock()
             mock_response = MagicMock()
             mock_response.model_dump.return_value = response_payload
-            mock_client_instance.responses.create = AsyncMock(return_value=mock_response)
+            mock_client_instance.responses.create = AsyncMock(
+                return_value=mock_response
+            )
             mock_openai_client.return_value = mock_client_instance
 
             mock_handle_tool_workflow.return_value = (mock_response, 0, 0)
@@ -502,8 +506,9 @@ class TestNilDBEndpoints:
             patch(
                 "nilai_api.routers.endpoints.responses.get_prompt_from_nildb"
             ) as mock_get_prompt,
-            patch("nilai_api.routers.endpoints.responses.state.get_model")
-            as mock_get_model,
+            patch(
+                "nilai_api.routers.endpoints.responses.state.get_model"
+            ) as mock_get_model,
         ):
             mock_model_endpoint = MagicMock()
             mock_model_endpoint.url = "http://test-model-endpoint"
@@ -564,10 +569,12 @@ class TestNilDBEndpoints:
             patch(
                 "nilai_api.routers.endpoints.responses.get_prompt_from_nildb"
             ) as mock_get_prompt,
-            patch("nilai_api.routers.endpoints.responses.AsyncOpenAI")
-            as mock_openai_client,
-            patch("nilai_api.routers.endpoints.responses.state.get_model")
-            as mock_get_model,
+            patch(
+                "nilai_api.routers.endpoints.responses.AsyncOpenAI"
+            ) as mock_openai_client,
+            patch(
+                "nilai_api.routers.endpoints.responses.state.get_model"
+            ) as mock_get_model,
             patch(
                 "nilai_api.routers.endpoints.responses.UserManager.update_token_usage"
             ) as mock_update_usage,
@@ -590,7 +597,9 @@ class TestNilDBEndpoints:
             mock_client_instance = MagicMock()
             mock_response = MagicMock()
             mock_response.model_dump.return_value = response_payload
-            mock_client_instance.responses.create = AsyncMock(return_value=mock_response)
+            mock_client_instance.responses.create = AsyncMock(
+                return_value=mock_response
+            )
             mock_openai_client.return_value = mock_client_instance
 
             mock_handle_tool_workflow.return_value = (mock_response, 0, 0)

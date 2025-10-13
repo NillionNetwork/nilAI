@@ -119,9 +119,13 @@ def test_model_standard_request(client, model):
     response_json = response.json()
     print(response_json)
     assert "output" in response_json, "Response should contain output"
-    assert len(response_json["output"]) > 0, "At least one output item should be present"
+    assert len(response_json["output"]) > 0, (
+        "At least one output item should be present"
+    )
 
-    text_items = [item for item in response_json["output"] if item.get("type") == "text"]
+    text_items = [
+        item for item in response_json["output"] if item.get("type") == "text"
+    ]
     assert len(text_items) > 0, "Response should contain text items"
     content = text_items[0].get("text", "")
     assert content, f"No content returned for {model}"
@@ -132,18 +136,14 @@ def test_model_standard_request(client, model):
 
     assert content.strip(), f"Empty response returned for {model}"
 
-    assert response_json["usage"]["input_tokens"] > 0, (
-        f"Input tokens are 0 for {model}"
-    )
+    assert response_json["usage"]["input_tokens"] > 0, f"Input tokens are 0 for {model}"
     assert response_json["usage"]["output_tokens"] > 0, (
         f"Output tokens are 0 for {model}"
     )
-    assert response_json["usage"]["total_tokens"] > 0, (
-        f"Total tokens are 0 for {model}"
-    )
-    
+    assert response_json["usage"]["total_tokens"] > 0, f"Total tokens are 0 for {model}"
+
     assert "signature" in response_json, "Response should contain signature"
-    
+
     print(
         f"\nModel {model} standard response: {content[:100]}..."
         if len(content) > 100
@@ -168,25 +168,25 @@ def test_model_standard_request_nillion_2025(nillion_2025_client, model):
     response_json = response.json()
     print(response_json)
     assert "output" in response_json, "Response should contain output"
-    assert len(response_json["output"]) > 0, "At least one output item should be present"
+    assert len(response_json["output"]) > 0, (
+        "At least one output item should be present"
+    )
 
-    text_items = [item for item in response_json["output"] if item.get("type") == "text"]
+    text_items = [
+        item for item in response_json["output"] if item.get("type") == "text"
+    ]
     assert len(text_items) > 0, "Response should contain text items"
     content = text_items[0].get("text", "")
     assert content, f"No content returned for {model}"
 
     assert content.strip(), f"Empty response returned for {model}"
 
-    assert response_json["usage"]["input_tokens"] > 0, (
-        f"Input tokens are 0 for {model}"
-    )
+    assert response_json["usage"]["input_tokens"] > 0, f"Input tokens are 0 for {model}"
     assert response_json["usage"]["output_tokens"] > 0, (
         f"Output tokens are 0 for {model}"
     )
-    assert response_json["usage"]["total_tokens"] > 0, (
-        f"Total tokens are 0 for {model}"
-    )
-    
+    assert response_json["usage"]["total_tokens"] > 0, f"Total tokens are 0 for {model}"
+
     print(
         f"\nModel {model} standard response: {content[:100]}..."
         if len(content) > 100
@@ -217,35 +217,37 @@ def test_model_streaming_request(client, model):
         content = ""
         had_usage = False
         had_completed_event = False
-        
+
         for chunk in response.iter_lines():
             if chunk and chunk.strip() and chunk.startswith("data:"):
                 chunk_count += 1
                 chunk_data = chunk[6:].strip()
-                
+
                 if chunk_data == "[DONE]":
                     continue
-                    
+
                 print(f"\nModel {model} stream chunk {chunk_count}: {chunk_data}")
                 chunk_json = json.loads(chunk_data)
-                
+
                 if chunk_json.get("type") == "response.text.delta":
                     delta = chunk_json.get("delta", "")
                     content += delta
-                
+
                 if chunk_json.get("type") == "response.output_item.added":
                     item = chunk_json.get("item", {})
-                    if item.get("type") == "message" and isinstance(item.get("content"), list):
+                    if item.get("type") == "message" and isinstance(
+                        item.get("content"), list
+                    ):
                         for content_item in item["content"]:
                             if content_item.get("type") == "text":
                                 content += content_item.get("text", "")
-                
+
                 if chunk_json.get("type") == "response.completed":
                     had_completed_event = True
                     if chunk_json.get("usage"):
                         print(f"Usage: {chunk_json.get('usage')}")
                         had_usage = True
-                        
+
         assert had_usage, f"No usage data received for {model} streaming request"
         assert had_completed_event, f"No completed event received for {model}"
         assert chunk_count > 0, f"No chunks received for {model} streaming request"
@@ -290,12 +292,14 @@ def test_model_tools_request(client, model):
 
         response_json = response.json()
         assert "output" in response_json, "Response should contain output"
-        assert len(response_json["output"]) > 0, "At least one output item should be present"
+        assert len(response_json["output"]) > 0, (
+            "At least one output item should be present"
+        )
 
         output = response_json["output"]
 
         tool_calls = [item for item in output if item.get("type") == "function_call"]
-        
+
         if tool_calls:
             print(f"\nModel {model} tool calls: {json.dumps(tool_calls, indent=2)}")
             assert len(tool_calls) > 0, f"Tool calls array is empty for {model}"
@@ -370,20 +374,20 @@ def test_function_calling_with_streaming_httpx(client, model):
                     chunk_json = json.loads(data_line)
                 except json.JSONDecodeError:
                     continue
-                
+
                 if chunk_json.get("type") == "response.function_call_arguments.delta":
                     had_tool_call = True
-                
+
                 if chunk_json.get("type") == "response.output_item.added":
                     item = chunk_json.get("item", {})
                     if item.get("type") == "function_call":
                         had_tool_call = True
-                
+
                 if chunk_json.get("type") == "response.completed":
                     usage = chunk_json.get("usage")
                     if usage:
                         had_usage = True
-                        
+
         assert had_tool_call, f"No tool calls received for {model} streaming request"
         assert had_usage, f"No usage data received for {model} streaming request"
 
@@ -403,7 +407,7 @@ def test_invalid_auth_token():
         "model": test_models[0],
         "input": "Test",
     }
-    
+
     response = invalid_client.post("/v1/responses", json=payload)
     assert response.status_code in [401, 403], (
         "Invalid token should result in unauthorized access"
@@ -510,7 +514,9 @@ def test_large_payload_handling(client):
     if response.status_code == 200:
         response_json = response.json()
         assert "output" in response_json, "Response should contain output"
-        assert len(response_json["output"]) > 0, "At least one output item should be present"
+        assert len(response_json["output"]) > 0, (
+            "At least one output item should be present"
+        )
 
 
 @pytest.mark.parametrize("invalid_model", ["nonexistent-model/v1", "", None, "   "])
@@ -622,7 +628,9 @@ def test_response_high_temperature(client):
     )
     response_json = response.json()
     assert "output" in response_json, "Response should contain output"
-    assert len(response_json["output"]) > 0, "At least one output item should be present"
+    assert len(response_json["output"]) > 0, (
+        "At least one output item should be present"
+    )
 
 
 def test_model_streaming_request_high_token(client):
@@ -699,11 +707,13 @@ def test_nildb_prompt_document(document_id_client: httpx.Client, model):
     assert response.status_code == 200, (
         f"Response should be successful: {response.text}"
     )
-    
+
     response_json = response.json()
-    text_items = [item for item in response_json["output"] if item.get("type") == "text"]
+    text_items = [
+        item for item in response_json["output"] if item.get("type") == "text"
+    ]
     assert len(text_items) > 0, "Response should contain text items"
-    
+
     message: str = text_items[0].get("text", "")
     assert "cheese" in message.lower(), "Response should contain cheese"
 
@@ -758,7 +768,7 @@ def test_execute_python_sha256_e2e(client, model):
     last_data = None
     last_content = ""
     last_status = None
-    
+
     for _ in range(trials):
         response = client.post("/v1/responses", json=payload)
         last_status = response.status_code
@@ -768,15 +778,15 @@ def test_execute_python_sha256_e2e(client, model):
         last_data = data
         if not ("output" in data and data["output"]):
             continue
-        
+
         text_items = [item for item in data["output"] if item.get("type") == "text"]
         if not text_items:
             continue
-            
+
         content = text_items[0].get("text", "")
         last_content = content
         normalized_content = re.sub(r"\s+", " ", content)
-        
+
         if re.search(pattern, normalized_content):
             break
     else:
@@ -789,4 +799,3 @@ def test_execute_python_sha256_e2e(client, model):
                 f"Full: {json.dumps(last_data, indent=2)[:1000] if last_data else '<no json>'}"
             )
         )
-

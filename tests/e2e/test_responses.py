@@ -59,19 +59,19 @@ def test_response_generation(client, model):
             temperature=0.2,
             max_output_tokens=100,
         )
-        
+
         assert hasattr(response, "output"), "Response should contain output"
         assert hasattr(response, "signature"), "Response should contain signature"
         assert hasattr(response, "usage"), "Response should contain usage"
         assert response.model == model, f"Response model should be {model}"
-        
+
         output = response.output
         assert isinstance(output, list), "Output should be a list"
         assert len(output) > 0, "Output should contain at least one item"
-        
+
         text_items = [item for item in output if getattr(item, "type", None) == "text"]
         assert len(text_items) > 0, "Output should contain at least one text item"
-        
+
         content = getattr(text_items[0], "text", "")
         assert content, f"No content returned for {model}"
         print(
@@ -80,15 +80,11 @@ def test_response_generation(client, model):
             else content
         )
 
-        assert response.usage.input_tokens > 0, (
-            f"No input tokens returned for {model}"
-        )
+        assert response.usage.input_tokens > 0, f"No input tokens returned for {model}"
         assert response.usage.output_tokens > 0, (
             f"No output tokens returned for {model}"
         )
-        assert response.usage.total_tokens > 0, (
-            f"No total tokens returned for {model}"
-        )
+        assert response.usage.total_tokens > 0, f"No total tokens returned for {model}"
 
         assert "paris" in content.lower(), (
             "Response should mention Paris as the capital of France"
@@ -116,7 +112,7 @@ def test_rate_limiting_nucs(rate_limited_client, model):
                 max_output_tokens=100,
             )
         except (openai.RateLimitError, openai.APIStatusError) as e:
-            if hasattr(e, 'status_code') and e.status_code in [429, 403, 503]:
+            if hasattr(e, "status_code") and e.status_code in [429, 403, 503]:
                 rate_limited = True
                 break
 
@@ -191,22 +187,25 @@ def test_streaming_response(client, model):
             chunk_count += 1
             print(f"Model {model} stream chunk {chunk_count}: {chunk}")
 
-            if hasattr(chunk, 'type'):
+            if hasattr(chunk, "type"):
                 if chunk.type == "response.output_item.added":
-                    item = getattr(chunk, 'item', None)
-                    if item and hasattr(item, 'type') and item.type == "message":
-                        content_list = getattr(item, 'content', [])
+                    item = getattr(chunk, "item", None)
+                    if item and hasattr(item, "type") and item.type == "message":
+                        content_list = getattr(item, "content", [])
                         if isinstance(content_list, list):
                             for content_item in content_list:
-                                if hasattr(content_item, 'type') and content_item.type == "text":
-                                    full_content += getattr(content_item, 'text', '')
+                                if (
+                                    hasattr(content_item, "type")
+                                    and content_item.type == "text"
+                                ):
+                                    full_content += getattr(content_item, "text", "")
 
                 if chunk.type == "response.text.delta":
-                    delta = getattr(chunk, 'delta', '')
+                    delta = getattr(chunk, "delta", "")
                     full_content += delta
 
                 if chunk.type == "response.completed":
-                    usage = getattr(chunk, 'usage', None)
+                    usage = getattr(chunk, "usage", None)
                     if usage:
                         had_usage = True
                         print(f"Model {model} usage: {usage}")
@@ -259,7 +258,9 @@ def test_function_calling(client, model):
         assert hasattr(response, "output"), "Response should contain output"
 
         output = response.output
-        tool_calls = [item for item in output if getattr(item, "type", None) == "function_call"]
+        tool_calls = [
+            item for item in output if getattr(item, "type", None) == "function_call"
+        ]
 
         if tool_calls:
             tool_calls_json = [
@@ -271,24 +272,26 @@ def test_function_calling(client, model):
                 }
                 for item in tool_calls
             ]
-            print(f"\nModel {model} tool calls: {json.dumps(tool_calls_json, indent=2)}")
-            
+            print(
+                f"\nModel {model} tool calls: {json.dumps(tool_calls_json, indent=2)}"
+            )
+
             assert len(tool_calls) > 0, f"Tool calls array is empty for {model}"
-            
+
             first_call = tool_calls[0]
             assert getattr(first_call, "name", None) == "get_weather", (
                 "Function name should be get_weather"
             )
-            
+
             arguments = getattr(first_call, "arguments", None)
             assert arguments, "Function should have arguments"
-            
+
             args = json.loads(arguments)
             assert "location" in args, "Arguments should contain location"
             assert "paris" in args["location"].lower(), "Location should be Paris"
 
             function_response = "The weather in Paris is currently 22°C and sunny."
-            
+
             follow_up_response = client.responses.create(
                 model=model,
                 input=[
@@ -312,10 +315,12 @@ def test_function_calling(client, model):
                 instructions="You are Llama 1B, a detail-oriented AI tasked with verifying and analyzing the output of a recent tool call. Your first responsibility is to review, line by line, the produced output. Check that every section conforms to the expected format and contains all required information. Look for any discrepancies, missing data, or anomalies—be it in structure, content, or data types. Once you have completed your review, list any errors or inconsistencies found and suggest specific corrections if needed. Do not proceed with any further processing until you have fully validated and reported on the integrity of the tool calls output.",
                 temperature=0.2,
             )
-            
+
             output = follow_up_response.output
-            text_items = [item for item in output if getattr(item, "type", None) == "text"]
-            
+            text_items = [
+                item for item in output if getattr(item, "type", None) == "text"
+            ]
+
             if text_items:
                 follow_up_content = getattr(text_items[0], "text", "")
                 assert follow_up_content, "No content in follow-up response"
@@ -326,7 +331,9 @@ def test_function_calling(client, model):
                     or "weather" in follow_up_content.lower()
                 ), "Follow-up should mention the weather details"
         else:
-            text_items = [item for item in output if getattr(item, "type", None) == "text"]
+            text_items = [
+                item for item in output if getattr(item, "type", None) == "text"
+            ]
             if text_items:
                 content = getattr(text_items[0], "text", "")
                 print(
@@ -378,17 +385,17 @@ def test_function_calling_with_streaming(client, model):
         for chunk in stream:
             print(f"Model {model} stream chunk: {chunk}")
 
-            if hasattr(chunk, 'type'):
+            if hasattr(chunk, "type"):
                 if chunk.type == "response.function_call_arguments.delta":
                     had_tool_call = True
 
                 if chunk.type == "response.output_item.added":
-                    item = getattr(chunk, 'item', None)
-                    if item and hasattr(item, 'type') and item.type == "function_call":
+                    item = getattr(chunk, "item", None)
+                    if item and hasattr(item, "type") and item.type == "function_call":
                         had_tool_call = True
 
                 if chunk.type == "response.completed":
-                    usage = getattr(chunk, 'usage', None)
+                    usage = getattr(chunk, "usage", None)
                     if usage:
                         had_usage = True
                         print(f"Model {model} usage: {usage}")
@@ -397,9 +404,7 @@ def test_function_calling_with_streaming(client, model):
         assert had_usage, f"No usage data received for {model} streaming request"
 
     except Exception as e:
-        pytest.fail(
-            f"Error testing streaming function calling with {model}: {str(e)}"
-        )
+        pytest.fail(f"Error testing streaming function calling with {model}: {str(e)}")
 
 
 def test_usage_endpoint(client):
@@ -475,7 +480,9 @@ def test_invalid_model_handling(client, invalid_model):
         )
         pytest.fail(f"Invalid model {invalid_model} should raise an error")
     except Exception as e:
-        assert True, f"Invalid model {invalid_model} raised an error as expected: {str(e)}"
+        assert True, (
+            f"Invalid model {invalid_model} raised an error as expected: {str(e)}"
+        )
 
 
 def test_timeout_handling(client):
@@ -559,12 +566,14 @@ def test_response_high_temperature(client):
         temperature=2.0,
         max_output_tokens=50,
     )
-    
+
     assert response, "High temperature request should return a valid response"
     assert hasattr(response, "output"), "Response should contain output"
     assert len(response.output) > 0, "At least one output item should be present"
-    
-    text_items = [item for item in response.output if getattr(item, "type", None) == "text"]
+
+    text_items = [
+        item for item in response.output if getattr(item, "type", None) == "text"
+    ]
     assert len(text_items) > 0, "Response should contain text content"
     assert getattr(text_items[0], "text", None), "Response should contain text"
 
@@ -582,8 +591,8 @@ def test_streaming_request_high_token(client):
     chunk_count = 0
     for chunk in stream:
         chunk_count += 1
-        if hasattr(chunk, 'type') and chunk.type == "response.text.delta":
-            delta = getattr(chunk, 'delta', None)
+        if hasattr(chunk, "type") and chunk.type == "response.text.delta":
+            delta = getattr(chunk, "delta", None)
             assert delta is not None, "Chunk should contain delta"
         if chunk_count >= 20:
             break
@@ -620,7 +629,9 @@ def test_web_search(client, model):
             )
 
             text_items = [
-                item for item in response.output if getattr(item, "type", None) == "text"
+                item
+                for item in response.output
+                if getattr(item, "type", None) == "text"
             ]
             assert len(text_items) > 0, "Response should contain text content"
             content = getattr(text_items[0], "text", "")
@@ -646,7 +657,7 @@ def test_web_search(client, model):
 
 def test_web_search_brave_rps_e2e(client):
     import openai
-    
+
     request_barrier = threading.Barrier(40)
     responses = []
     start_time = None
@@ -670,7 +681,7 @@ def test_web_search_brave_rps_e2e(client):
             responses.append((completion_time, response, "success"))
         except (openai.RateLimitError, openai.APIStatusError) as e:
             completion_time = time.time() - start_time
-            if hasattr(e, 'status_code') and e.status_code in [429, 503]:
+            if hasattr(e, "status_code") and e.status_code in [429, 503]:
                 responses.append((completion_time, e, "rate_limited"))
             else:
                 responses.append((completion_time, e, "error"))
@@ -712,14 +723,14 @@ def test_web_search_brave_rps_e2e(client):
         assert len(sources) > 0, "Sources should not be empty"
 
     for t, error in rate_limited_responses:
-        assert hasattr(error, 'status_code') and error.status_code in [429, 503], (
+        assert hasattr(error, "status_code") and error.status_code in [429, 503], (
             "Rate limited responses should have 429 or 503 status"
         )
 
 
 def test_web_search_queueing_next_second_e2e(client):
     import openai
-    
+
     request_barrier = threading.Barrier(25)
     responses = []
     start_time = None
@@ -743,7 +754,7 @@ def test_web_search_queueing_next_second_e2e(client):
             responses.append((completion_time, response, "success"))
         except (openai.RateLimitError, openai.APIStatusError) as e:
             completion_time = time.time() - start_time
-            if hasattr(e, 'status_code') and e.status_code in [429, 503]:
+            if hasattr(e, "status_code") and e.status_code in [429, 503]:
                 responses.append((completion_time, e, "rate_limited"))
             else:
                 responses.append((completion_time, e, "error"))
@@ -778,7 +789,9 @@ def test_web_search_queueing_next_second_e2e(client):
 
     for t, response in successful_responses:
         assert hasattr(response, "output"), "Response should contain output"
-        assert len(response.output) > 0, "Response should contain at least one output item"
+        assert len(response.output) > 0, (
+            "Response should contain at least one output item"
+        )
 
         text_items = [
             item for item in response.output if getattr(item, "type", None) == "text"
@@ -798,7 +811,7 @@ def test_web_search_queueing_next_second_e2e(client):
         assert "snippet" in first_source, "First source should have snippet"
 
     for t, error in rate_limited_responses:
-        assert hasattr(error, 'status_code') and error.status_code in [429, 503], (
+        assert hasattr(error, "status_code") and error.status_code in [429, 503], (
             "Rate limited responses should have 429 or 503 status"
         )
 
@@ -824,7 +837,7 @@ def test_execute_python_sha256_e2e(client, model):
     pattern = rf"\b{escaped_expected}\b"
     last_response = None
     last_content = ""
-    
+
     for _ in range(trials):
         response = client.responses.create(
             model=model,
@@ -854,18 +867,20 @@ def test_execute_python_sha256_e2e(client, model):
             ],
         )
         last_response = response
-        
+
         if not response.output:
             continue
-            
-        text_items = [item for item in response.output if getattr(item, "type", None) == "text"]
+
+        text_items = [
+            item for item in response.output if getattr(item, "type", None) == "text"
+        ]
         if not text_items:
             continue
-            
+
         content = getattr(text_items[0], "text", "")
         last_content = content
         normalized_content = re.sub(r"\s+", " ", content)
-        
+
         if re.search(pattern, normalized_content):
             break
     else:
@@ -877,4 +892,3 @@ def test_execute_python_sha256_e2e(client, model):
                 f"Full: {last_response.model_dump_json() if last_response else '<no response>'}"
             )
         )
-

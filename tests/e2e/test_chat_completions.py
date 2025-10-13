@@ -976,7 +976,7 @@ def test_execute_python_sha256_e2e(client, model):
     pattern = rf"\b{escaped_expected}\b"
     last_completion = None
     last_content = ""
-    
+
     for _ in range(trials):
         completion = client.chat.completions.create(
             model=model,
@@ -1008,14 +1008,14 @@ def test_execute_python_sha256_e2e(client, model):
             ],
         )
         last_completion = completion
-        
+
         if not completion.choices:
             continue
-            
+
         content = completion.choices[0].message.content or ""
         last_content = content
         normalized_content = re.sub(r"\s+", " ", content)
-        
+
         if re.search(pattern, normalized_content):
             break
     else:

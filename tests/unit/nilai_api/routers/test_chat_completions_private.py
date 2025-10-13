@@ -322,4 +322,3 @@ def test_chat_completion_stream_includes_sources(
     assert "sources" in final_payload
     assert len(final_payload["sources"]) == 1
     assert final_payload["sources"][0]["source"] == "https://example.com"
-
