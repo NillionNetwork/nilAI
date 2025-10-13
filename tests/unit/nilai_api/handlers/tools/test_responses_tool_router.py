@@ -1,5 +1,5 @@
 import json
-from typing import Any, Dict, cast
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -13,6 +13,7 @@ from openai.types.responses import (
     Response,
     ResponseFunctionToolCall,
     ResponseUsage,
+    FunctionToolParam,
 )
 from openai.types.responses.response_usage import (
     InputTokensDetails,
@@ -40,7 +41,8 @@ async def test_route_and_execute_tool_call_invokes_code_execution(mocker):
     mock_exec.assert_awaited_once_with("print(6*7)")
     assert result.type == "function_call_output"
     assert result.call_id == "call_123"
-    payload = json.loads(result.output or "{}")
+    output_str = result.output if isinstance(result.output, str) else "{}"
+    payload = json.loads(output_str)
     assert payload == {"result": "42"}
 
 
@@ -80,6 +82,18 @@ def make_tool_call_response(code: str) -> Response:
 
 @pytest.mark.asyncio
 async def test_handle_responses_tool_workflow_executes_and_uses_result(mocker):
+    tool: FunctionToolParam = {
+        "type": "function",
+        "name": "execute_python",
+        "description": "Execute small Python code snippets.",
+        "parameters": {
+            "type": "object",
+            "properties": {"code": {"type": "string"}},
+            "required": ["code"],
+        },
+        "strict": None,
+    }
+
     req = ResponseRequest(
         model="openai/gpt-oss-20b",
         input=[
@@ -91,20 +105,7 @@ async def test_handle_responses_tool_workflow_executes_and_uses_result(mocker):
                 ],
             }
         ],
-        tools=[
-            {
-                "type": "function",
-                "function": {
-                    "name": "execute_python",
-                    "description": "Execute small Python code snippets.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {"code": {"type": "string"}},
-                        "required": ["code"],
-                    },
-                },
-            }
-        ],
+        tools=[tool],
     )
 
     first_response = make_tool_call_response("print(6*7)")
@@ -146,6 +147,8 @@ async def test_handle_responses_tool_workflow_executes_and_uses_result(mocker):
 
     mock_exec.assert_awaited_once_with("print(6*7)")
     assert final == second_response
+    assert first_response.usage is not None
+    assert second_response.usage is not None
     assert (
         prompt_tokens
         == first_response.usage.input_tokens + second_response.usage.input_tokens

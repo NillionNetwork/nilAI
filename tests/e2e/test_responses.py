@@ -409,8 +409,6 @@ def test_function_calling_with_streaming(client, model):
 
 def test_usage_endpoint(client):
     try:
-        invocation_token = api_key_getter()
-
         url = BASE_URL + "/usage"
         response = client.get(url)
         assert response.status_code == 200, "Usage endpoint should return 200 OK"

@@ -210,6 +210,7 @@ def test_create_response(mock_user, mock_state, mock_user_manager, mocker, clien
 
     assert response.status_code == 200
     assert "usage" in response.json()
+    assert response_data.usage is not None
     assert response.json()["usage"] == response_data.usage.model_dump(mode="json")
 
 
@@ -274,7 +275,7 @@ def test_create_response_stream_includes_sources(
     )
 
     final_event = ResponseCompletedEvent(
-        response=streaming_response, type="response.completed"
+        response=streaming_response, sequence_number=1, type="response.completed"
     )
 
     async def chunk_generator():
