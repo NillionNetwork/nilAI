@@ -50,7 +50,7 @@ def mock_user_manager(mock_user, mocker):
             "prompt_tokens": 100,
             "completion_tokens": 50,
             "total_tokens": 150,
-            "queries": 0,
+            "queries": 10,
         },
     )
     mocker.patch.object(UserManager, "update_token_usage")
@@ -63,7 +63,7 @@ def mock_user_manager(mock_user, mocker):
             "total_tokens": 150,
             "completion_tokens_details": None,
             "prompt_tokens_details": None,
-            "queries": 0,
+            "queries": 10,
         },
     )
     mocker.patch.object(
@@ -223,6 +223,8 @@ def test_create_response_stream_includes_sources(
         OutputTokensDetails,
     )
     from nilai_common import ResponseCompletedEvent
+
+    mock_user.rate_limits_obj.web_search_rate_limit_minute = 100
 
     source = Source(source="https://example.com", content="Example result")
 

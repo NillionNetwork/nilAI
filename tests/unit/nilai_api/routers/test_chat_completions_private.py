@@ -224,6 +224,8 @@ def test_chat_completion(mock_user, mock_state, mock_user_manager, mocker, clien
 def test_chat_completion_stream_includes_sources(
     mock_user, mock_state, mock_user_manager, mocker, client
 ):
+    mock_user.rate_limits_obj.web_search_rate_limit_minute = 100
+
     source = Source(source="https://example.com", content="Example result")
 
     mock_web_search_result = MagicMock()
