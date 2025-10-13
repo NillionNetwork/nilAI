@@ -1,0 +1,45 @@
+services:
+  gpt_20b_gpu:
+    image: nillion/nilai-vllm:latest
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    env_file:
+      - .env
+    restart: unless-stopped
+    depends_on:
+      etcd:
+        condition: service_healthy
+    command: >
+      --model openai/gpt-oss-20b
+      --gpu-memory-utilization 0.30
+      --max-model-len 40000
+      --max-num-batched-tokens 40000
+      --max-num-seqs 2
+      --tensor-parallel-size 1
+      --uvicorn-log-level warning
+      --async-scheduling
+    environment:
+      - SVC_HOST=gpt_20b_gpu
+      - SVC_PORT=8000
+      - ETCD_HOST=etcd
+      - ETCD_PORT=2379
+      - TOOL_SUPPORT=true
+    volumes:
+      - hugging_face_models:/root/.cache/huggingface  # cache models
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      retries: 3
+      start_period: 60s
+      timeout: 10s
+volumes:
+  hugging_face_models:
