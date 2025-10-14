@@ -17,18 +17,28 @@ from nilai_common import (
     ResponseFunctionToolCallParam,
 )
 
-# Assuming a code execution module exists
 from . import code_execution
 
 logger = logging.getLogger(__name__)
+
+AVAILABLE_TOOLS = {"execute_python"}
 
 
 async def route_and_execute_tool_call(
     tool_call: ResponseFunctionToolCallParam,
 ) -> FunctionCallOutput:
-    """
-    Executes a function tool call and returns a correctly formatted FunctionCallOutput
-    object.
+    """Route and execute a single tool call, returning the result as a FunctionCallOutput.
+
+    Currently supports:
+    - execute_python: Executes Python code in a sandbox environment
+
+    For unknown tools, returns an error message in the output field.
+
+    Args:
+        tool_call: Tool call parameter containing name, arguments, and call_id
+
+    Returns:
+        FunctionCallOutput object with execution result or error message
     """
     func_name = tool_call["name"]
     arguments = tool_call["arguments"] or "{}"
@@ -61,16 +71,35 @@ async def route_and_execute_tool_call(
 async def process_tool_calls(
     tool_calls: List[ResponseFunctionToolCallParam],
 ) -> List[FunctionCallOutput]:
-    """Processes a list of tool calls and returns them as FunctionCallOutput objects."""
+    """Process multiple tool calls concurrently using asyncio.gather.
+
+    Executes all tool calls in parallel for optimal performance.
+    Unknown tools will return error messages in their output.
+
+    Args:
+        tool_calls: List of tool call parameters to execute
+
+    Returns:
+        List of FunctionCallOutput objects with execution results
+    """
     tasks = [route_and_execute_tool_call(tc) for tc in tool_calls]
-    results = await asyncio.gather(*tasks)
-    return results
+    return await asyncio.gather(*tasks)
 
 
 def extract_function_tool_calls_from_response(
     response: Response,
 ) -> List[ResponseFunctionToolCallParam]:
-    """Extracts all function tool call items from a Response object's output and converts them to param format."""
+    """Extract all function tool calls from a Response object's output.
+
+    Filters the response output for ResponseFunctionToolCall items and converts
+    them to the parameter format required for tool execution.
+
+    Args:
+        response: Response object from the model containing potential tool calls
+
+    Returns:
+        List of ResponseFunctionToolCallParam objects ready for execution
+    """
     if not response.output:
         return []
     return [
@@ -85,15 +114,54 @@ def extract_function_tool_calls_from_response(
     ]
 
 
+def check_if_all_tools_available(
+    tool_calls: List[ResponseFunctionToolCallParam],
+) -> bool:
+    """Check if all requested tools are available in the registry.
+
+    Validates that each tool call references a tool that exists in AVAILABLE_TOOLS.
+    Logs a warning for the first unavailable tool encountered.
+
+    Args:
+        tool_calls: List of tool calls to validate
+
+    Returns:
+        True if all tools are available, False if any tool is unavailable
+    """
+    for tool_call in tool_calls:
+        if tool_call["name"] not in AVAILABLE_TOOLS:
+            logger.warning(
+                f"[responses_tool] Tool '{tool_call['name']}' not available, shortcutting workflow"
+            )
+            return False
+    return True
+
+
 async def handle_responses_tool_workflow(
     client: AsyncOpenAI,
     req: ResponseRequest,
     input_items: Union[str, List[ResponseInputItemParam]],
     first_response: Response,
 ) -> Tuple[Response, int, int]:
-    """
-    Manages a tool-use workflow by rebuilding the conversation
-    history with the full context for each turn.
+    """Handle the complete tool workflow for responses API.
+
+    This function manages the multi-turn tool execution flow:
+    1. Extracts tool calls from the model's first response
+    2. Validates all tools are available in the registry
+    3. If any tool is unavailable, shortcuts the workflow and returns the first response
+    4. If all tools are available, executes them concurrently
+    5. Constructs a new input with original messages + tool calls + tool results
+    6. Makes a follow-up API call with tool results
+    7. Returns the final response with aggregated token usage
+
+    Args:
+        client: AsyncOpenAI client for making API calls
+        req: Original request parameters
+        input_items: Original input messages (string or list)
+        first_response: Initial response from the model containing tool calls
+
+    Returns:
+        Tuple of (final_response, total_prompt_tokens, total_completion_tokens)
     """
     logger.info("[responses_tool] evaluating tool workflow for response")
 
@@ -105,7 +173,7 @@ async def handle_responses_tool_workflow(
     tool_calls = extract_function_tool_calls_from_response(first_response)
     logger.info(f"[responses_tool] extracted tool_calls: {tool_calls}")
 
-    if not tool_calls:
+    if not tool_calls or not check_if_all_tools_available(tool_calls):
         return first_response, prompt_tokens, completion_tokens
 
     tool_results = await process_tool_calls(tool_calls)
@@ -151,13 +219,9 @@ async def handle_responses_tool_workflow(
         "top_p": req.top_p,
         "temperature": req.temperature,
         "max_output_tokens": req.max_output_tokens,
-        "tool_choice": "auto",
     }
 
-    if req.tools:
-        request_kwargs["tools"] = req.tools
-
-    logger.info("[responses_tool] performing follow-up response with tool outputs")
+    logger.info("[responses_tool] performing follow-up completion with tool outputs")
     second_response: Response = await client.responses.create(**request_kwargs)
 
     if second_response.usage:
