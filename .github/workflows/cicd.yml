@@ -50,6 +50,7 @@ jobs:
           # Set dummy secrets for unit tests
           sed -i 's/HF_TOKEN=.*/HF_TOKEN=dummy_token/' .env
           sed -i 's/BRAVE_SEARCH_API=.*/BRAVE_SEARCH_API=dummy_api/' .env
+          sed -i 's/E2B_API_KEY=.*/BRAVEE2B_API_KEY_SEARCH_API=dummy_token/' .env
 
       - name: pyright
         run: uv run pyright
@@ -82,7 +83,7 @@ jobs:
           github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
           runners-per-machine: 3
           number-of-machines: 1
-          ec2-image-id: ami-0174a246556e8750b
+          ec2-image-id: ami-0e70d84403fc045d7
           ec2-instance-type: g6.xlarge
           subnet-id: subnet-0ec4c353621eabae2
           security-group-id: sg-03ee5c56e1f467aa0
