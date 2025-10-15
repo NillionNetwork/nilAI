@@ -50,6 +50,7 @@ jobs:
           # Set dummy secrets for unit tests
           sed -i 's/HF_TOKEN=.*/HF_TOKEN=dummy_token/' .env
           sed -i 's/BRAVE_SEARCH_API=.*/BRAVE_SEARCH_API=dummy_api/' .env
+          sed -i 's/E2B_API_KEY=.*/BRAVEE2B_API_KEY_SEARCH_API=dummy_token/' .env
 
       - name: pyright
         run: uv run pyright
@@ -73,7 +74,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.GH_AWS_ACCESS_KEY }}
           aws-secret-access-key: ${{ secrets.GH_AWS_SECRET_KEY }}
-          aws-region: "eu-west-1"
+          aws-region: "us-east-1"
       - name: Start EC2 runner
         id: start-ec2-runner
         uses: NillionNetwork/ec2-github-runner@v2.2
@@ -82,12 +83,12 @@ jobs:
           github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
           runners-per-machine: 3
           number-of-machines: 1
-          ec2-image-id: ami-0174a246556e8750b
+          ec2-image-id: ami-0e70d84403fc045d7
           ec2-instance-type: g6.xlarge
-          subnet-id: subnet-0ec4c353621eabae2
-          security-group-id: sg-03ee5c56e1f467aa0
-          key-name: production-github-runner-key
-          iam-role-name: github-runners-production-github-runner-ec2
+          subnet-id: subnet-0bb357f46d1bc355c
+          security-group-id: sg-022a5cdcf57e9618b
+          key-name: us-east-1-github-runner-key
+          iam-role-name: github-runners-us-east-1-github-runner-ec2
           aws-resource-tags: >
             [
               {"Key": "Name", "Value": "github-runner-${{ github.run_id }}-${{ github.run_number }}"},
@@ -327,7 +328,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.GH_AWS_ACCESS_KEY }}
           aws-secret-access-key: ${{ secrets.GH_AWS_SECRET_KEY }}
-          aws-region: "eu-west-1"
+          aws-region: "us-east-1"
 
       - name: Stop EC2 runner
         uses: NillionNetwork/ec2-github-runner@v2.2
