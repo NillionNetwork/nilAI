@@ -20,7 +20,7 @@ services:
         condition: service_healthy
     command: >
       --model openai/gpt-oss-20b
-      --gpu-memory-utilization 0.98
+      --gpu-memory-utilization 0.95
       --max-model-len 10000
       --max-num-batched-tokens 10000
       --max-num-seqs 2
