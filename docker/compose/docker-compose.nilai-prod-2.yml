@@ -37,8 +37,8 @@ services:
     environment:
       - SVC_HOST=llama_8b_gpu
       - SVC_PORT=8000
-      - ETCD_HOST=redis
-      - ETCD_PORT=6379
+      - DISCOVERY_HOST=redis
+      - DISCOVERY_PORT=6379
       - TOOL_SUPPORT=true
     volumes:
       - hugging_face_models:/root/.cache/huggingface
@@ -77,8 +77,8 @@ services:
     environment:
       - SVC_HOST=gpt_20b_gpu
       - SVC_PORT=8000
-      - ETCD_HOST=redis
-      - ETCD_PORT=6379
+      - DISCOVERY_HOST=redis
+      - DISCOVERY_PORT=6379
       - TOOL_SUPPORT=true
     volumes:
       - hugging_face_models:/root/.cache/huggingface  # cache models

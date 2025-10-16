@@ -97,6 +97,7 @@ services:
 
   nilauth-credit-server:
     image: ghcr.io/nillionnetwork/nilauth-credit:sha-cb9e36a
+    platform: linux/amd64 # for macOS to force running on Rosetta 2
     environment:
       DATABASE_URL: postgresql://nilauth:nilauth_dev_password@nilauth-postgres:5432/nilauth_credit
       HOST: 0.0.0.0

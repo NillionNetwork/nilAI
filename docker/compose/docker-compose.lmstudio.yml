@@ -9,8 +9,8 @@ services:
     environment:
       - SVC_HOST=host.docker.internal
       - SVC_PORT=1234
-      - ETCD_HOST=redis
-      - ETCD_PORT=6379
+      - DISCOVERY_HOST=redis
+      - DISCOVERY_PORT=6379
       - LMSTUDIO_SUPPORTED_FEATURES=chat_completion
     extra_hosts:
       - "host.docker.internal:host-gateway"

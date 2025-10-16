@@ -27,9 +27,9 @@ def to_bool(value: str) -> bool:
 SETTINGS: HostSettings = HostSettings(
     host=str(os.getenv("SVC_HOST", "localhost")),
     port=int(os.getenv("SVC_PORT", 8000)),
-    discovery_host=str(os.getenv("ETCD_HOST", "localhost")),
+    discovery_host=str(os.getenv("DISCOVERY_HOST", "redis")),
     discovery_port=int(
-        os.getenv("ETCD_PORT", 6379)
+        os.getenv("DISCOVERY_PORT", 6379)
     ),  # Redis port (changed from etcd's 2379)
     tool_support=to_bool(os.getenv("TOOL_SUPPORT", "False")),
     multimodal_support=to_bool(os.getenv("MULTIMODAL_SUPPORT", "False")),
