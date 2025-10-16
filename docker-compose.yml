@@ -22,51 +22,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 5s
-
-  prometheus:
-    container_name: prometheus
-    image: prom/prometheus:v3.1.0
-    restart: unless-stopped
-    user: "$UID:$GID"
-    command: "--config.file=/etc/prometheus/prometheus.yml --storage.tsdb.retention.time=30d --web.enable-admin-api"
-    healthcheck:
-      test: ["CMD", "wget", "http://localhost:9090/-/healthy", "-O", "/dev/null", "-o", "/dev/null"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
-
-  node_exporter:
-    container_name: node-exporter
-    image: quay.io/prometheus/node-exporter:v1.8.2
-    command:
-      - '--path.rootfs=/host'
-    restart: unless-stopped
-#    volumes:
-#      - '/:/host:ro,rslave'
-    healthcheck:
-      test: ["CMD", "wget", "http://localhost:9100/", "-O", "/dev/null", "-o", "/dev/null"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
-
-  grafana:
-    container_name: grafana
-    image: 'grafana/grafana:11.5.1'
-    restart: unless-stopped
-    user: "$UID:$GID"
-    depends_on:
-      - prometheus
-    environment:
-      - GF_USERS_ALLOW_SIGN_UP=false
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
-
   api:
     container_name: nilai-api
     image: nillion/nilai-api:latest
@@ -97,16 +52,6 @@ services:
       retries: 3
       start_period: 15s
       timeout: 10s
-  attestation:
-    image: nillion/nilai-attestation:latest
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 30s
-      retries: 3
-      start_period: 15s
-      timeout: 10s
-
   caddy:
     image: caddy:latest
     container_name: caddy
