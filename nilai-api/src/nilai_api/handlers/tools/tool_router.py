@@ -15,6 +15,7 @@ from nilai_common import (
 
 from . import code_execution
 from openai import AsyncOpenAI
+from nilai_api.config import CONFIG
 
 import logging
 
@@ -47,11 +48,8 @@ async def route_and_execute_tool_call(
             tool_call_id=tool_call.id,
         )
 
-    # Unknown tool: return an error message to the model
     return MessageAdapter.new_tool_message(
-        name=func_name,
-        content=f"Tool '{func_name}' not implemented",
-        tool_call_id=tool_call.id,
+        name=func_name, content="", tool_call_id=tool_call.id
     )
 
 
@@ -163,6 +161,14 @@ async def handle_tool_workflow(
     logger.info(f"[tools] extracted tool_calls: {tool_calls}")
 
     if not tool_calls:
+        return first_response, 0, 0
+
+    unknown = [tc for tc in tool_calls if tc.function.name not in CONFIG.tools.implemented_tools]
+    if unknown:
+        logger.info(
+            "[tools] unknown tool(s): %s. Returning first response unchanged.",
+            [tc.function.name for tc in unknown],
+        )
         return first_response, 0, 0
 
     assistant_tool_call_msg = MessageAdapter.new_assistant_tool_call_message(tool_calls)
