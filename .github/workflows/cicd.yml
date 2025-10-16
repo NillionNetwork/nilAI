@@ -11,10 +11,14 @@ on:
 permissions:
   id-token: write # Required for OIDC
   contents: read  # Required for checkout
+  packages: read  # Required for GHCR access
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        test-type: [pyright, unit, integration]
 
     steps:
       - uses: actions/checkout@v4
@@ -39,9 +43,11 @@ jobs:
           uv sync
 
       - name: Run Ruff format check
+        if: matrix.test-type == 'pyright'
         run: uv run ruff format --check
 
       - name: Run Ruff linting
+        if: matrix.test-type == 'pyright'
         run: uv run ruff check --exclude packages/verifier/
 
       - name: Create .env for tests
@@ -52,13 +58,16 @@ jobs:
           sed -i 's/BRAVE_SEARCH_API=.*/BRAVE_SEARCH_API=dummy_api/' .env
           sed -i 's/E2B_API_KEY=.*/E2B_API_KEY=dummy_token/' .env
 
-      - name: pyright
+      - name: Run pyright
+        if: matrix.test-type == 'pyright'
         run: uv run pyright
 
       - name: Run unit tests
+        if: matrix.test-type == 'unit'
         run: uv run pytest -v tests/unit
 
       - name: Run integration tests
+        if: matrix.test-type == 'integration'
         run: uv run pytest -v tests/integration
 
   start-runner:
@@ -148,6 +157,13 @@ jobs:
          sed -i 's/BRAVE_SEARCH_API=.*/BRAVE_SEARCH_API=${{ secrets.BRAVE_SEARCH_API }}/' .env
          sed -i 's/NILDB_BUILDER_PRIVATE_KEY=.*/NILDB_BUILDER_PRIVATE_KEY=${{ secrets.NILDB_BUILDER_PRIVATE_KEY }}/' .env
          sed -i 's/NILDB_COLLECTION=.*/NILDB_COLLECTION=${{ secrets.NILDB_COLLECTION }}/' .env
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
 
       - name: Compose docker-compose.yml
         run: python3 ./scripts/docker-composer.py --dev -f docker/compose/docker-compose.gpt-20b-gpu.ci.yml -o development-compose.yml
