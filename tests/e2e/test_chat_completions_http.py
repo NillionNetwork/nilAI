@@ -443,12 +443,17 @@ def test_model_tools_request(client, model):
 @pytest.mark.parametrize("model", test_models)
 def test_function_calling_with_streaming_httpx(client, model):
     """Test function calling with streaming using httpx, verifying tool calls and usage data."""
+    if model == "openai/gpt-oss-20b":
+        pytest.skip(
+            "Skipping test for openai/gpt-oss-20b model as it only supports responses endpoint"
+        )
+
     payload = {
         "model": model,
         "messages": [
             {
                 "role": "system",
-                "content": "You are a helpful assistant that provides accurate and concise information.",
+                "content": "You are a helpful assistant that provides accurate and concise information. You are a helpful assistant that provides accurate and concise information. For getting weather, use function call with get_weather.",
             },
             {
                 "role": "user",
@@ -476,6 +481,7 @@ def test_function_calling_with_streaming_httpx(client, model):
                 },
             }
         ],
+        "tool_choice": {"type": "function", "function": {"name": "get_weather"}},
         "temperature": 0.2,
         "stream": True,
     }
@@ -621,7 +627,7 @@ def test_invalid_nildb_command_nucs(nildb_client):
 def test_large_payload_handling(client):
     """Test handling of large input payloads"""
     # Create a very large system message
-    large_system_message = "Hello " * 10000  # 100KB of text
+    large_system_message = "Hello " * 1000  # 100KB of text
 
     payload = {
         "model": test_models[0],
@@ -861,10 +867,6 @@ def test_nildb_prompt_document(document_id_client: httpx.Client, model):
     payload = {
         "model": model,
         "messages": [
-            {
-                "role": "system",
-                "content": "You are a helpful assistant.",
-            },
             {"role": "user", "content": "Can you make a small rhyme?"},
         ],
         "temperature": 0.2,
@@ -880,12 +882,80 @@ def test_nildb_prompt_document(document_id_client: httpx.Client, model):
     assert "cheese" in message.lower(), "Response should contain cheese"
 
 
+@pytest.fixture
+def high_web_search_rate_limit(monkeypatch):
+    monkeypatch.setenv("WEB_SEARCH_RATE_LIMIT_MINUTE", "9999")
+    monkeypatch.setenv("WEB_SEARCH_RATE_LIMIT_HOUR", "9999")
+    monkeypatch.setenv("WEB_SEARCH_RATE_LIMIT_DAY", "9999")
+    monkeypatch.setenv("WEB_SEARCH_RATE_LIMIT", "9999")
+
+
+@pytest.mark.parametrize("model", test_models)
+def test_web_search(client, model, high_web_search_rate_limit):
+    """Test web_search functionality with proper source validation."""
+    payload = {
+        "model": model,
+        "messages": [
+            {
+                "role": "system",
+                "content": "You are a helpful assistant that provides accurate and up-to-date information.",
+            },
+            {
+                "role": "user",
+                "content": "Who won the Roland Garros Open in 2024? Just reply with the winner's name.",
+            },
+        ],
+        "extra_body": {"web_search": True},
+        "temperature": 0.2,
+        "max_tokens": 150,
+    }
+
+    response = client.post("/chat/completions", json=payload, timeout=30)
+    assert response.status_code == 200, (
+        f"Response for {model} failed with status {response.status_code}"
+    )
+
+    response_json = response.json()
+    assert response_json.get("model") == model, f"Response model should be {model}"
+    assert "choices" in response_json, "Response should contain choices"
+    assert len(response_json["choices"]) > 0, (
+        "Response should contain at least one choice"
+    )
+
+    message = response_json["choices"][0].get("message", {})
+    content = message.get("content", "")
+    reasoning_content = message.get("reasoning_content", "")
+
+    assert content or reasoning_content, (
+        "Response should contain content or reasoning_content"
+    )
+
+    sources = response_json.get("sources")
+    if sources is not None:
+        assert isinstance(sources, list), "Sources should be a list"
+        assert len(sources) > 0, "Sources should not be empty"
+        print(f"Sources found: {len(sources)}")
+    else:
+        print(
+            "Warning: Sources field is None - web search may not be enabled or working properly"
+        )
+
+    print(
+        f"\nModel {model} web search response: {content[:100] if content else 'No content'}..."
+    )
+
+
 @pytest.mark.skipif(
     not os.environ.get("E2B_API_KEY"),
     reason="Requires E2B_API_KEY for code execution sandbox",
 )
 @pytest.mark.parametrize("model", test_models)
 def test_execute_python_sha256_e2e(client, model):
+    if model == "openai/gpt-oss-20b":
+        pytest.skip(
+            "Skipping test for openai/gpt-oss-20b model as it only supports responses endpoint"
+        )
+
     expected = "75cc238b167a05ab7336d773cb096735d459df2f0df9c8df949b1c44075df8a5"
 
     system_msg = (

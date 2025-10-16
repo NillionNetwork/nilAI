@@ -299,7 +299,7 @@ async def generate_search_query_from_llm(
     req = {
         "model": model_name,
         "messages": messages,
-        "max_tokens": 600,
+        "max_tokens": 1000,
     }
 
     logger.info("Generate search query start model=%s", model_name)

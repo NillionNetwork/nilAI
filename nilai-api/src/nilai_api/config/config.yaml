@@ -35,9 +35,9 @@ rate_limiting:
   user_rate_limit_minute: 100
   user_rate_limit_hour: 1000
   user_rate_limit_day: 10000
-  web_search_rate_limit_minute: 1
-  web_search_rate_limit_hour: 3
-  web_search_rate_limit_day: 72
+  web_search_rate_limit_minute: 50
+  web_search_rate_limit_hour: 500
+  web_search_rate_limit_day: 5000
   web_search_rate_limit: null # For-good rate limit
   model_concurrent_rate_limit:
     meta-llama/Llama-3.2-1B-Instruct: 45

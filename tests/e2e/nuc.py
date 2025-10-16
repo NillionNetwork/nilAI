@@ -99,7 +99,7 @@ def get_nuc_token(
         delegation_expires_at = (
             expires_at
             if expires_at is not None
-            else datetime.now(timezone.utc) + timedelta(minutes=5)
+            else datetime.now(timezone.utc) + timedelta(hours=1)
         )
 
         # Create delegation token
@@ -158,7 +158,7 @@ def get_rate_limited_nuc_token(rate_limit: int = 3) -> InvocationToken:
     """Convenience function for getting rate-limited tokens."""
     return get_nuc_token(
         usage_limit=rate_limit,
-        expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
         create_delegation=True,
     )
 
@@ -177,7 +177,7 @@ def get_invalid_rate_limited_nuc_token() -> InvocationToken:
     """Convenience function for getting invalid rate-limited tokens (for testing)."""
     return get_nuc_token(
         usage_limit=3,
-        expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
         create_delegation=True,
         create_invalid_delegation=True,
     )

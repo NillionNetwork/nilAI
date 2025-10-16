@@ -163,7 +163,11 @@ async def handle_tool_workflow(
     if not tool_calls:
         return first_response, 0, 0
 
-    unknown = [tc for tc in tool_calls if tc.function.name not in CONFIG.tools.implemented_tools]
+    unknown = [
+        tc
+        for tc in tool_calls
+        if tc.function.name not in CONFIG.tools.implemented_tools
+    ]
     if unknown:
         logger.info(
             "[tools] unknown tool(s): %s. Returning first response unchanged.",

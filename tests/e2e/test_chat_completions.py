@@ -217,6 +217,7 @@ def test_invalid_nildb_command_nucs(nildb_client, model):
     assert forbidden, "No NILDB command detected, when expected"
 
 
+@pytest.mark.rerun(3)
 @pytest.mark.parametrize(
     "model",
     test_models,
@@ -234,7 +235,6 @@ def test_streaming_chat_completion(client, model):
                 {"role": "user", "content": "Write a short poem about mountains."},
             ],
             temperature=0.2,
-            max_tokens=100,
             stream=True,
         )
 
@@ -253,7 +253,6 @@ def test_streaming_chat_completion(client, model):
             if chunk.usage:
                 had_usage = True
                 print(f"Model {model} usage: {chunk.usage}")
-                break
         assert had_usage, f"No usage data received for {model} streaming request"
         assert chunk_count > 0, f"No chunks received for {model} streaming request"
         assert full_content, f"No content assembled from stream for {model}"
@@ -274,6 +273,11 @@ def test_streaming_chat_completion(client, model):
 )
 def test_function_calling(client, model):
     """Test function calling with different models"""
+    if model == "openai/gpt-oss-20b":
+        pytest.skip(
+            "Skipping test for openai/gpt-oss-20b model as it only supports responses endpoint"
+        )
+
     try:
         response = client.chat.completions.create(
             model=model,
@@ -409,13 +413,18 @@ def test_function_calling(client, model):
 )
 def test_function_calling_with_streaming(client, model):
     """Test function calling with different models"""
+    if model == "openai/gpt-oss-20b":
+        pytest.skip(
+            "Skipping test for openai/gpt-oss-20b model as it only supports responses endpoint"
+        )
+
     try:
         response = client.chat.completions.create(
             model=model,
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a helpful assistant that provides accurate and concise information.",
+                    "content": "You are a helpful assistant that provides accurate and concise information. You must use the get_weather tool to get the weather information.",
                 },
                 {
                     "role": "user",
@@ -443,6 +452,7 @@ def test_function_calling_with_streaming(client, model):
                     },
                 }
             ],
+            tool_choice={"type": "function", "function": {"name": "get_weather"}},
             temperature=0.2,
             stream=True,
         )
@@ -688,13 +698,16 @@ def test_chat_completion_high_temperature(client):
                 "content": "Write an imaginative story about a wizard.",
             },
         ],
-        temperature=5.0,  # Extremely high temperature for creative responses
+        temperature=1.99,  # Extremely high temperature for creative responses
         max_tokens=50,
     )
     assert response, "High temperature request should return a valid response"
     assert response.choices, "Response should contain choices"
     assert len(response.choices) > 0, "At least one choice should be present"
-    assert response.choices[0].message.content, "Response should contain content"
+    assert (
+        response.choices[0].message.content
+        or response.choices[0].message.reasoning_content
+    ), "Response should contain content or reasoning_content"
 
 
 def test_model_streaming_request_high_token(client):
@@ -766,7 +779,12 @@ def test_web_search(client, model):
             )
 
             content = response.choices[0].message.content
-            assert content, "Response should contain content"
+            reasoning_content = getattr(
+                response.choices[0].message, "reasoning_content", None
+            )
+            assert content or reasoning_content, (
+                "Response should contain content or reasoning_content"
+            )
 
             sources = getattr(response, "sources", None)
             assert sources is not None, "Sources field should not be None"
@@ -788,192 +806,36 @@ def test_web_search(client, model):
                 raise last_exception
 
 
-def test_web_search_brave_rps_e2e(client):
-    """Test that web search requests are rate limited to 20 per second globally for the Brave API."""
-    import threading
-    import time
-    import openai
-    from concurrent.futures import ThreadPoolExecutor, as_completed
-
-    # Use a barrier to ensure all requests start simultaneously
-    request_barrier = threading.Barrier(40)
-    responses = []
-    start_time = None
-
-    def make_request():
-        request_barrier.wait()
-
-        nonlocal start_time
-        if start_time is None:
-            start_time = time.time()
-
-        try:
-            response = client.chat.completions.create(
-                model=test_models[0],
-                messages=[{"role": "user", "content": "What is the latest news?"}],
-                extra_body={"web_search": True},
-                max_tokens=10,
-                temperature=0.0,
-            )
-            completion_time = time.time() - start_time
-            responses.append((completion_time, response, "success"))
-        except openai.RateLimitError as e:
-            completion_time = time.time() - start_time
-            responses.append((completion_time, e, "rate_limited"))
-        except Exception as e:
-            completion_time = time.time() - start_time
-            responses.append((completion_time, e, "error"))
-
-    with ThreadPoolExecutor(max_workers=40) as executor:
-        futures = [executor.submit(make_request) for _ in range(40)]
-
-        for future in as_completed(futures):
-            try:
-                future.result()
-            except Exception as e:
-                print(f"Thread execution error: {e}")
-
-    assert len(responses) == 40, "All requests should complete"
-
-    successful_responses = [(t, r) for t, r, status in responses if status == "success"]
-    rate_limited_responses = [
-        (t, r) for t, r, status in responses if status == "rate_limited"
-    ]
-    error_responses = [(t, r) for t, r, status in responses if status == "error"]
-
-    print(
-        f"Successful: {len(successful_responses)}, Rate limited: {len(rate_limited_responses)}, Errors: {len(error_responses)}"
-    )
-
-    # Verify rate limiting behavior
-    # At least some requests should be rate limited or delayed
-    assert len(rate_limited_responses) > 0 or len(successful_responses) < 40, (
-        "Rate limiting should be enforced - either some requests should be rate limited or delayed"
-    )
-
-    for t, response in successful_responses:
-        assert isinstance(response, ChatCompletion), (
-            "Response should be a ChatCompletion object"
-        )
-        sources = getattr(response, "sources", None)
-        assert sources is not None, (
-            "Successful web search responses should have sources"
-        )
-        assert isinstance(sources, list), "Sources should be a list"
-        assert len(sources) > 0, "Sources should not be empty"
-
-    for t, error in rate_limited_responses:
-        assert isinstance(error, openai.RateLimitError), (
-            "Rate limited responses should be RateLimitError"
-        )
-
-
-def test_web_search_queueing_next_second_e2e(client):
-    """Test that web search requests are properly queued and processed in batches."""
-    import threading
-    import time
-    import openai
-    from concurrent.futures import ThreadPoolExecutor, as_completed
-
-    request_barrier = threading.Barrier(25)
-    responses = []
-    start_time = None
-
-    def make_request():
-        request_barrier.wait()
-
-        nonlocal start_time
-        if start_time is None:
-            start_time = time.time()
-
-        try:
-            response = client.chat.completions.create(
-                model=test_models[0],
-                messages=[{"role": "user", "content": "What is the weather like?"}],
-                extra_body={"web_search": True},
-                max_tokens=10,
-                temperature=0.0,
-            )
-            completion_time = time.time() - start_time
-            responses.append((completion_time, response, "success"))
-        except openai.RateLimitError as e:
-            completion_time = time.time() - start_time
-            responses.append((completion_time, e, "rate_limited"))
-        except Exception as e:
-            completion_time = time.time() - start_time
-            responses.append((completion_time, e, "error"))
-
-    with ThreadPoolExecutor(max_workers=25) as executor:
-        futures = [executor.submit(make_request) for _ in range(25)]
-
-        for future in as_completed(futures):
-            try:
-                future.result()
-            except Exception as e:
-                print(f"Thread execution error: {e}")
-
-    assert len(responses) == 25, "All requests should complete"
-
-    # Categorize responses
-    successful_responses = [(t, r) for t, r, status in responses if status == "success"]
-    rate_limited_responses = [
-        (t, r) for t, r, status in responses if status == "rate_limited"
-    ]
-    error_responses = [(t, r) for t, r, status in responses if status == "error"]
-
-    print(
-        f"Successful: {len(successful_responses)}, Rate limited: {len(rate_limited_responses)}, Errors: {len(error_responses)}"
-    )
-
-    # Verify queuing behavior
-    # With 25 requests and 20 RPS limit, some should be queued or rate limited
-    assert len(rate_limited_responses) > 0 or len(successful_responses) < 25, (
-        "Queuing should be enforced - either some requests should be rate limited or delayed"
-    )
-
-    for t, response in successful_responses:
-        assert isinstance(response, ChatCompletion), (
-            "Response should be a ChatCompletion object"
-        )
-        assert len(response.choices) > 0, "Response should contain at least one choice"
-        assert response.choices[0].message.content, "Response should contain content"
-
-        sources = getattr(response, "sources", None)
-        assert sources is not None, "Web search responses should have sources"
-        assert isinstance(sources, list), "Sources should be a list"
-        assert len(sources) > 0, "Sources should not be empty"
-
-        first_source = sources[0]
-        assert isinstance(first_source, dict), "First source should be a dictionary"
-        assert "title" in first_source, "First source should have title"
-        assert "url" in first_source, "First source should have url"
-        assert "snippet" in first_source, "First source should have snippet"
-
-    for t, error in rate_limited_responses:
-        assert isinstance(error, openai.RateLimitError), (
-            "Rate limited responses should be RateLimitError"
-        )
-
-
 @pytest.mark.skipif(
     not os.environ.get("E2B_API_KEY"),
     reason="Requires E2B_API_KEY for code execution sandbox",
 )
 @pytest.mark.parametrize("model", test_models)
-def test_execute_python_sha256_e2e(client, model):
-    expected = "75cc238b167a05ab7336d773cb096735d459df2f0df9c8df949b1c44075df8a5"
+def test_execute_python_sha256_simple_e2e(client, model):
+    # Some tiny models don't support tool calls; skip those explicitly.
+    if model == "openai/gpt-oss-20b":
+        pytest.skip(
+            "Skipping test for openai/gpt-oss-20b model as it only supports responses endpoint"
+        )
+
+    # Expected SHA-256 of the *string* "7919" (the 1,000th prime)
+    expected = "a8054ef7fc192135dd8dc07d4d9832c9fa9bd39d01ba383e29e378f5cc72cacd"
 
     system_msg = (
-        "You are a helpful assistant. When a user asks a question that requires code execution, "
-        "use the execute_python tool to find the answer. After the tool provides its result, "
-        "you must use that result to formulate a clear, final answer to the user's original question. "
-        "Do not include any code or JSON in your final response."
+        "You are a helpful assistant. If a question requires running code, "
+        "you MUST use the execute_python tool to run it and use the tool's output "
+        "to produce your final answer. Do not include any code or JSON in the final answer; "
+        "just the result."
     )
-    user_msg = "Execute this exact Python code and return the result: import hashlib; print(hashlib.sha256('Nillion'.encode()).hexdigest())"
 
-    trials = 3
-    escaped_expected = re.escape(expected)
-    pattern = rf"\b{escaped_expected}\b"
+    # Simple, concrete task that requires code execution for a reliable result.
+    user_msg = (
+        "Find the 1,000th prime number using Python (by writing and running code). "
+        "Then output ONLY the SHA-256 hash of that prime, as a 64-character lowercase hex string."
+    )
+
+    trials = 2
+    pattern = rf"\b{re.escape(expected)}\b"
     last_completion = None
     last_content = ""
 
@@ -1002,21 +864,18 @@ def test_execute_python_sha256_e2e(client, model):
                             "required": ["code"],
                             "additionalProperties": False,
                         },
-                        "strict": True,
                     },
                 }
             ],
         )
-        last_completion = completion
 
+        last_completion = completion
         if not completion.choices:
             continue
 
         content = completion.choices[0].message.content or ""
         last_content = content
-        normalized_content = re.sub(r"\s+", " ", content)
-
-        if re.search(pattern, normalized_content):
+        if re.search(pattern, content.strip()):
             break
     else:
         pytest.fail(

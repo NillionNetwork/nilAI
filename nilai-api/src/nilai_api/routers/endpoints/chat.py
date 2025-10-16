@@ -228,6 +228,7 @@ async def chat_completion(
                 }
                 if req.tools:
                     request_kwargs["tools"] = req.tools
+                    request_kwargs["tool_choice"] = req.tool_choice
 
                 response = await client.chat.completions.create(**request_kwargs)
 
