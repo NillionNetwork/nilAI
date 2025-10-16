@@ -10,8 +10,8 @@ ATTEMPT=1
 while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
     echo "Waiting for nilai to become healthy... API:[$API_HEALTH_STATUS] MODEL:[$MODEL_HEALTH_STATUS] NUC_API:[$NUC_API_HEALTH_STATUS] (Attempt $ATTEMPT/$MAX_ATTEMPTS)"
     
-    echo "===== Model Container Logs (last 50 lines) ====="
-    docker logs --tail 50 nilai_gpt_20b_gpu_1 2>&1
+    echo "===== Model Container Logs (last 80 lines) ====="
+    docker logs --tail 80 nilai_gpt_20b_gpu_1 2>&1
     docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Image}}"
     echo "================================================="
     
