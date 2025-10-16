@@ -35,7 +35,7 @@ dependencies = [
     "trafilatura>=1.7.0",
     "secretvaults",
     "e2b-code-interpreter>=1.0.3",
-    "nilauth-credit-middleware==0.1.0",
+    "nilauth-credit-middleware==0.1.1",
 ]
 
 
