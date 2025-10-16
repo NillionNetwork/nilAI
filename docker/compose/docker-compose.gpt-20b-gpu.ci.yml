@@ -39,7 +39,7 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       retries: 10
-      start_period: 300s
+      start_period: 900s
       timeout: 15s
 volumes:
   hugging_face_models:
