@@ -12,6 +12,7 @@ while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
     
     echo "===== Model Container Logs (last 50 lines) ====="
     docker logs --tail 50 nilai-gpt_20b_gpu 2>&1
+    docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Image}}"
     echo "================================================="
     
     sleep 30
