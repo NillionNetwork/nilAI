@@ -118,7 +118,6 @@ def mock_state(mocker):
     # Patch get_attestation method
     attestation_response = AttestationReport(
         verifying_key="test-verifying-key",
-        nonce="0" * 64,
         cpu_attestation="test-cpu-attestation",
         gpu_attestation="test-gpu-attestation",
     )

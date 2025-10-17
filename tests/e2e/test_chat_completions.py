@@ -17,7 +17,7 @@ import pytest_asyncio
 from openai import OpenAI
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletion
-from .config import BASE_URL, test_models, AUTH_STRATEGY, api_key_getter
+from .config import BASE_URL, ENVIRONMENT, test_models, AUTH_STRATEGY, api_key_getter
 from .nuc import (
     get_rate_limited_nuc_token,
     get_invalid_rate_limited_nuc_token,
@@ -568,6 +568,10 @@ def test_usage_endpoint(client):
         pytest.fail(f"Error testing usage endpoint: {str(e)}")
 
 
+@pytest.mark.skipif(
+    ENVIRONMENT != "mainnet",
+    reason="Attestation endpoint not available in non-mainnet environment",
+)
 def test_attestation_endpoint(client):
     """Test retrieving attestation report"""
     try:

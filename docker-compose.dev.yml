@@ -107,6 +107,8 @@ services:
     depends_on:
       nilauth-postgres:
         condition: service_healthy
+    volumes:
+      - ./scripts/credit-init.sql:/app/migrations/20251015000006_seed_test_data.sql
     healthcheck:
       test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/health" ]
       interval: 30s

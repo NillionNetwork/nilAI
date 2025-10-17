@@ -24,7 +24,7 @@ dev = [
     "uvicorn>=0.32.1",
     "pytest-asyncio>=1.2.0",
     "testcontainers>=4.13.0",
-    "pyright>=1.1.405",
+    "pyright>=1.1.406",
     "pre-commit>=4.1.0",
     "httpx>=0.28.1",
 ]

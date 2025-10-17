@@ -177,10 +177,10 @@ async def main():
         os.getenv("LMSTUDIO_SUPPORTED_FEATURES", "chat_completion")
     ) or ["chat_completion"]
 
-    tool_default = to_bool(os.getenv("LMSTUDIO_TOOL_SUPPORT_DEFAULT", "false"))
+    tool_default = to_bool(os.getenv("LMSTUDIO_TOOL_SUPPORT_DEFAULT", "true"))
     tool_models = set(_parse_csv(os.getenv("LMSTUDIO_TOOL_SUPPORT_MODELS", "")))
 
-    multimodal_default = to_bool(os.getenv("LMSTUDIO_MULTIMODAL_DEFAULT", "false"))
+    multimodal_default = to_bool(os.getenv("LMSTUDIO_MULTIMODAL_DEFAULT", "true"))
     multimodal_models = set(_parse_csv(os.getenv("LMSTUDIO_MULTIMODAL_MODELS", "")))
 
     version = os.getenv("LMSTUDIO_MODEL_VERSION", "local")

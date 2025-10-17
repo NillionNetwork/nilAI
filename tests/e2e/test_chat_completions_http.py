@@ -12,7 +12,7 @@ import json
 import os
 import re
 
-from .config import BASE_URL, test_models, AUTH_STRATEGY, api_key_getter
+from .config import BASE_URL, ENVIRONMENT, test_models, AUTH_STRATEGY, api_key_getter
 from .nuc import (
     get_rate_limited_nuc_token,
     get_invalid_rate_limited_nuc_token,
@@ -162,6 +162,10 @@ def test_usage_endpoint(client):
         assert key in usage_data, f"Expected key {key} not found in usage data"
 
 
+@pytest.mark.skipif(
+    ENVIRONMENT != "mainnet",
+    reason="Attestation endpoint not available in non-mainnet environment",
+)
 def test_attestation_endpoint(client):
     """Test the attestation endpoint"""
     response = client.get("/attestation/report")

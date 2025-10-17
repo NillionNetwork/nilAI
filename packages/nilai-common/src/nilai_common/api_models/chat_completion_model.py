@@ -29,6 +29,9 @@ from openai.types.chat.chat_completion_content_part_text_param import (
 from openai.types.chat.chat_completion_content_part_image_param import (
     ChatCompletionContentPartImageParam,
 )
+
+from openai.types.completion_usage import CompletionUsage as Usage
+
 from openai.types.chat.chat_completion import Choice as OpenaAIChoice
 from pydantic import BaseModel, Field
 
@@ -37,6 +40,44 @@ from nilai_common.api_models.common_model import Source
 ChatToolFunction: TypeAlias = Function
 ImageContent: TypeAlias = ChatCompletionContentPartImageParam
 TextContent: TypeAlias = ChatCompletionContentPartTextParam
+Message: TypeAlias = ChatCompletionMessageParam  # SDK union of message shapes
+
+# Explicitly re-export OpenAI types that are part of our public API
+__all__ = [
+    "ChatCompletion",
+    "ChatCompletionMessage",
+    "ChatCompletionMessageToolCall",
+    "ChatToolFunction",
+    "Function",
+    "ImageContent",
+    "TextContent",
+    "Message",
+    "ResultContent",
+    "Choice",
+    "Source",
+    "SearchResult",
+    "Topic",
+    "TopicResponse",
+    "TopicQuery",
+    "MessageAdapter",
+    "WebSearchEnhancedMessages",
+    "WebSearchContext",
+    "ChatRequest",
+    "SignedChatCompletion",
+    "ModelMetadata",
+    "ModelEndpoint",
+    "HealthCheckResponse",
+    "AttestationReport",
+    "AMDAttestationToken",
+    "NVAttestationToken",
+    "Usage",
+]
+
+
+# ---------- Domain-specific objects for web search ----------
+class ResultContent(BaseModel):
+    text: str
+    truncated: bool = False
 Message: TypeAlias = ChatCompletionMessageParam
 
 
@@ -285,3 +326,52 @@ class SignedChatCompletion(ChatCompletion):
     sources: Optional[List[Source]] = Field(
         default=None, description="Sources used for web search when enabled"
     )
+
+
+class ModelMetadata(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    version: str
+    description: str
+    author: str
+    license: str
+    source: str
+    supported_features: List[str]
+    tool_support: bool
+    multimodal_support: bool = False
+
+
+class ModelEndpoint(BaseModel):
+    url: str
+    metadata: ModelMetadata
+
+
+class HealthCheckResponse(BaseModel):
+    status: str
+    uptime: str
+
+
+# ---------- Attestation ----------
+Nonce = Annotated[
+    str,
+    Field(
+        max_length=64,
+        min_length=64,
+        description="The nonce to be used for the attestation",
+    ),
+]
+
+AMDAttestationToken = Annotated[
+    str, Field(description="The attestation token from AMD's attestation service")
+]
+
+NVAttestationToken = Annotated[
+    str, Field(description="The attestation token from NVIDIA's attestation service")
+]
+
+
+class AttestationReport(BaseModel):
+    nonce: Nonce
+    verifying_key: Annotated[str, Field(description="PEM encoded public key")]
+    cpu_attestation: AMDAttestationToken
+    gpu_attestation: NVAttestationToken
