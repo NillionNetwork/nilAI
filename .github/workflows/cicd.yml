@@ -97,7 +97,7 @@ jobs:
               {"Key": "Deployment", "Value": "github-runners"},
               {"Key": "Type", "Value": "GithubRunner"},
               {"Key": "User", "Value": "ec2-user"},
-              {"Key": "Environment", "Value": "production"}
+              {"Key": "Environment", "Value": "us-east-1"}
             ]
 
   build-images:
