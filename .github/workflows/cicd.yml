@@ -163,7 +163,7 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+          password: ${{ secrets.GH_PAT }}
 
       - name: Compose docker-compose.yml
         run: python3 ./scripts/docker-composer.py --dev -f docker/compose/docker-compose.gpt-20b-gpu.ci.yml -o development-compose.yml
