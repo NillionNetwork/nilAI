@@ -6,6 +6,7 @@ import signal
 import httpx
 
 from nilai_common import (
+    MODEL_CAPABILITIES,
     MODEL_SETTINGS,
     SETTINGS,
     ModelEndpoint,
@@ -37,8 +38,8 @@ async def get_metadata():
                     license="Apache 2.0",
                     source=f"https://huggingface.co/{model_name}",
                     supported_features=["chat_completion"],
-                    tool_support=SETTINGS.tool_support,
-                    multimodal_support=SETTINGS.multimodal_support,
+                    tool_support=MODEL_CAPABILITIES.tool_support,
+                    multimodal_support=MODEL_CAPABILITIES.multimodal_support,
                 )
 
         except Exception as e:

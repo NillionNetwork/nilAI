@@ -7,13 +7,13 @@ from functools import lru_cache
 from nilai_api.state import state
 from nilai_api.auth.common import AuthenticationError
 
-from nilai_common.logger import setup_logger
 
 from nilai_api.auth.nuc_helpers.usage import TokenRateLimits
 from nilai_api.auth.nuc_helpers.nildb_document import PromptDocument
 
-logger = setup_logger(__name__)
+import logging
 
+logger = logging.getLogger(__name__)
 
 NILAI_BASE_COMMAND: Command = Command.parse("/nil/ai")
 

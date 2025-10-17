@@ -33,7 +33,7 @@ from nilai_common.api_models import (
     EasyInputMessageParam,
     ResponseFunctionToolCallParam,
 )
-from nilai_common.config import SETTINGS, MODEL_SETTINGS
+from nilai_common.config import SETTINGS, MODEL_SETTINGS, MODEL_CAPABILITIES
 from nilai_common.discovery import ModelServiceDiscovery
 
 __all__ = [
@@ -55,6 +55,7 @@ __all__ = [
     "NVAttestationToken",
     "SETTINGS",
     "MODEL_SETTINGS",
+    "MODEL_CAPABILITIES",
     "SearchResult",
     "Source",
     "TopicResponse",

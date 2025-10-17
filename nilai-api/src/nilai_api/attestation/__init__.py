@@ -1,9 +1,6 @@
 from fastapi import HTTPException
 import httpx
 from nilai_common import AttestationReport
-from nilai_common.logger import setup_logger
-
-logger = setup_logger(__name__)
 
 ATTESTATION_URL = "http://nilcc-attester/v2/report"
 
