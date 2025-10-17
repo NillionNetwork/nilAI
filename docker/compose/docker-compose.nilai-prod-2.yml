@@ -33,7 +33,7 @@ services:
       --tool-call-parser llama3_json
       --uvicorn-log-level warning
       --enable-auto-tool-choice
-      --chat-template /opt/vllm/templates/llama3.1_tool_json.jinja
+      --chat-template /daemon/nilai-models/templates/llama3.1_tool_json.jinja
     environment:
       - SVC_HOST=llama_8b_gpu
       - SVC_PORT=8000
