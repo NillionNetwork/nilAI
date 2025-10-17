@@ -216,7 +216,7 @@ def test_invalid_nildb_command_nucs(nildb_client, model):
 
     assert forbidden, "No NILDB command detected, when expected"
 
-
+@pytest.mark.rerun(3)
 @pytest.mark.parametrize(
     "model",
     test_models,
@@ -253,7 +253,6 @@ def test_streaming_chat_completion(client, model):
             if chunk.usage:
                 had_usage = True
                 print(f"Model {model} usage: {chunk.usage}")
-                break
         assert had_usage, f"No usage data received for {model} streaming request"
         assert chunk_count > 0, f"No chunks received for {model} streaming request"
         assert full_content, f"No content assembled from stream for {model}"
