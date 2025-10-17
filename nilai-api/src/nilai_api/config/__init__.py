@@ -44,11 +44,19 @@ class NilAIConfig(BaseModel):
 
         keywords = {"pass", "token", "key"}
         for key, value in list(config_dict.items()):
-            if isinstance(value, str) and any(k in key for k in keywords) and value is not None:
+            if (
+                isinstance(value, str)
+                and any(k in key for k in keywords)
+                and value is not None
+            ):
                 config_dict[key] = "***************"
             elif isinstance(value, dict):
                 for k, v in list(value.items()):
-                    if isinstance(v, str) and any(kw in k for kw in keywords) and v is not None:
+                    if (
+                        isinstance(v, str)
+                        and any(kw in k for kw in keywords)
+                        and v is not None
+                    ):
                         value[k] = "***************"
 
         return json.dumps(config_dict, indent=4)

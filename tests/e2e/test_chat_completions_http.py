@@ -443,12 +443,17 @@ def test_model_tools_request(client, model):
 @pytest.mark.parametrize("model", test_models)
 def test_function_calling_with_streaming_httpx(client, model):
     """Test function calling with streaming using httpx, verifying tool calls and usage data."""
+    if model == "openai/gpt-oss-20b":
+        pytest.skip(
+            "Skipping test for openai/gpt-oss-20b model as it only supports responses endpoint"
+        )
+
     payload = {
         "model": model,
         "messages": [
             {
                 "role": "system",
-                "content": "You are a helpful assistant that provides accurate and concise information.",
+                "content": "You are a helpful assistant that provides accurate and concise information. You are a helpful assistant that provides accurate and concise information. For getting weather, use function call with get_weather.",
             },
             {
                 "role": "user",
@@ -476,6 +481,7 @@ def test_function_calling_with_streaming_httpx(client, model):
                 },
             }
         ],
+        "tool_choice": {"type": "function", "function": {"name": "get_weather"}},
         "temperature": 0.2,
         "stream": True,
     }
@@ -886,6 +892,11 @@ def test_nildb_prompt_document(document_id_client: httpx.Client, model):
 )
 @pytest.mark.parametrize("model", test_models)
 def test_execute_python_sha256_e2e(client, model):
+    if model == "openai/gpt-oss-20b":
+        pytest.skip(
+            "Skipping test for openai/gpt-oss-20b model as it only supports responses endpoint"
+        )
+
     expected = "75cc238b167a05ab7336d773cb096735d459df2f0df9c8df949b1c44075df8a5"
 
     system_msg = (

@@ -16,12 +16,11 @@ from nilai_common import (
     EasyInputMessageParam,
     ResponseFunctionToolCallParam,
 )
+from nilai_api.config import CONFIG
 
 from . import code_execution
 
 logger = logging.getLogger(__name__)
-
-AVAILABLE_TOOLS = {"execute_python"}
 
 
 async def route_and_execute_tool_call(
@@ -32,18 +31,14 @@ async def route_and_execute_tool_call(
     Currently supports:
     - execute_python: Executes Python code in a sandbox environment
 
-    For unknown tools, returns an error message in the output field.
-
     Args:
         tool_call: Tool call parameter containing name, arguments, and call_id
 
     Returns:
-        FunctionCallOutput object with execution result or error message
+        FunctionCallOutput object with execution result
     """
     func_name = tool_call["name"]
     arguments = tool_call["arguments"] or "{}"
-
-    output_json_string = json.dumps({"error": f"Tool '{func_name}' not implemented"})
 
     if func_name == "execute_python":
         try:
@@ -59,6 +54,8 @@ async def route_and_execute_tool_call(
             )
         except Exception as e:
             output_json_string = json.dumps({"error": f"Error executing tool: {e}"})
+    else:
+        output_json_string = json.dumps({"result": ""})
 
     return FunctionCallOutput(
         id=str(uuid.uuid4()),
@@ -74,7 +71,6 @@ async def process_tool_calls(
     """Process multiple tool calls concurrently using asyncio.gather.
 
     Executes all tool calls in parallel for optimal performance.
-    Unknown tools will return error messages in their output.
 
     Args:
         tool_calls: List of tool call parameters to execute
@@ -114,29 +110,6 @@ def extract_function_tool_calls_from_response(
     ]
 
 
-def check_if_all_tools_available(
-    tool_calls: List[ResponseFunctionToolCallParam],
-) -> bool:
-    """Check if all requested tools are available in the registry.
-
-    Validates that each tool call references a tool that exists in AVAILABLE_TOOLS.
-    Logs a warning for the first unavailable tool encountered.
-
-    Args:
-        tool_calls: List of tool calls to validate
-
-    Returns:
-        True if all tools are available, False if any tool is unavailable
-    """
-    for tool_call in tool_calls:
-        if tool_call["name"] not in AVAILABLE_TOOLS:
-            logger.warning(
-                f"[responses_tool] Tool '{tool_call['name']}' not available, shortcutting workflow"
-            )
-            return False
-    return True
-
-
 async def handle_responses_tool_workflow(
     client: AsyncOpenAI,
     req: ResponseRequest,
@@ -173,7 +146,17 @@ async def handle_responses_tool_workflow(
     tool_calls = extract_function_tool_calls_from_response(first_response)
     logger.info(f"[responses_tool] extracted tool_calls: {tool_calls}")
 
-    if not tool_calls or not check_if_all_tools_available(tool_calls):
+    if not tool_calls:
+        return first_response, prompt_tokens, completion_tokens
+
+    unknown = [
+        tc for tc in tool_calls if tc["name"] not in CONFIG.tools.implemented_tools
+    ]
+    if unknown:
+        logger.info(
+            "[responses_tool] unknown tool(s): %s. Returning first response unchanged.",
+            [tc["name"] for tc in unknown],
+        )
         return first_response, prompt_tokens, completion_tokens
 
     tool_results = await process_tool_calls(tool_calls)
