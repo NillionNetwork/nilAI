@@ -31,6 +31,9 @@ from openai.types.chat.chat_completion_content_part_text_param import (
 from openai.types.chat.chat_completion_content_part_image_param import (
     ChatCompletionContentPartImageParam,
 )
+
+from openai.types.completion_usage import CompletionUsage as Usage
+
 from openai.types.chat.chat_completion import Choice as OpenaAIChoice
 from pydantic import BaseModel, Field
 
@@ -40,6 +43,37 @@ ChatToolFunction: TypeAlias = Function
 ImageContent: TypeAlias = ChatCompletionContentPartImageParam
 TextContent: TypeAlias = ChatCompletionContentPartTextParam
 Message: TypeAlias = ChatCompletionMessageParam  # SDK union of message shapes
+
+# Explicitly re-export OpenAI types that are part of our public API
+__all__ = [
+    "ChatCompletion",
+    "ChatCompletionMessage",
+    "ChatCompletionMessageToolCall",
+    "ChatToolFunction",
+    "Function",
+    "ImageContent",
+    "TextContent",
+    "Message",
+    "ResultContent",
+    "Choice",
+    "Source",
+    "SearchResult",
+    "Topic",
+    "TopicResponse",
+    "TopicQuery",
+    "MessageAdapter",
+    "WebSearchEnhancedMessages",
+    "WebSearchContext",
+    "ChatRequest",
+    "SignedChatCompletion",
+    "ModelMetadata",
+    "ModelEndpoint",
+    "HealthCheckResponse",
+    "AttestationReport",
+    "AMDAttestationToken",
+    "NVAttestationToken",
+    "Usage",
+]
 
 
 # ---------- Domain-specific objects for web search ----------
@@ -364,14 +398,6 @@ class HealthCheckResponse(BaseModel):
 
 
 # ---------- Attestation ----------
-Nonce = Annotated[
-    str,
-    Field(
-        max_length=64,
-        min_length=64,
-        description="The nonce to be used for the attestation",
-    ),
-]
 
 AMDAttestationToken = Annotated[
     str, Field(description="The attestation token from AMD's attestation service")
@@ -383,7 +409,6 @@ NVAttestationToken = Annotated[
 
 
 class AttestationReport(BaseModel):
-    nonce: Nonce
     verifying_key: Annotated[str, Field(description="PEM encoded public key")]
     cpu_attestation: AMDAttestationToken
     gpu_attestation: NVAttestationToken

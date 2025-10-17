@@ -64,8 +64,6 @@ services:
     image: 'grafana/grafana:11.5.1'
     restart: unless-stopped
     user: "$UID:$GID"
-    depends_on:
-      - prometheus
     environment:
       - GF_USERS_ALLOW_SIGN_UP=false
     healthcheck:
@@ -99,6 +97,7 @@ services:
 
   nilauth-credit-server:
     image: ghcr.io/nillionnetwork/nilauth-credit:sha-cb9e36a
+    platform: linux/amd64 # for macOS to force running on Rosetta 2
     environment:
       DATABASE_URL: postgresql://nilauth:nilauth_dev_password@nilauth-postgres:5432/nilauth_credit
       HOST: 0.0.0.0
@@ -108,8 +107,10 @@ services:
     depends_on:
       nilauth-postgres:
         condition: service_healthy
+    volumes:
+      - ./scripts/credit-init.sql:/app/migrations/20251015000006_seed_test_data.sql
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/health"]
       interval: 30s
       retries: 3
       start_period: 15s

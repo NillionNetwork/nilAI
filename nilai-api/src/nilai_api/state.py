@@ -17,9 +17,16 @@ class AppState:
         self.sem = Semaphore(2)
 
         self.discovery_service = ModelServiceDiscovery(
-            host=CONFIG.etcd.host, port=CONFIG.etcd.port
+            host=CONFIG.discovery.host, port=CONFIG.discovery.port
         )
+        self._discovery_initialized = False
         self._uptime = time.time()
+
+    async def _ensure_discovery_initialized(self):
+        """Ensure discovery service is initialized."""
+        if not self._discovery_initialized:
+            await self.discovery_service.initialize()
+            self._discovery_initialized = True
 
     @property
     def uptime(self):
@@ -42,11 +49,13 @@ class AppState:
 
     @property
     async def models(self) -> Dict[str, ModelEndpoint]:
+        await self._ensure_discovery_initialized()
         return await self.discovery_service.discover_models()
 
     async def get_model(self, model_id: str) -> Optional[ModelEndpoint]:
         if model_id is None or len(model_id) == 0:
             return None
+        await self._ensure_discovery_initialized()
         return await self.discovery_service.get_model(model_id)
 
 

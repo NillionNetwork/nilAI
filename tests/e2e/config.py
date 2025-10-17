@@ -37,7 +37,7 @@ models = {
         "meta-llama/Llama-3.2-1B-Instruct",
         "meta-llama/Llama-3.1-8B-Instruct",
     ],
-    "ci": ["meta-llama/Llama-3.2-1B-Instruct"],
+    "ci": ["llama-3.2-1b-instruct"],
 }
 
 if ENVIRONMENT not in models:

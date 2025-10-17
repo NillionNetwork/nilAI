@@ -10,7 +10,6 @@ from nilai_common.api_model import (
     HealthCheckResponse,
     ModelEndpoint,
     ModelMetadata,
-    Nonce,
     AMDAttestationToken,
     NVAttestationToken,
     SearchResult,
@@ -22,10 +21,10 @@ from nilai_common.api_model import (
     Topic,
     Message,
     MessageAdapter,
+    Usage,
 )
 from nilai_common.config import SETTINGS, MODEL_SETTINGS
 from nilai_common.discovery import ModelServiceDiscovery
-from openai.types.completion_usage import CompletionUsage as Usage
 
 __all__ = [
     "Message",
@@ -43,7 +42,6 @@ __all__ = [
     "HealthCheckResponse",
     "ModelEndpoint",
     "ModelServiceDiscovery",
-    "Nonce",
     "AMDAttestationToken",
     "NVAttestationToken",
     "SETTINGS",
@@ -55,4 +53,5 @@ __all__ = [
     "WebSearchEnhancedMessages",
     "WebSearchContext",
     "ResultContent",
+    "Usage",
 ]
