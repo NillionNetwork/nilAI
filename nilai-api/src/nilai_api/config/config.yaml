@@ -2,16 +2,21 @@
 # Configuration with structured sections and default values
 
 # Environment Configuration
-environment: "mainnet"
+environment: "ci"
 
 # Authentication Configuration
 auth:
-  strategy: "api_key"
+  strategy: "ci"
   nilauth_trusted_root_issuers: []
 
 # Documentation Configuration
 docs:
   token: null
+
+# Tools Configuration
+tools:
+  implemented_tools:
+    - execute_python
 
 # Web Search Configuration
 web_search:

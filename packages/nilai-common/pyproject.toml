@@ -9,7 +9,7 @@ authors = [
 requires-python = ">=3.12"
 dependencies = [
     "etcd3gw>=2.4.2",
-    "openai>=1.59.9",
+    "openai>=1.99.2",
     "pydantic>=2.10.1",
     "tenacity>=9.0.0",
 ]

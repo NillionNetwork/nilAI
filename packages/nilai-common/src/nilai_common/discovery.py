@@ -9,7 +9,7 @@ from tenacity import retry, wait_exponential, stop_after_attempt
 
 from etcd3gw import Lease
 from etcd3gw.client import Etcd3Client
-from nilai_common.api_model import ModelEndpoint, ModelMetadata
+from nilai_common.api_models import ModelEndpoint, ModelMetadata
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
