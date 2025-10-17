@@ -216,6 +216,7 @@ def test_invalid_nildb_command_nucs(nildb_client, model):
 
     assert forbidden, "No NILDB command detected, when expected"
 
+
 @pytest.mark.rerun(3)
 @pytest.mark.parametrize(
     "model",
