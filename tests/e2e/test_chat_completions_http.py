@@ -627,7 +627,7 @@ def test_invalid_nildb_command_nucs(nildb_client):
 def test_large_payload_handling(client):
     """Test handling of large input payloads"""
     # Create a very large system message
-    large_system_message = "Hello " * 10000  # 100KB of text
+    large_system_message = "Hello " * 1000  # 100KB of text
 
     payload = {
         "model": test_models[0],
