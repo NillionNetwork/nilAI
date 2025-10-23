@@ -356,12 +356,16 @@ def test_model_streaming_request(client, model):
 )
 def test_model_tools_request(client, model):
     """Test tools request for different models"""
+    if model == "openai/gpt-oss-20b":
+        pytest.skip(
+            "openai/gpt-oss-20b model only supports tool calls with responses endpoint"
+        )
     payload = {
         "model": model,
         "messages": [
             {
                 "role": "system",
-                "content": "You are a helpful assistant. When a user asks a question that requires calculation, use the execute_python tool to find the answer. After the tool provides its result, you must use that result to formulate a clear, final answer to the user's original question. Do not include any code or JSON in your final response.",
+                "content": "You are a helpful assistant. When a user asks a question that requires weather, use the get_weather tool to get the weather information.",
             },
             {"role": "user", "content": "What is the weather like in Paris today?"},
         ],
@@ -910,7 +914,7 @@ def test_web_search(client, model, high_web_search_rate_limit):
         "max_tokens": 150,
     }
 
-    response = client.post("/chat/completions", json=payload, timeout=30)
+    response = client.post("/chat/completions", json=payload, timeout=60)
     assert response.status_code == 200, (
         f"Response for {model} failed with status {response.status_code}"
     )

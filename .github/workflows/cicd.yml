@@ -50,7 +50,7 @@ jobs:
           # Set dummy secrets for unit tests
           sed -i 's/HF_TOKEN=.*/HF_TOKEN=dummy_token/' .env
           sed -i 's/BRAVE_SEARCH_API=.*/BRAVE_SEARCH_API=dummy_api/' .env
-          sed -i 's/E2B_API_KEY=.*/BRAVEE2B_API_KEY_SEARCH_API=dummy_token/' .env
+          sed -i 's/E2B_API_KEY=.*/E2B_API_KEY=dummy_token/' .env
 
       - name: pyright
         run: uv run pyright
