@@ -45,6 +45,11 @@ class Choice(OpenaAIChoice):
 
 
 def _extract_text_from_content(content: Any) -> Optional[str]:
+    """
+    - If content is a str -> return it (stripped) if non-empty.
+    - If content is a list of content parts -> concatenate 'text' parts.
+    - Else -> None.
+    """
     if isinstance(content, str):
         s = content.strip()
         return s or None
@@ -61,6 +66,8 @@ def _extract_text_from_content(content: Any) -> Optional[str]:
 
 
 class MessageAdapter(BaseModel):
+    """Thin wrapper around an OpenAI ChatCompletionMessageParam with convenience methods."""
+
     raw: Message
 
     @property
@@ -98,6 +105,16 @@ class MessageAdapter(BaseModel):
         content: str,
         tool_call_id: str,
     ) -> Message:
+        """Create a tool role message compatible with OpenAI SDK types.
+
+        Example shape:
+        {
+          "role": "tool",
+          "name": "execute_python",
+          "content": "...",
+          "tool_call_id": "call_abc123"
+        }
+        """
         message: Message = cast(
             Message,
             {
@@ -113,6 +130,15 @@ class MessageAdapter(BaseModel):
     def new_assistant_tool_call_message(
         tool_calls: List[ChatCompletionMessageToolCall],
     ) -> Message:
+        """Create an assistant message carrying tool_calls.
+
+        Shape example:
+        {
+          "role": "assistant",
+          "tool_calls": [...],
+          "content": None,
+        }
+        """
         return cast(
             Message,
             {
@@ -151,6 +177,7 @@ class MessageAdapter(BaseModel):
         return _extract_text_from_content(self.content)
 
     def to_openai_param(self) -> Message:
+        # Return the original dict for API calls.
         return self.raw
 
 
@@ -164,6 +191,8 @@ class WebSearchEnhancedMessages(BaseModel):
 
 
 class WebSearchContext(BaseModel):
+    """Prompt and sources obtained from a web search."""
+
     prompt: str
     sources: List[Source]
 
@@ -198,15 +227,31 @@ class ChatRequest(BaseModel):
         return adapt_messages(self.messages)
 
     def get_last_user_query(self) -> Optional[str]:
+        """
+        Returns the latest non-empty user text (plain or from content parts),
+        or None if not found.
+        """
         for m in reversed(self.adapted_messages):
             if m.role == "user" and m.is_text_part():
                 return m.extract_text()
         return None
 
     def has_multimodal_content(self) -> bool:
+        """True if any message contains an image content part."""
         return any([m.is_multimodal_part() for m in self.adapted_messages])
 
     def ensure_system_content(self, system_content: str) -> None:
+        """Ensure the conversation starts with a system message containing the given content.
+
+        This method directly mutates the `self.messages` list in place.
+
+        Logic cases:
+        1. Empty message list: Insert new system message at the beginning
+        2. First message is not system: Insert new system message at the beginning
+        3. First message is system: Merge content with existing system message
+           - String content: Append with separator
+           - List content: Add new text part to the list
+        """
         msgs = self.messages
 
         if not msgs:

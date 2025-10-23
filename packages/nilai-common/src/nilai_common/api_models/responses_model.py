@@ -69,10 +69,14 @@ __all__ = [
 
 
 class StreamOptions(BaseModel):
+    """Configuration options for streaming responses."""
+
     include_obfuscation: Optional[bool] = None
 
 
 class ResponseRequest(BaseModel):
+    """Request model for generating AI responses with various configuration options."""
+
     model: ResponsesModel
 
     input: Union[str, ResponseInputParam]
@@ -180,6 +184,8 @@ class ResponseRequest(BaseModel):
 
 
 class WebSearchEnhancedInput(BaseModel):
+    """Input model enhanced with web search sources for context-aware responses."""
+
     input: Union[str, ResponseInputParam]
     instructions: Optional[str]
     sources: List[Source]
@@ -187,7 +193,7 @@ class WebSearchEnhancedInput(BaseModel):
 
 class SignedResponse(Response):
     """
-    An extension of the official Response object.
+    An extension of the official Response object with cryptographic signature and web search sources.
     """
 
     signature: str

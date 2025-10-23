@@ -2,11 +2,11 @@
 # Configuration with structured sections and default values
 
 # Environment Configuration
-environment: "ci"
+environment: "mainnet"
 
 # Authentication Configuration
 auth:
-  strategy: "ci"
+  strategy: "api_key"
   nilauth_trusted_root_issuers: []
 
 # Documentation Configuration
@@ -35,9 +35,9 @@ rate_limiting:
   user_rate_limit_minute: 100
   user_rate_limit_hour: 1000
   user_rate_limit_day: 10000
-  web_search_rate_limit_minute: 50
-  web_search_rate_limit_hour: 500
-  web_search_rate_limit_day: 5000
+  web_search_rate_limit_minute: 6
+  web_search_rate_limit_hour: 18
+  web_search_rate_limit_day: 72
   web_search_rate_limit: null # For-good rate limit
   model_concurrent_rate_limit:
     meta-llama/Llama-3.2-1B-Instruct: 45

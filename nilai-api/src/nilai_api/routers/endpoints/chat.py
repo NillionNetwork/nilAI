@@ -147,12 +147,6 @@ async def chat_completion(
             detail=f"Invalid model name {model_name}, check /v1/models for options",
         )
 
-    if not endpoint.metadata.tool_support and req.tools:
-        raise HTTPException(
-            status_code=400,
-            detail="Model does not support tool usage, remove tools from request",
-        )
-
     has_multimodal = req.has_multimodal_content()
     logger.info(f"[chat] has_multimodal: {has_multimodal}")
     if has_multimodal and (not endpoint.metadata.multimodal_support or req.web_search):
@@ -202,6 +196,28 @@ async def chat_completion(
         )
         logger.info(f"[chat] web_search messages: {messages}")
 
+    request_kwargs = {
+        "model": req.model,
+        "messages": messages,
+        "top_p": req.top_p,
+        "temperature": req.temperature,
+        "max_tokens": req.max_tokens,
+    }
+
+    if req.tools:
+        if not endpoint.metadata.tool_support:
+            raise HTTPException(
+                status_code=400,
+                detail="Model does not support tool usage, remove tools from request",
+            )
+        if model_name == "openai/gpt-oss-20b":
+            raise HTTPException(
+                status_code=400,
+                detail="This model only supports tool calls with responses endpoint",
+            )
+        request_kwargs["tools"] = req.tools
+        request_kwargs["tool_choice"] = req.tool_choice
+
     if req.stream:
 
         async def chat_completion_stream_generator() -> AsyncGenerator[str, None]:
@@ -212,23 +228,13 @@ async def chat_completion(
             try:
                 logger.info(f"[chat] stream start request_id={request_id}")
 
-                request_kwargs = {
-                    "model": req.model,
-                    "messages": messages,
-                    "stream": True,
-                    "top_p": req.top_p,
-                    "temperature": req.temperature,
-                    "max_tokens": req.max_tokens,
-                    "extra_body": {
-                        "stream_options": {
-                            "include_usage": True,
-                            "continuous_usage_stats": False,
-                        }
-                    },
+                request_kwargs["stream"] = True
+                request_kwargs["extra_body"] = {
+                    "stream_options": {
+                        "include_usage": True,
+                        "continuous_usage_stats": False,
+                    }
                 }
-                if req.tools:
-                    request_kwargs["tools"] = req.tools
-                    request_kwargs["tool_choice"] = req.tool_choice
 
                 response = await client.chat.completions.create(**request_kwargs)
 
@@ -279,20 +285,8 @@ async def chat_completion(
             media_type="text/event-stream",
         )
 
-    current_messages = messages
-    request_kwargs = {
-        "model": req.model,
-        "messages": current_messages,
-        "top_p": req.top_p,
-        "temperature": req.temperature,
-        "max_tokens": req.max_tokens,
-    }
-    if req.tools:
-        request_kwargs["tools"] = req.tools
-        request_kwargs["tool_choice"] = req.tool_choice
-
     logger.info(f"[chat] call start request_id={request_id}")
-    logger.info(f"[chat] call message: {current_messages}")
+    logger.info(f"[chat] call message: {request_kwargs['messages']}")
     t_call = time.monotonic()
     response = await client.chat.completions.create(**request_kwargs)
     logger.info(
@@ -304,7 +298,7 @@ async def chat_completion(
         final_completion,
         agg_prompt_tokens,
         agg_completion_tokens,
-    ) = await handle_tool_workflow(client, req, current_messages, response)
+    ) = await handle_tool_workflow(client, req, request_kwargs["messages"], response)
     logger.info(f"[chat] call final_completion: {final_completion}")
     model_response = SignedChatCompletion(
         **final_completion.model_dump(),
