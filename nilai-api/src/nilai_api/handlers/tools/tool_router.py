@@ -43,7 +43,7 @@ async def route_and_execute_tool_call(
                     content = json.dumps({"error": "No code provided by the model."})
                 else:
                     result = await code_execution.execute_python(code)
-                    content = json.dumps({"result": str(result).strip()})
+                    content = str(result).strip()
             except json.JSONDecodeError:
                 logger.error("[tools] invalid JSON in tool call arguments")
                 content = json.dumps({"error": "Invalid JSON in tool call arguments."})
