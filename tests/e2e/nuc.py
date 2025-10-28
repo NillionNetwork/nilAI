@@ -99,7 +99,7 @@ def get_nuc_token(
         delegation_expires_at = (
             expires_at
             if expires_at is not None
-            else datetime.now(timezone.utc) + timedelta(hours=1)
+            else datetime.now(timezone.utc) + timedelta(minutes=30)
         )
 
         # Create delegation token

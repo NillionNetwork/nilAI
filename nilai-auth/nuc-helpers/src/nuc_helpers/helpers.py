@@ -265,6 +265,10 @@ def get_invocation_token(
         NucTokenBuilder.extending(delegated_token_envelope)
         .body(InvocationBody(args={}))
         .audience(Did(nilai_public_key.serialize()))
+        .expires_at(
+            datetime.datetime.now(datetime.timezone.utc)
+            + datetime.timedelta(minutes=30)
+        )
         .build(delegated_key)
     )
     return InvocationToken(token=invocation)
