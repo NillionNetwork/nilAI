@@ -151,9 +151,6 @@ async def create_response(
         )
 
     model_url = endpoint.url + "/v1/"
-    logger.info(
-        f"[responses] start request_id={request_id} user={auth_info.user.userid} model={model_name} stream={req.stream} web_search={bool(req.web_search)} tools={bool(req.tools)} multimodal={has_multimodal} url={model_url}"
-    )
 
     client = AsyncOpenAI(base_url=model_url, api_key="<not-needed>")
     if auth_info.prompt_document:

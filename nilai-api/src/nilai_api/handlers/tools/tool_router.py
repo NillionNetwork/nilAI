@@ -15,11 +15,12 @@ from nilai_common import (
 
 from . import code_execution
 from openai import AsyncOpenAI
-from nilai_api.config import CONFIG
 
 import logging
 
 logger = logging.getLogger(__name__)
+
+SUPPORTED_TOOLS = {"execute_python"}
 
 
 async def route_and_execute_tool_call(
@@ -31,26 +32,33 @@ async def route_and_execute_tool_call(
     with role="tool".
     """
     func_name = tool_call.function.name
-    arguments = tool_call.function.arguments or "{}"
+    arguments_json = tool_call.function.arguments or "{}"
 
-    if func_name == "execute_python":
-        # arguments is a JSON string
-        try:
-            args = json.loads(arguments)
-        except Exception:
-            args = {}
-        code = args.get("code", "")
-        result = await code_execution.execute_python(code)
-        logger.info(f"[tool] execute_python result: {result}")
-        return MessageAdapter.new_tool_message(
-            name="execute_python",
-            content=result,
-            tool_call_id=tool_call.id,
-        )
-
-    return MessageAdapter.new_tool_message(
-        name=func_name, content="", tool_call_id=tool_call.id
-    )
+    match func_name:
+        case "execute_python":
+            try:
+                parsed_arguments = json.loads(arguments_json)
+                code = parsed_arguments.get("code", "")
+                if not str(code).strip():
+                    content = json.dumps({"error": "No code provided by the model."})
+                else:
+                    result = await code_execution.execute_python(code)
+                    content = json.dumps({"result": str(result).strip()})
+            except json.JSONDecodeError:
+                logger.error("[tools] invalid JSON in tool call arguments")
+                content = json.dumps({"error": "Invalid JSON in tool call arguments."})
+            except Exception as e:
+                logger.error(f"[tools] error executing tool: {e}")
+                content = json.dumps({"error": f"Error executing tool: {e}"})
+            return MessageAdapter.new_tool_message(
+                name="execute_python",
+                content=content,
+                tool_call_id=tool_call.id,
+            )
+        case _:
+            return MessageAdapter.new_tool_message(
+                name=func_name, content="", tool_call_id=tool_call.id
+            )
 
 
 async def process_tool_calls(
@@ -161,13 +169,9 @@ async def handle_tool_workflow(
     logger.info(f"[tools] extracted tool_calls: {tool_calls}")
 
     if not tool_calls:
-        return first_response, 0, 0
+        return first_response, prompt_tokens, completion_tokens
 
-    unknown = [
-        tc
-        for tc in tool_calls
-        if tc.function.name not in CONFIG.tools.implemented_tools
-    ]
+    unknown = [tc for tc in tool_calls if tc.function.name not in SUPPORTED_TOOLS]
     if unknown:
         logger.info(
             "[tools] unknown tool(s): %s. Returning first response unchanged.",

@@ -8,7 +8,6 @@ from .auth import AuthConfig, DocsConfig
 from .nildb import NilDBConfig
 from .web_search import WebSearchSettings
 from .rate_limiting import RateLimitingConfig
-from .tools import ToolsConfig
 from .utils import create_config_model, CONFIG_DATA
 
 
@@ -27,7 +26,6 @@ class NilAIConfig(BaseModel):
     )
     auth: AuthConfig = create_config_model(AuthConfig, "auth", CONFIG_DATA)
     docs: DocsConfig = create_config_model(DocsConfig, "docs", CONFIG_DATA, "DOCS_")
-    tools: ToolsConfig = create_config_model(ToolsConfig, "tools", CONFIG_DATA)
     web_search: WebSearchSettings = create_config_model(
         WebSearchSettings, "web_search", CONFIG_DATA, "WEB_SEARCH_"
     )

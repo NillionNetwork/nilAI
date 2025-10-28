@@ -306,7 +306,10 @@ def test_model_streaming_request(client, model):
                 "role": "system",
                 "content": "You are a helpful assistant that provides accurate and concise information.",
             },
-            {"role": "user", "content": "Write a short poem about mountains."},
+            {
+                "role": "user",
+                "content": "Write a short poem about mountains. It must be 20 words maximum.",
+            },
         ],
         "temperature": 0.2,
         "stream": True,

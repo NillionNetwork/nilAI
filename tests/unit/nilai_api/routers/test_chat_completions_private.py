@@ -103,23 +103,30 @@ def mock_user_manager(mock_user, mocker):
 
 @pytest.fixture
 def mock_state(mocker):
+    # Prepare expected models data
     expected_models = {"ABC": model_endpoint}
 
+    # Create a mock discovery service that returns the expected models
     mock_discovery_service = mocker.Mock()
     mock_discovery_service.discover_models = AsyncMock(return_value=expected_models)
 
+    # Create a mock AppState
     mocker.patch.object(state, "discovery_service", mock_discovery_service)
 
+    # Patch other attributes
     mocker.patch.object(state, "b64_public_key", "test-verifying-key")
 
+    # Patch get_model method
     mocker.patch.object(state, "get_model", return_value=model_endpoint)
 
+    # Patch get_attestation method
     attestation_response = AttestationReport(
         verifying_key="test-verifying-key",
         nonce="0" * 64,
         cpu_attestation="test-cpu-attestation",
         gpu_attestation="test-gpu-attestation",
     )
+    # Patch the get_attestation_report function
     mocker.patch(
         "nilai_api.routers.private.get_attestation_report",
         new_callable=AsyncMock,
@@ -137,10 +144,13 @@ def client(mock_user_manager):
         yield client
 
 
+# Example test
 @pytest.mark.asyncio
 async def test_models_property(mock_state):
+    # Retrieve the models
     models = await state.models
 
+    # Assert the expected models
     assert models == {"ABC": model_endpoint}
 
 
@@ -185,6 +195,7 @@ def test_chat_completion(mock_user, mock_state, mock_user_manager, mocker, clien
     data.pop("signature")
     data.pop("sources", None)
     response_data = ChatCompletion(**data)
+    # Patch nilai_api.routers.private.AsyncOpenAI to return a mock instance with chat.completions.create as an AsyncMock
     mock_chat_completions = MagicMock()
     mock_chat_completions.create = mocker.AsyncMock(return_value=response_data)
     mock_chat = MagicMock()

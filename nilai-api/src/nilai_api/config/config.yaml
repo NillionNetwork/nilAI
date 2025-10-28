@@ -13,10 +13,6 @@ auth:
 docs:
   token: null
 
-# Tools Configuration
-tools:
-  implemented_tools:
-    - execute_python
 
 # Web Search Configuration
 web_search:

@@ -16,11 +16,12 @@ from nilai_common import (
     EasyInputMessageParam,
     ResponseFunctionToolCallParam,
 )
-from nilai_api.config import CONFIG
 
 from . import code_execution
 
 logger = logging.getLogger(__name__)
+
+SUPPORTED_TOOLS = {"execute_python"}
 
 
 async def route_and_execute_tool_call(
@@ -37,25 +38,31 @@ async def route_and_execute_tool_call(
     Returns:
         FunctionCallOutput object with execution result
     """
-    func_name = tool_call["name"]
-    arguments = tool_call["arguments"] or "{}"
+    tool_name = tool_call["name"]
+    arguments_json = tool_call["arguments"] or "{}"
 
-    if func_name == "execute_python":
-        try:
-            args = json.loads(arguments)
-            code = args.get("code", "")
-            result = await code_execution.execute_python(code)
-
-            output_json_string = json.dumps({"result": str(result).strip()})
-            logger.info(f"[responses_tool] execute_python result: {result.strip()}")
-        except json.JSONDecodeError:
-            output_json_string = json.dumps(
-                {"error": "Invalid JSON in tool call arguments."}
-            )
-        except Exception as e:
-            output_json_string = json.dumps({"error": f"Error executing tool: {e}"})
-    else:
-        output_json_string = json.dumps({"result": ""})
+    match tool_name:
+        case "execute_python":
+            try:
+                parsed_arguments = json.loads(arguments_json)
+                code = parsed_arguments.get("code", "")
+                if not str(code).strip():
+                    output_json_string = json.dumps(
+                        {"error": "No code provided by the model."}
+                    )
+                else:
+                    result = await code_execution.execute_python(code)
+                    output_json_string = json.dumps({"result": str(result).strip()})
+            except json.JSONDecodeError:
+                logger.error("[responses_tool] invalid JSON in tool call arguments")
+                output_json_string = json.dumps(
+                    {"error": "Invalid JSON in tool call arguments."}
+                )
+            except Exception as e:
+                logger.error(f"[responses_tool] error executing tool: {e}")
+                output_json_string = json.dumps({"error": f"Error executing tool: {e}"})
+        case _:
+            output_json_string = json.dumps({"result": ""})
 
     return FunctionCallOutput(
         id=str(uuid.uuid4()),
@@ -149,13 +156,13 @@ async def handle_responses_tool_workflow(
     if not tool_calls:
         return first_response, prompt_tokens, completion_tokens
 
-    unknown = [
-        tc for tc in tool_calls if tc["name"] not in CONFIG.tools.implemented_tools
+    unsupported_tool_calls = [
+        tc for tc in tool_calls if tc["name"] not in SUPPORTED_TOOLS
     ]
-    if unknown:
+    if unsupported_tool_calls:
         logger.info(
             "[responses_tool] unknown tool(s): %s. Returning first response unchanged.",
-            [tc["name"] for tc in unknown],
+            [tc["name"] for tc in unsupported_tool_calls],
         )
         return first_response, prompt_tokens, completion_tokens
 

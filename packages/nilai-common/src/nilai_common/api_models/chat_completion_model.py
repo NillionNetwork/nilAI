@@ -160,7 +160,7 @@ class MessageAdapter(BaseModel):
 
     def is_multimodal_part(self) -> bool:
         c = self.content
-        if c is None:
+        if c is None:  # tool calling message
             return False
         if isinstance(c, str):
             return False

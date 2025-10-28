@@ -217,7 +217,6 @@ def test_invalid_nildb_command_nucs(nildb_client, model):
     assert forbidden, "No NILDB command detected, when expected"
 
 
-@pytest.mark.rerun(3)
 @pytest.mark.parametrize(
     "model",
     test_models,
@@ -232,7 +231,10 @@ def test_streaming_chat_completion(client, model):
                     "role": "system",
                     "content": "You are a helpful assistant that provides accurate and concise information.",
                 },
-                {"role": "user", "content": "Write a short poem about mountains."},
+                {
+                    "role": "user",
+                    "content": "Write a short poem about mountains. It must be 20 words maximum.",
+                },
             ],
             temperature=0.2,
             stream=True,
