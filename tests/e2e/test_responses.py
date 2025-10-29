@@ -15,8 +15,9 @@ from .nuc import (
 
 def _create_openai_client(api_key: str) -> OpenAI:
     transport = httpx.HTTPTransport(verify=False)
+    openai_base_url = BASE_URL.rstrip("/v1").rstrip("/")
     return OpenAI(
-        base_url=BASE_URL,
+        base_url=openai_base_url,
         api_key=api_key,
         http_client=httpx.Client(transport=transport),
     )
