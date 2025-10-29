@@ -120,6 +120,21 @@ jobs:
           - component: api
             build_args: "--target nilai --platform linux/amd64"
     steps:
+      - name: Disable unattended-upgrades
+        run: |
+          echo "Disabling unattended-upgrades to prevent dpkg lock issues..."
+          # Stop and disable the unattended-upgrades service
+          sudo systemctl stop unattended-upgrades || true
+          sudo systemctl disable unattended-upgrades || true
+          sudo systemctl mask unattended-upgrades || true
+          # Kill any running unattended-upgrades processes
+          sudo killall -9 unattended-upgrade apt apt-get dpkg || true
+          # Remove any stale locks
+          sudo rm -f /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/cache/apt/archives/lock /var/lib/apt/lists/lock || true
+          # Reconfigure dpkg in case it was interrupted
+          sudo dpkg --configure -a || true
+          echo "unattended-upgrades disabled successfully"
+
       - name: Checkout
         uses: actions/checkout@v2
 
@@ -266,7 +281,7 @@ jobs:
           docker ps -a
 
       - name: Wait for services to be healthy
-        run: bash scripts/wait_for_ci_services.sh
+        run: bash .github/scripts/wait_for_ci_services.sh
 
       - name: Run E2E tests for NUC
         run: |

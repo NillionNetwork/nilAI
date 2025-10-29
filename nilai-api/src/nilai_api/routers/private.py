@@ -37,7 +37,7 @@ async def get_prompt_store_delegation(
     if not auth_info.user.is_subscription_owner:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Prompt storage is reserved to subscription owners",
+            detail=f"Prompt storage is reserved to subscription owners: {auth_info.user} is not a subscription owner, apikey: {auth_info.user}",
         )
 
     try:
