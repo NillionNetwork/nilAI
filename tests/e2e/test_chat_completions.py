@@ -745,67 +745,40 @@ def test_model_streaming_request_high_token(client):
 )
 def test_web_search(client, model):
     """Test web_search functionality with proper source validation."""
-    import time
-    import openai
 
-    max_retries = 5
-    last_exception = None
+    response = client.chat.completions.create(
+        model=model,
+        messages=[
+            {
+                "role": "system",
+                "content": "You are a helpful assistant that provides accurate and up-to-date information.",
+            },
+            {
+                "role": "user",
+                "content": "Who won the Roland Garros Open in 2024? Just reply with the winner's name.",
+            },
+        ],
+        extra_body={"web_search": True},
+        temperature=0.2,
+        max_tokens=150,
+    )
 
-    for attempt in range(max_retries):
-        try:
-            print(f"\nAttempt {attempt + 1}/{max_retries}...")
+    assert isinstance(response, ChatCompletion), (
+        "Response should be a ChatCompletion object"
+    )
+    assert response.model == model, f"Response model should be {model}"
+    assert len(response.choices) > 0, "Response should contain at least one choice"
 
-            response = client.chat.completions.create(
-                model=model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are a helpful assistant that provides accurate and up-to-date information.",
-                    },
-                    {
-                        "role": "user",
-                        "content": "Who won the Roland Garros Open in 2024? Just reply with the winner's name.",
-                    },
-                ],
-                extra_body={"web_search": True},
-                temperature=0.2,
-                max_tokens=150,
-            )
+    content = response.choices[0].message.content
+    reasoning_content = getattr(response.choices[0].message, "reasoning_content", None)
+    assert content or reasoning_content, (
+        "Response should contain content or reasoning_content"
+    )
 
-            assert isinstance(response, ChatCompletion), (
-                "Response should be a ChatCompletion object"
-            )
-            assert response.model == model, f"Response model should be {model}"
-            assert len(response.choices) > 0, (
-                "Response should contain at least one choice"
-            )
-
-            content = response.choices[0].message.content
-            reasoning_content = getattr(
-                response.choices[0].message, "reasoning_content", None
-            )
-            assert content or reasoning_content, (
-                "Response should contain content or reasoning_content"
-            )
-
-            sources = getattr(response, "sources", None)
-            assert sources is not None, "Sources field should not be None"
-            assert isinstance(sources, list), "Sources should be a list"
-            assert len(sources) > 0, "Sources should not be empty"
-
-            print(f"Success on attempt {attempt + 1}")
-            return
-        except openai.RateLimitError as e:
-            print(f"Rate limit hit on attempt {attempt + 1}: {e}")
-        except AssertionError as e:
-            print(f"Assertion failed on attempt {attempt + 1}: {e}")
-            last_exception = e
-            if attempt < max_retries - 1:
-                print("Retrying...")
-                time.sleep(1)
-            else:
-                print("All retries failed.")
-                raise last_exception
+    sources = getattr(response, "sources", None)
+    assert sources is not None, "Sources field should not be None"
+    assert isinstance(sources, list), "Sources should be a list"
+    assert len(sources) > 0, "Sources should not be empty"
 
 
 @pytest.mark.skipif(

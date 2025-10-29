@@ -1,6 +1,5 @@
 import json
 import os
-import time
 import httpx
 import pytest
 from openai import OpenAI
@@ -683,34 +682,14 @@ def test_streaming_request_high_token(client):
 @pytest.mark.parametrize("model", test_models)
 def test_web_search(client, model, high_web_search_rate_limit):
     """Test web_search functionality with proper source validation"""
-    import openai
 
-    max_retries = 3
-    retry_count = 0
-    response = None
-
-    while retry_count <= max_retries:
-        try:
-            response = client.responses.create(
-                model=model,
-                input="Who won the Roland Garros Open in 2024? Just reply with the winner's name.",
-                instructions="You are a helpful assistant that provides accurate and up-to-date information.",
-                extra_body={"web_search": True},
-                temperature=0.2,
-            )
-            break
-        except (openai.RateLimitError, openai.APIStatusError) as e:
-            if hasattr(e, "status_code") and e.status_code == 429:
-                if retry_count < max_retries:
-                    print(
-                        "\nRate limit reached for web search. Waiting 90 seconds before retrying..."
-                    )
-                    time.sleep(90)
-                    retry_count += 1
-                else:
-                    raise
-            else:
-                raise
+    response = client.responses.create(
+        model=model,
+        input="Who won the Roland Garros Open in 2024? Just reply with the winner's name.",
+        instructions="You are a helpful assistant that provides accurate and up-to-date information.",
+        extra_body={"web_search": True},
+        temperature=0.2,
+    )
 
     assert response is not None, "Response should not be None"
     assert response.model == model, f"Response model should be {model}"
