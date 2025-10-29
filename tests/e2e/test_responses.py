@@ -14,10 +14,10 @@ from .nuc import (
 
 
 def _create_openai_client(api_key: str) -> OpenAI:
+    """Helper function to create an OpenAI client with SSL verification disabled"""
     transport = httpx.HTTPTransport(verify=False)
-    openai_base_url = BASE_URL.rstrip("/v1").rstrip("/")
     return OpenAI(
-        base_url=openai_base_url,
+        base_url=BASE_URL,
         api_key=api_key,
         http_client=httpx.Client(transport=transport),
     )
@@ -57,6 +57,7 @@ def high_web_search_rate_limit(monkeypatch):
 
 @pytest.mark.parametrize("model", test_models)
 def test_response_generation(client, model):
+    """Test basic response generation with different models"""
     try:
         response = client.responses.create(
             model=model,
@@ -124,22 +125,21 @@ def test_response_generation(client, model):
     AUTH_STRATEGY != "nuc", reason="NUC rate limiting not used with API key"
 )
 def test_rate_limiting_nucs(rate_limited_client, model):
+    """Test rate limiting by sending multiple rapid requests"""
     import openai
 
     rate_limited = False
     for _ in range(4):
         try:
-            rate_limited_client.responses.create(
+            _ = rate_limited_client.responses.create(
                 model=model,
                 input="What is the capital of France?",
                 instructions="You are a helpful assistant that provides accurate and concise information.",
                 temperature=0.2,
                 max_output_tokens=100,
             )
-        except (openai.RateLimitError, openai.APIStatusError) as e:
-            if hasattr(e, "status_code") and e.status_code in [429, 403, 503]:
-                rate_limited = True
-                break
+        except openai.RateLimitError:
+            rate_limited = True
 
     assert rate_limited, "No NUC rate limiting detected, when expected"
 
@@ -149,6 +149,7 @@ def test_rate_limiting_nucs(rate_limited_client, model):
     AUTH_STRATEGY != "nuc", reason="NUC rate limiting not used with API key"
 )
 def test_invalid_rate_limiting_nucs(invalid_rate_limited_client, model):
+    """Test invalid rate limiting by sending multiple rapid requests"""
     import openai
 
     forbidden = False
@@ -173,6 +174,7 @@ def test_invalid_rate_limiting_nucs(invalid_rate_limited_client, model):
     AUTH_STRATEGY != "nuc", reason="NUC rate limiting not used with API key"
 )
 def test_invalid_nildb_command_nucs(nildb_client, model):
+    """Test invalid NILDB command handling"""
     import openai
 
     forbidden = False
@@ -194,6 +196,7 @@ def test_invalid_nildb_command_nucs(nildb_client, model):
 
 @pytest.mark.parametrize("model", test_models)
 def test_streaming_response(client, model):
+    """Test streaming response generation with different models"""
     try:
         stream = client.responses.create(
             model=model,
@@ -253,6 +256,7 @@ def test_streaming_response(client, model):
 
 @pytest.mark.parametrize("model", test_models)
 def test_function_calling(client, model):
+    """Test function calling with different models"""
     try:
         tools_def = [
             {
@@ -364,6 +368,7 @@ def test_function_calling(client, model):
 
 @pytest.mark.parametrize("model", test_models)
 def test_function_calling_with_streaming(client, model):
+    """Test function calling with streaming"""
     if model == "openai/gpt-oss-20b":
         pytest.skip(
             "Skipping test for openai/gpt-oss-20b model as it only supports non streaming with responsesendpoint"
@@ -430,6 +435,7 @@ def test_function_calling_with_streaming(client, model):
 
 
 def test_usage_endpoint(client):
+    """Test retrieving usage statistics"""
     try:
         import requests
 
@@ -465,6 +471,7 @@ def test_usage_endpoint(client):
 
 
 def test_attestation_endpoint(client):
+    """Test retrieving attestation report"""
     try:
         import requests
 
@@ -497,6 +504,7 @@ def test_attestation_endpoint(client):
 
 
 def test_health_endpoint(client):
+    """Test health check endpoint"""
     try:
         import requests
 
@@ -525,6 +533,7 @@ def test_health_endpoint(client):
 
 @pytest.mark.parametrize("invalid_model", ["nonexistent-model/v1", "", None, "   "])
 def test_invalid_model_handling(client, invalid_model):
+    """Test handling of invalid or non-existent models"""
     try:
         client.responses.create(
             model=invalid_model,
@@ -538,6 +547,7 @@ def test_invalid_model_handling(client, invalid_model):
 
 
 def test_timeout_handling(client):
+    """Test request timeout behavior"""
     try:
         client.responses.create(
             model=test_models[0],
@@ -551,6 +561,7 @@ def test_timeout_handling(client):
 
 
 def test_empty_input_handling(client):
+    """Test handling of empty input"""
     try:
         client.responses.create(
             model=test_models[0],
@@ -562,6 +573,7 @@ def test_empty_input_handling(client):
 
 
 def test_unsupported_parameters(client):
+    """Test handling of unsupported or unexpected parameters"""
     try:
         response = client.responses.create(
             model=test_models[0],
@@ -575,6 +587,7 @@ def test_unsupported_parameters(client):
 
 
 def test_response_invalid_temperature(client):
+    """Test response with invalid temperature type"""
     try:
         client.responses.create(
             model=test_models[0],
@@ -587,6 +600,7 @@ def test_response_invalid_temperature(client):
 
 
 def test_response_missing_model(client):
+    """Test response with missing model field"""
     try:
         client.responses.create(
             input="What is your name?",
@@ -598,6 +612,7 @@ def test_response_missing_model(client):
 
 
 def test_response_negative_max_tokens(client):
+    """Test response with negative max_output_tokens value"""
     try:
         client.responses.create(
             model=test_models[0],
@@ -611,6 +626,7 @@ def test_response_negative_max_tokens(client):
 
 
 def test_response_high_temperature(client):
+    """Test response with a high temperature value"""
     response = client.responses.create(
         model=test_models[0],
         input="Write an imaginative story about a wizard. Only write 10 words",
@@ -640,6 +656,7 @@ def test_response_high_temperature(client):
 
 
 def test_streaming_request_high_token(client):
+    """Test streaming request with high max_output_tokens"""
     stream = client.responses.create(
         model=test_models[0],
         input="Tell me a long story about a superhero's journey.",
@@ -665,6 +682,7 @@ def test_streaming_request_high_token(client):
 
 @pytest.mark.parametrize("model", test_models)
 def test_web_search(client, model, high_web_search_rate_limit):
+    """Test web_search functionality with proper source validation"""
     import openai
 
     max_retries = 3
@@ -733,6 +751,7 @@ def test_web_search(client, model, high_web_search_rate_limit):
 )
 @pytest.mark.parametrize("model", test_models)
 def test_execute_python_sha256_e2e(client, model):
+    """Test Python code execution via execute_python tool"""
     expected = "75cc238b167a05ab7336d773cb096735d459df2f0df9c8df949b1c44075df8a5"
 
     instructions = (
