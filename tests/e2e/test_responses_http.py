@@ -912,6 +912,9 @@ def test_nildb_delegation(client: httpx.Client):
     )
 
 
+@pytest.mark.skip(
+    reason="prompt cannot be accessed because of a secretvaults-py update"
+)
 @pytest.mark.parametrize("model", test_models)
 @pytest.mark.skipif(
     AUTH_STRATEGY != "nuc", reason="NUC required for this tests on nilDB"

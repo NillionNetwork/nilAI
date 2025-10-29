@@ -158,7 +158,7 @@ def get_rate_limited_nuc_token(rate_limit: int = 3) -> InvocationToken:
     """Convenience function for getting rate-limited tokens."""
     return get_nuc_token(
         usage_limit=rate_limit,
-        expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
         create_delegation=True,
     )
 
