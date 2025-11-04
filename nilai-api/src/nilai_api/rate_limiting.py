@@ -3,7 +3,6 @@ from typing import Callable, Tuple, Awaitable, Annotated
 
 from nilai_api.db.users import RateLimits
 from pydantic import BaseModel
-from nilai_api.config import CONFIG
 
 from fastapi.params import Depends
 from fastapi import status, HTTPException, Request
