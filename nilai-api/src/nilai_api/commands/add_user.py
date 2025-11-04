@@ -6,9 +6,7 @@ import click
 
 
 @click.command()
-@click.option("--name", type=str, required=True, help="User Name")
-@click.option("--apikey", type=str, help="API Key")
-@click.option("--userid", type=str, help="User Id")
+@click.option("--user_id", type=str, help="User Id")
 @click.option("--ratelimit-day", type=int, help="number of request per day")
 @click.option("--ratelimit-hour", type=int, help="number of request per hour")
 @click.option("--ratelimit-minute", type=int, help="number of request per minute")
@@ -26,9 +24,7 @@ import click
     help="number of web search request per minute",
 )
 def main(
-    name,
-    apikey: str | None,
-    userid: str | None,
+    user_id: str | None,
     ratelimit_day: int | None,
     ratelimit_hour: int | None,
     ratelimit_minute: int | None,
@@ -38,9 +34,7 @@ def main(
 ):
     async def add_user():
         user: UserModel = await UserManager.insert_user(
-            name,
-            apikey,
-            userid,
+            user_id,
             RateLimits(
                 user_rate_limit_day=ratelimit_day,
                 user_rate_limit_hour=ratelimit_hour,
@@ -52,9 +46,7 @@ def main(
         )
         json_user = json.dumps(
             {
-                "userid": user.userid,
-                "name": user.name,
-                "apikey": user.apikey,
+                "user_id": user.user_id,
                 "ratelimit_day": user.rate_limits_obj.user_rate_limit_day,
                 "ratelimit_hour": user.rate_limits_obj.user_rate_limit_hour,
                 "ratelimit_minute": user.rate_limits_obj.user_rate_limit_minute,

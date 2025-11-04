@@ -1,3 +1,4 @@
+import logging
 from asyncio import iscoroutine
 from typing import Callable, Tuple, Awaitable, Annotated
 
@@ -10,6 +11,8 @@ from redis.asyncio import from_url, Redis
 
 from nilai_api.auth import get_auth_info, AuthenticationInfo, TokenRateLimits
 from nilai_api.config import CONFIG
+
+logger = logging.getLogger(__name__)
 
 LUA_RATE_LIMIT_SCRIPT = """
 local key = KEYS[1]
@@ -52,7 +55,7 @@ async def _extract_coroutine_result(maybe_future, request: Request):
 
 
 class UserRateLimits(BaseModel):
-    subscription_holder: str
+    user_id: str
     token_rate_limit: TokenRateLimits | None
     rate_limits: RateLimits
 
@@ -60,14 +63,13 @@ class UserRateLimits(BaseModel):
 def get_user_limits(
     auth_info: Annotated[AuthenticationInfo, Depends(get_auth_info)],
 ) -> UserRateLimits:
-    # TODO: When the only allowed strategy is NUC, we can change the apikey name to subscription_holder
-    # In apikey mode, the apikey is unique as the userid.
-    # In nuc mode, the apikey is associated with a subscription holder and the userid is the user
+    # In apikey mode, the apikey is unique as the user_id.
+    # In nuc mode, the apikey is associated with a subscription holder and the user_id is the user
     # For NUCs we want the rate limit to be per subscription holder, not per user
-    # In JWT mode, the apikey is the userid too
+    # In JWT mode, the apikey is the user_id too
     # So we use the apikey as the id
     return UserRateLimits(
-        subscription_holder=auth_info.user.apikey,
+        user_id=auth_info.user.user_id,
         token_rate_limit=auth_info.token_rate_limit,
         rate_limits=auth_info.user.rate_limits,
     )
@@ -105,21 +107,21 @@ class RateLimit:
         await self.check_bucket(
             redis,
             redis_rate_limit_command,
-            f"minute:{user_limits.subscription_holder}",
+            f"minute:{user_limits.user_id}",
             user_limits.rate_limits.user_rate_limit_minute,
             MINUTE_MS,
         )
         await self.check_bucket(
             redis,
             redis_rate_limit_command,
-            f"hour:{user_limits.subscription_holder}",
+            f"hour:{user_limits.user_id}",
             user_limits.rate_limits.user_rate_limit_hour,
             HOUR_MS,
         )
         await self.check_bucket(
             redis,
             redis_rate_limit_command,
-            f"day:{user_limits.subscription_holder}",
+            f"day:{user_limits.user_id}",
             user_limits.rate_limits.user_rate_limit_day,
             DAY_MS,
         )
@@ -127,7 +129,7 @@ class RateLimit:
         await self.check_bucket(
             redis,
             redis_rate_limit_command,
-            f"user:{user_limits.subscription_holder}",
+            f"user:{user_limits.user_id}",
             user_limits.rate_limits.user_rate_limit,
             0,  # No expiration for for-good rate limit
         )
@@ -187,7 +189,7 @@ class RateLimit:
                 await self.check_bucket(
                     redis,
                     redis_rate_limit_command,
-                    f"web_search:{user_limits.subscription_holder}",
+                    f"web_search:{user_limits.user_id}",
                     user_limits.rate_limits.web_search_rate_limit,
                     0,
                 )
@@ -206,13 +208,33 @@ class RateLimit:
         times: int | None,
         milliseconds: int,
     ):
+        """
+        Check if the rate limit is exceeded for a given key
+
+        Args:
+            redis: The Redis client
+            redis_rate_limit_command: The Redis rate limit command
+            key: The key to check the rate limit for
+            times: The number of times allowed for the key
+            milliseconds: The expiration time in milliseconds of the rate limit
+
+        Returns:
+            None if the rate limit is not exceeded
+            The number of milliseconds to wait before the rate limit is reset if the rate limit is exceeded
+
+        Raises:
+            HTTPException: If the rate limit is exceeded
+        """
         if times is None:
             return
+        # Evaluate the Lua script to check if the rate limit is exceeded
         expire = await redis.evalsha(
             redis_rate_limit_command, 1, key, str(times), str(milliseconds)
         )  # type: ignore
-
         if int(expire) > 0:
+            logger.error(
+                f"Rate limit exceeded for key: {key}, expires in: {expire} milliseconds, times allowed: {times}, expiration time: {milliseconds / 1000} seconds"
+            )
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail="Too Many Requests",

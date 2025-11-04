@@ -20,7 +20,7 @@ async def test_runs_in_a_loop():
 @pytest.fixture
 def mock_user():
     mock = MagicMock(spec=UserModel)
-    mock.userid = "test-user-id"
+    mock.user_id = "test-user-id"
     mock.name = "Test User"
     mock.apikey = "test-api-key"
     mock.prompt_tokens = 100
@@ -38,62 +38,30 @@ def mock_user():
 def mock_user_manager(mock_user, mocker):
     from nilai_api.db.logs import QueryLogManager
     from nilai_api.db.users import UserManager
+    from nilai_common import Usage
 
+    # Mock QueryLogManager for usage tracking
     mocker.patch.object(
-        UserManager,
-        "get_token_usage",
-        return_value={
-            "prompt_tokens": 100,
-            "completion_tokens": 50,
-            "total_tokens": 150,
-            "queries": 10,
-        },
-    )
-    mocker.patch.object(UserManager, "update_token_usage")
-    mocker.patch.object(
-        UserManager,
+        QueryLogManager,
         "get_user_token_usage",
-        return_value={
-            "prompt_tokens": 100,
-            "completion_tokens": 50,
-            "total_tokens": 150,
-            "completion_tokens_details": None,
-            "prompt_tokens_details": None,
-            "queries": 10,
-        },
+        new_callable=AsyncMock,
+        return_value=Usage(
+            prompt_tokens=100,
+            completion_tokens=50,
+            total_tokens=150,
+            completion_tokens_details=None,
+            prompt_tokens_details=None,
+        ),
     )
-    mocker.patch.object(
-        UserManager,
-        "insert_user",
-        return_value={
-            "userid": "test-user-id",
-            "apikey": "test-api-key",
-            "rate_limits": RateLimits().get_effective_limits().model_dump_json(),
-        },
-    )
-    mocker.patch.object(
-        UserManager,
-        "check_api_key",
+    mocker.patch.object(QueryLogManager, "log_query", new_callable=AsyncMock)
+
+    # Mock validate_credential for authentication
+    mocker.patch(
+        "nilai_api.auth.strategies.validate_credential",
+        new_callable=AsyncMock,
         return_value=mock_user,
     )
-    mocker.patch.object(
-        UserManager,
-        "get_all_users",
-        return_value=[
-            {
-                "userid": "test-user-id",
-                "apikey": "test-api-key",
-                "rate_limits": RateLimits().get_effective_limits().model_dump_json(),
-            },
-            {
-                "userid": "test-user-id-2",
-                "apikey": "test-api-key",
-                "rate_limits": RateLimits().get_effective_limits().model_dump_json(),
-            },
-        ],
-    )
-    mocker.patch.object(QueryLogManager, "log_query")
-    mocker.patch.object(UserManager, "update_last_activity")
+
     return UserManager
 
 
@@ -173,7 +141,6 @@ def test_get_usage(mock_user, mock_user_manager, mock_state, client):
         "total_tokens": 150,
         "completion_tokens_details": None,
         "prompt_tokens_details": None,
-        "queries": 10,
     }
 
 
@@ -220,6 +187,9 @@ def test_chat_completion(mock_user, mock_state, mock_user_manager, mocker, clien
         "nilai_api.routers.endpoints.chat.handle_tool_workflow",
         return_value=(response_data, 0, 0),
     )
+    mocker.patch(
+        "nilai_api.routers.private.QueryLogContext.commit", new_callable=AsyncMock
+    )
     response = client.post(
         "/v1/chat/completions",
         json={
@@ -259,6 +229,9 @@ def test_chat_completion_stream_includes_sources(
     mocker.patch(
         "nilai_api.routers.endpoints.chat.handle_web_search",
         new=AsyncMock(return_value=mock_web_search_result),
+    )
+    mocker.patch(
+        "nilai_api.routers.private.QueryLogContext.commit", new_callable=AsyncMock
     )
 
     class MockChunk:

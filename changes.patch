@@ -1,0 +1,3200 @@
+diff --git a/.gitignore b/.gitignore
+index f3d8ab4..7cbf1bf 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -179,3 +179,5 @@ private_key.key.lock
+
+ development-compose.yml
+ production-compose.yml
++
++.vscode/
+diff --git a/QUERY_LOG_DEPENDENCY_MIGRATION.md b/QUERY_LOG_DEPENDENCY_MIGRATION.md
+new file mode 100644
+index 0000000..0eaca24
+--- /dev/null
++++ b/QUERY_LOG_DEPENDENCY_MIGRATION.md
+@@ -0,0 +1,253 @@
++# QueryLog Dependency Migration Guide
++
++## Overview
++
++The `QueryLogManager` has been converted to a FastAPI dependency pattern using `QueryLogContext`. This provides better integration with the request lifecycle and more accurate timing metrics.
++
++## What Changed
++
++### Before (Static Manager)
++```python
++from nilai_api.db.logs import QueryLogManager
++
++# Manual logging with all parameters
++await QueryLogManager.log_query(
++    userid=auth_info.user.userid,
++    model=req.model,
++    prompt_tokens=prompt_tokens,
++    completion_tokens=completion_tokens,
++    response_time_ms=response_time_ms,
++    web_search_calls=len(sources) if sources else 0,
++    was_streamed=req.stream,
++    was_multimodal=has_multimodal,
++    was_nilrag=bool(req.nilrag),
++    was_nildb=bool(auth_info.prompt_document),
++)
++```
++
++### After (Dependency Pattern)
++```python
++from fastapi import Depends
++from nilai_api.db.logs import QueryLogContext, get_query_log_context
++
++@router.post("/endpoint")
++async def endpoint(
++    log_ctx: QueryLogContext = Depends(get_query_log_context),  # Inject dependency
++):
++    # Set context as you go
++    log_ctx.set_user(auth_info.user.userid)
++    log_ctx.set_model(req.model)
++
++    # ... do work ...
++
++    # Commit at the end (calculates timing automatically)
++    await log_ctx.commit()
++```
++
++## Key Features
++
++### 1. Automatic Timing Tracking
++```python
++# Context automatically tracks:
++# - Total request time (from dependency creation)
++# - Model inference time (with start_model_timing/end_model_timing)
++# - Tool execution time (with start_tool_timing/end_tool_timing)
++
++log_ctx.start_model_timing()
++response = await model.generate()
++log_ctx.end_model_timing()
++```
++
++### 2. Incremental Context Building
++```python
++# Set request parameters
++log_ctx.set_request_params(
++    temperature=req.temperature,
++    max_tokens=req.max_tokens,
++    was_streamed=req.stream,
++    was_multimodal=has_multimodal,
++    was_nildb=bool(auth_info.prompt_document),
++    was_nilrag=bool(req.nilrag),
++)
++
++# Set usage metrics (can be called multiple times, last wins)
++log_ctx.set_usage(
++    prompt_tokens=100,
++    completion_tokens=50,
++    tool_calls=2,
++    web_search_calls=1,
++)
++```
++
++### 3. Error Tracking
++```python
++try:
++    # ... process request ...
++except HTTPException as e:
++    log_ctx.set_error(error_code=e.status_code, error_message=str(e.detail))
++    await log_ctx.commit()
++    raise
++```
++
++### 4. Safe Commit (No Breaking)
++```python
++# Commit never raises exceptions - logging failures are logged but don't break requests
++await log_ctx.commit()
++```
++
++## Migration Steps for `/v1/chat/completions`
++
++### Step 1: Add Dependency to Function Signature
++
++```python
++@router.post("/v1/chat/completions", tags=["Chat"], response_model=None)
++async def chat_completion(
++    req: ChatRequest = Body(...),
++    _rate_limit=Depends(RateLimit(...)),
++    auth_info: AuthenticationInfo = Depends(get_auth_info),
++    meter: MeteringContext = Depends(LLMMeter),
++    log_ctx: QueryLogContext = Depends(get_query_log_context),  # ADD THIS
++):
++```
++
++### Step 2: Initialize Context Early
++
++```python
++    # Right after validation
++    log_ctx.set_user(auth_info.user.userid)
++    log_ctx.set_model(req.model)
++    log_ctx.set_request_params(
++        temperature=req.temperature,
++        max_tokens=req.max_tokens,
++        was_streamed=req.stream,
++        was_multimodal=has_multimodal,
++        was_nildb=bool(auth_info.prompt_document),
++        was_nilrag=bool(req.nilrag),
++    )
++```
++
++### Step 3: Track Model Timing
++
++```python
++    # Before model call
++    log_ctx.start_model_timing()
++
++    response = await client.chat.completions.create(...)
++
++    # After model call
++    log_ctx.end_model_timing()
++```
++
++### Step 4: Track Tool Timing (if applicable)
++
++```python
++    if req.tools:
++        log_ctx.start_tool_timing()
++
++        (final_completion, agg_prompt, agg_completion) = await handle_tool_workflow(...)
++
++        log_ctx.end_tool_timing()
++        log_ctx.set_usage(tool_calls=len(response.choices[0].message.tool_calls or []))
++```
++
++### Step 5: Replace QueryLogManager.log_query()
++
++```python
++    # OLD - Remove this:
++    await QueryLogManager.log_query(
++        auth_info.user.userid,
++        model=req.model,
++        prompt_tokens=...,
++        completion_tokens=...,
++        response_time_ms=...,
++        web_search_calls=...,
++    )
++
++    # NEW - Replace with:
++    log_ctx.set_usage(
++        prompt_tokens=model_response.usage.prompt_tokens,
++        completion_tokens=model_response.usage.completion_tokens,
++        web_search_calls=len(sources) if sources else 0,
++    )
++    await log_ctx.commit()
++```
++
++### Step 6: Handle Streaming Case
++
++For streaming responses, commit inside the generator:
++
++```python
++async def chat_completion_stream_generator():
++    try:
++        # ... streaming logic ...
++
++        async for chunk in response:
++            if chunk.usage is not None:
++                prompt_token_usage = chunk.usage.prompt_tokens
++                completion_token_usage = chunk.usage.completion_tokens
++            # ... yield chunks ...
++
++        # At the end of stream
++        log_ctx.set_usage(
++            prompt_tokens=prompt_token_usage,
++            completion_tokens=completion_token_usage,
++            web_search_calls=len(sources) if sources else 0,
++        )
++        await log_ctx.commit()
++    except Exception as e:
++        log_ctx.set_error(error_code=500, error_message=str(e))
++        await log_ctx.commit()
++        raise
++```
++
++## Complete Example
++
++Here's a minimal complete example:
++
++```python
++@router.post("/v1/chat/completions")
++async def chat_completion(
++    req: ChatRequest,
++    auth_info: AuthenticationInfo = Depends(get_auth_info),
++    log_ctx: QueryLogContext = Depends(get_query_log_context),
++):
++    # Setup
++    log_ctx.set_user(auth_info.user.userid)
++    log_ctx.set_model(req.model)
++
++    try:
++        # Process request
++        log_ctx.start_model_timing()
++        response = await process_request(req)
++        log_ctx.end_model_timing()
++
++        # Set usage
++        log_ctx.set_usage(
++            prompt_tokens=response.usage.prompt_tokens,
++            completion_tokens=response.usage.completion_tokens,
++        )
++
++        # Commit
++        await log_ctx.commit()
++
++        return response
++    except HTTPException as e:
++        log_ctx.set_error(e.status_code, str(e.detail))
++        await log_ctx.commit()
++        raise
++```
++
++## Benefits
++
++1. ✅ **Automatic timing** - No manual time.monotonic() tracking needed
++2. ✅ **Granular metrics** - Separate model vs tool timing
++3. ✅ **Error tracking** - Built-in error code and message support
++4. ✅ **Type safety** - Full type hints throughout
++5. ✅ **Non-breaking** - Legacy `QueryLogManager.log_query()` still works
++6. ✅ **Clean separation** - Logging logic separate from business logic
++7. ✅ **Request isolation** - Each request gets its own context instance
++8. ✅ **Flexible updates** - Update metrics as you discover them during request processing
++
++## Backward Compatibility
++
++The old `QueryLogManager.log_query()` static method still works and is marked as "legacy support". You can migrate endpoints gradually without breaking existing functionality.
+diff --git a/docker-compose.dev.yml b/docker-compose.dev.yml
+index d40200e..5784fca 100644
+--- a/docker-compose.dev.yml
++++ b/docker-compose.dev.yml
+@@ -33,8 +33,6 @@ services:
+         condition: service_healthy
+       nilauth-credit-server:
+         condition: service_healthy
+-    environment:
+-      - POSTGRES_DB=${POSTGRES_DB_NUC}
+     volumes:
+       - ./nilai-api/:/app/nilai-api/
+       - ./packages/:/app/packages/
+@@ -97,7 +95,7 @@ services:
+
+   nilauth-credit-server:
+     image: ghcr.io/nillionnetwork/nilauth-credit:sha-cb9e36a
+-    platform: linux/amd64 # for macOS to force running on Rosetta 2
++    # platform: linux/amd64 # for macOS to force running on Rosetta 2
+     environment:
+       DATABASE_URL: postgresql://nilauth:nilauth_dev_password@nilauth-postgres:5432/nilauth_credit
+       HOST: 0.0.0.0
+diff --git a/grafana/runtime-data/dashboards/nuc-query-data.json b/grafana/runtime-data/dashboards/nuc-query-data.json
+index d66fd42..c7bbb6b 100644
+--- a/grafana/runtime-data/dashboards/nuc-query-data.json
++++ b/grafana/runtime-data/dashboards/nuc-query-data.json
+@@ -126,7 +126,7 @@
+             "editorMode": "code",
+             "format": "time_series",
+             "rawQuery": true,
+-            "rawSql": "SELECT \n  date_trunc('${time_granularity}', q.query_timestamp) AS \"time\", \n  COUNT(q.id) AS \"Queries\"\nFROM query_logs q\nLEFT JOIN users u ON q.userid = u.userid\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${user_filter:value}' = 'All' OR u.name = '${user_filter:value}')\n  AND ('${model_filter:single}' = 'All' OR q.model = '${model_filter:single}')\nGROUP BY date_trunc('${time_granularity}', q.query_timestamp)\nORDER BY \"time\";",
++            "rawSql": "SELECT \n  date_trunc('${time_granularity}', q.query_timestamp) AS \"time\", \n  COUNT(q.id) AS \"Queries\"\nFROM query_logs q\nLEFT JOIN users u ON q.user_id = u.user_id\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${user_filter:value}' = 'All' OR u.name = '${user_filter:value}')\n  AND ('${model_filter:single}' = 'All' OR q.model = '${model_filter:single}')\nGROUP BY date_trunc('${time_granularity}', q.query_timestamp)\nORDER BY \"time\";",
+             "refId": "A",
+             "sql": {
+               "columns": [
+@@ -218,7 +218,7 @@
+             "editorMode": "code",
+             "format": "table",
+             "rawQuery": true,
+-            "rawSql": "SELECT \n  q.model, \n  COUNT(q.id) AS total_queries\nFROM query_logs q\nLEFT JOIN users u ON q.userid = u.userid\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${user_filter:single}' = 'All' OR u.name = '${user_filter:single}')\nGROUP BY q.model\nORDER BY total_queries DESC;",
++            "rawSql": "SELECT \n  q.model, \n  COUNT(q.id) AS total_queries\nFROM query_logs q\nLEFT JOIN users u ON q.user_id = u.user_id\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${user_filter:single}' = 'All' OR u.name = '${user_filter:single}')\nGROUP BY q.model\nORDER BY total_queries DESC;",
+             "refId": "A",
+             "sql": {
+               "columns": [
+@@ -352,7 +352,7 @@
+             "editorMode": "code",
+             "format": "table",
+             "rawQuery": true,
+-            "rawSql": "SELECT \n  CASE \n    WHEN LENGTH(u.name) > 12 THEN LEFT(u.name, 3) || '...' || RIGHT(u.name, 3)\n    ELSE u.name\n  END AS \"User\", \n  COUNT(q.id) AS \"Queries\" \nFROM query_logs q \nJOIN users u ON q.userid = u.userid\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${model_filter:single}' = 'All' OR q.model = '${model_filter:single}')\nGROUP BY u.name\nORDER BY \"Queries\" DESC;",
++            "rawSql": "SELECT \n  CASE \n    WHEN LENGTH(u.name) > 12 THEN LEFT(u.name, 3) || '...' || RIGHT(u.name, 3)\n    ELSE u.name\n  END AS \"User\", \n  COUNT(q.id) AS \"Queries\" \nFROM query_logs q \nJOIN users u ON q.user_id = u.user_id\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${model_filter:single}' = 'All' OR q.model = '${model_filter:single}')\nGROUP BY u.name\nORDER BY \"Queries\" DESC;",
+             "refId": "A",
+             "sql": {
+               "columns": [
+@@ -360,7 +360,7 @@
+                   "alias": "\"User\"",
+                   "parameters": [
+                     {
+-                      "name": "userid",
++                      "name": "user_id",
+                       "type": "functionParameter"
+                     }
+                   ],
+@@ -381,7 +381,7 @@
+               "groupBy": [
+                 {
+                   "property": {
+-                    "name": "userid",
++                    "name": "user_id",
+                     "type": "string"
+                   },
+                   "type": "groupBy"
+@@ -481,7 +481,7 @@
+             "editorMode": "code",
+             "format": "table",
+             "rawQuery": true,
+-            "rawSql": "SELECT \n  CASE \n    WHEN LENGTH(u.name) > 8 THEN LEFT(u.name, 3) || '...' || RIGHT(u.name, 3)\n    ELSE u.name\n  END AS \"User\",\n  q.model AS \"Model\",\n  COUNT(q.id) AS \"Queries\",\n  MIN(q.query_timestamp) AS \"First Query\",\n  MAX(q.query_timestamp) AS \"Last Query\"\nFROM query_logs q \nJOIN users u ON q.userid = u.userid\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${user_filter:single}' = 'All' OR u.name = '${user_filter:single}')\n  AND ('${model_filter:single}' = 'All' OR q.model = '${model_filter:single}')\nGROUP BY u.name, q.model\nORDER BY \"Queries\" DESC\nLIMIT 20;",
++            "rawSql": "SELECT \n  CASE \n    WHEN LENGTH(u.name) > 8 THEN LEFT(u.name, 3) || '...' || RIGHT(u.name, 3)\n    ELSE u.name\n  END AS \"User\",\n  q.model AS \"Model\",\n  COUNT(q.id) AS \"Queries\",\n  MIN(q.query_timestamp) AS \"First Query\",\n  MAX(q.query_timestamp) AS \"Last Query\"\nFROM query_logs q \nJOIN users u ON q.user_id = u.user_id\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${user_filter:single}' = 'All' OR u.name = '${user_filter:single}')\n  AND ('${model_filter:single}' = 'All' OR q.model = '${model_filter:single}')\nGROUP BY u.name, q.model\nORDER BY \"Queries\" DESC\nLIMIT 20;",
+             "refId": "A",
+             "sql": {
+               "columns": [
+diff --git a/grafana/runtime-data/dashboards/query-data.json b/grafana/runtime-data/dashboards/query-data.json
+index 8e0b774..f33f87a 100644
+--- a/grafana/runtime-data/dashboards/query-data.json
++++ b/grafana/runtime-data/dashboards/query-data.json
+@@ -126,7 +126,7 @@
+             "editorMode": "code",
+             "format": "time_series",
+             "rawQuery": true,
+-            "rawSql": "SELECT \n  date_trunc('${time_granularity}', q.query_timestamp) AS \"time\", \n  COUNT(q.id) AS \"Queries\"\nFROM query_logs q\nLEFT JOIN users u ON q.userid = u.userid\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${user_filter:value}' = 'All' OR u.name = '${user_filter:value}')\n  AND ('${model_filter:single}' = 'All' OR q.model = '${model_filter:single}')\nGROUP BY date_trunc('${time_granularity}', q.query_timestamp)\nORDER BY \"time\";",
++            "rawSql": "SELECT \n  date_trunc('${time_granularity}', q.query_timestamp) AS \"time\", \n  COUNT(q.id) AS \"Queries\"\nFROM query_logs q\nLEFT JOIN users u ON q.user_id = u.user_id\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${user_filter:value}' = 'All' OR u.name = '${user_filter:value}')\n  AND ('${model_filter:single}' = 'All' OR q.model = '${model_filter:single}')\nGROUP BY date_trunc('${time_granularity}', q.query_timestamp)\nORDER BY \"time\";",
+             "refId": "A",
+             "sql": {
+               "columns": [
+@@ -218,7 +218,7 @@
+             "editorMode": "code",
+             "format": "table",
+             "rawQuery": true,
+-            "rawSql": "SELECT \n  q.model, \n  COUNT(q.id) AS total_queries\nFROM query_logs q\nLEFT JOIN users u ON q.userid = u.userid\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${user_filter:single}' = 'All' OR u.name = '${user_filter:single}')\nGROUP BY q.model\nORDER BY total_queries DESC;",
++            "rawSql": "SELECT \n  q.model, \n  COUNT(q.id) AS total_queries\nFROM query_logs q\nLEFT JOIN users u ON q.user_id = u.user_id\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${user_filter:single}' = 'All' OR u.name = '${user_filter:single}')\nGROUP BY q.model\nORDER BY total_queries DESC;",
+             "refId": "A",
+             "sql": {
+               "columns": [
+@@ -352,7 +352,7 @@
+             "editorMode": "code",
+             "format": "table",
+             "rawQuery": true,
+-            "rawSql": "SELECT \n  CASE \n    WHEN LENGTH(u.name) > 12 THEN LEFT(u.name, 3) || '...' || RIGHT(u.name, 3)\n    ELSE u.name\n  END AS \"User\", \n  COUNT(q.id) AS \"Queries\" \nFROM query_logs q \nJOIN users u ON q.userid = u.userid\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${model_filter:single}' = 'All' OR q.model = '${model_filter:single}')\nGROUP BY u.name\nORDER BY \"Queries\" DESC;",
++            "rawSql": "SELECT \n  CASE \n    WHEN LENGTH(u.name) > 12 THEN LEFT(u.name, 3) || '...' || RIGHT(u.name, 3)\n    ELSE u.name\n  END AS \"User\", \n  COUNT(q.id) AS \"Queries\" \nFROM query_logs q \nJOIN users u ON q.user_id = u.user_id\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${model_filter:single}' = 'All' OR q.model = '${model_filter:single}')\nGROUP BY u.name\nORDER BY \"Queries\" DESC;",
+             "refId": "A",
+             "sql": {
+               "columns": [
+@@ -360,7 +360,7 @@
+                   "alias": "\"User\"",
+                   "parameters": [
+                     {
+-                      "name": "userid",
++                      "name": "user_id",
+                       "type": "functionParameter"
+                     }
+                   ],
+@@ -381,7 +381,7 @@
+               "groupBy": [
+                 {
+                   "property": {
+-                    "name": "userid",
++                    "name": "user_id",
+                     "type": "string"
+                   },
+                   "type": "groupBy"
+@@ -481,7 +481,7 @@
+             "editorMode": "code",
+             "format": "table",
+             "rawQuery": true,
+-            "rawSql": "SELECT \n  CASE \n    WHEN LENGTH(u.name) > 8 THEN LEFT(u.name, 3) || '...' || RIGHT(u.name, 3)\n    ELSE u.name\n  END AS \"User\",\n  q.model AS \"Model\",\n  COUNT(q.id) AS \"Queries\",\n  MIN(q.query_timestamp) AS \"First Query\",\n  MAX(q.query_timestamp) AS \"Last Query\"\nFROM query_logs q \nJOIN users u ON q.userid = u.userid\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${user_filter:single}' = 'All' OR u.name = '${user_filter:single}')\n  AND ('${model_filter:single}' = 'All' OR q.model = '${model_filter:single}')\nGROUP BY u.name, q.model\nORDER BY \"Queries\" DESC\nLIMIT 20;",
++            "rawSql": "SELECT \n  CASE \n    WHEN LENGTH(u.name) > 8 THEN LEFT(u.name, 3) || '...' || RIGHT(u.name, 3)\n    ELSE u.name\n  END AS \"User\",\n  q.model AS \"Model\",\n  COUNT(q.id) AS \"Queries\",\n  MIN(q.query_timestamp) AS \"First Query\",\n  MAX(q.query_timestamp) AS \"Last Query\"\nFROM query_logs q \nJOIN users u ON q.user_id = u.user_id\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${user_filter:single}' = 'All' OR u.name = '${user_filter:single}')\n  AND ('${model_filter:single}' = 'All' OR q.model = '${model_filter:single}')\nGROUP BY u.name, q.model\nORDER BY \"Queries\" DESC\nLIMIT 20;",
+             "refId": "A",
+             "sql": {
+               "columns": [
+diff --git a/grafana/runtime-data/dashboards/testnet-nuc-query-data.json b/grafana/runtime-data/dashboards/testnet-nuc-query-data.json
+index f98d70e..358ba4e 100644
+--- a/grafana/runtime-data/dashboards/testnet-nuc-query-data.json
++++ b/grafana/runtime-data/dashboards/testnet-nuc-query-data.json
+@@ -126,7 +126,7 @@
+             "editorMode": "code",
+             "format": "time_series",
+             "rawQuery": true,
+-            "rawSql": "SELECT \n  date_trunc('${time_granularity}', q.query_timestamp) AS \"time\", \n  COUNT(q.id) AS \"Queries\"\nFROM query_logs q\nLEFT JOIN users u ON q.userid = u.userid\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${user_filter:value}' = 'All' OR u.name = '${user_filter:value}')\n  AND ('${model_filter:single}' = 'All' OR q.model = '${model_filter:single}')\nGROUP BY date_trunc('${time_granularity}', q.query_timestamp)\nORDER BY \"time\";",
++            "rawSql": "SELECT \n  date_trunc('${time_granularity}', q.query_timestamp) AS \"time\", \n  COUNT(q.id) AS \"Queries\"\nFROM query_logs q\nLEFT JOIN users u ON q.user_id = u.user_id\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${user_filter:value}' = 'All' OR u.name = '${user_filter:value}')\n  AND ('${model_filter:single}' = 'All' OR q.model = '${model_filter:single}')\nGROUP BY date_trunc('${time_granularity}', q.query_timestamp)\nORDER BY \"time\";",
+             "refId": "A",
+             "sql": {
+               "columns": [
+@@ -218,7 +218,7 @@
+             "editorMode": "code",
+             "format": "table",
+             "rawQuery": true,
+-            "rawSql": "SELECT \n  q.model, \n  COUNT(q.id) AS total_queries\nFROM query_logs q\nLEFT JOIN users u ON q.userid = u.userid\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${user_filter:single}' = 'All' OR u.name = '${user_filter:single}')\nGROUP BY q.model\nORDER BY total_queries DESC;",
++            "rawSql": "SELECT \n  q.model, \n  COUNT(q.id) AS total_queries\nFROM query_logs q\nLEFT JOIN users u ON q.user_id = u.user_id\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${user_filter:single}' = 'All' OR u.name = '${user_filter:single}')\nGROUP BY q.model\nORDER BY total_queries DESC;",
+             "refId": "A",
+             "sql": {
+               "columns": [
+@@ -352,7 +352,7 @@
+             "editorMode": "code",
+             "format": "table",
+             "rawQuery": true,
+-            "rawSql": "SELECT \n  CASE \n    WHEN LENGTH(u.name) > 12 THEN LEFT(u.name, 3) || '...' || RIGHT(u.name, 3)\n    ELSE u.name\n  END AS \"User\", \n  COUNT(q.id) AS \"Queries\" \nFROM query_logs q \nJOIN users u ON q.userid = u.userid\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${model_filter:single}' = 'All' OR q.model = '${model_filter:single}')\nGROUP BY u.name\nORDER BY \"Queries\" DESC;",
++            "rawSql": "SELECT \n  CASE \n    WHEN LENGTH(u.name) > 12 THEN LEFT(u.name, 3) || '...' || RIGHT(u.name, 3)\n    ELSE u.name\n  END AS \"User\", \n  COUNT(q.id) AS \"Queries\" \nFROM query_logs q \nJOIN users u ON q.user_id = u.user_id\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${model_filter:single}' = 'All' OR q.model = '${model_filter:single}')\nGROUP BY u.name\nORDER BY \"Queries\" DESC;",
+             "refId": "A",
+             "sql": {
+               "columns": [
+@@ -360,7 +360,7 @@
+                   "alias": "\"User\"",
+                   "parameters": [
+                     {
+-                      "name": "userid",
++                      "name": "user_id",
+                       "type": "functionParameter"
+                     }
+                   ],
+@@ -381,7 +381,7 @@
+               "groupBy": [
+                 {
+                   "property": {
+-                    "name": "userid",
++                    "name": "user_id",
+                     "type": "string"
+                   },
+                   "type": "groupBy"
+@@ -481,7 +481,7 @@
+             "editorMode": "code",
+             "format": "table",
+             "rawQuery": true,
+-            "rawSql": "SELECT \n  CASE \n    WHEN LENGTH(u.name) > 8 THEN LEFT(u.name, 3) || '...' || RIGHT(u.name, 3)\n    ELSE u.name\n  END AS \"User\",\n  q.model AS \"Model\",\n  COUNT(q.id) AS \"Queries\",\n  MIN(q.query_timestamp) AS \"First Query\",\n  MAX(q.query_timestamp) AS \"Last Query\"\nFROM query_logs q \nJOIN users u ON q.userid = u.userid\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${user_filter:single}' = 'All' OR u.name = '${user_filter:single}')\n  AND ('${model_filter:single}' = 'All' OR q.model = '${model_filter:single}')\nGROUP BY u.name, q.model\nORDER BY \"Queries\" DESC\nLIMIT 20;",
++            "rawSql": "SELECT \n  CASE \n    WHEN LENGTH(u.name) > 8 THEN LEFT(u.name, 3) || '...' || RIGHT(u.name, 3)\n    ELSE u.name\n  END AS \"User\",\n  q.model AS \"Model\",\n  COUNT(q.id) AS \"Queries\",\n  MIN(q.query_timestamp) AS \"First Query\",\n  MAX(q.query_timestamp) AS \"Last Query\"\nFROM query_logs q \nJOIN users u ON q.user_id = u.user_id\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${user_filter:single}' = 'All' OR u.name = '${user_filter:single}')\n  AND ('${model_filter:single}' = 'All' OR q.model = '${model_filter:single}')\nGROUP BY u.name, q.model\nORDER BY \"Queries\" DESC\nLIMIT 20;",
+             "refId": "A",
+             "sql": {
+               "columns": [
+diff --git a/grafana/runtime-data/dashboards/totals-data.json b/grafana/runtime-data/dashboards/totals-data.json
+index 2db20c7..ff66ce0 100644
+--- a/grafana/runtime-data/dashboards/totals-data.json
++++ b/grafana/runtime-data/dashboards/totals-data.json
+@@ -83,7 +83,7 @@
+           "editorMode": "code",
+           "format": "table",
+           "rawQuery": true,
+-          "rawSql": "SELECT \n  COUNT(q.id) AS \"Queries\" \nFROM query_logs q\nLEFT JOIN users u ON q.userid = u.userid\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${user_filter:single}' = 'All' OR u.name = '${user_filter:single}')",
++          "rawSql": "SELECT \n  COUNT(q.id) AS \"Queries\" \nFROM query_logs q\nLEFT JOIN users u ON q.user_id = u.user_id\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${user_filter:single}' = 'All' OR u.name = '${user_filter:single}')",
+           "refId": "A",
+           "sql": {
+             "columns": [
+@@ -165,7 +165,7 @@
+           "editorMode": "code",
+           "format": "table",
+           "rawQuery": true,
+-          "rawSql": "SELECT SUM(total_tokens) AS total_tokens\nFROM query_logs q\nLEFT JOIN users u ON q.userid = u.userid\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${user_filter:single}' = 'All' OR u.name = '${user_filter:single}')",
++          "rawSql": "SELECT SUM(total_tokens) AS total_tokens\nFROM query_logs q\nLEFT JOIN users u ON q.user_id = u.user_id\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${user_filter:single}' = 'All' OR u.name = '${user_filter:single}')",
+           "refId": "A",
+           "sql": {
+             "columns": [
+@@ -248,7 +248,7 @@
+           "editorMode": "code",
+           "format": "table",
+           "rawQuery": true,
+-          "rawSql": "SELECT SUM(q.prompt_tokens) AS total_tokens\nFROM query_logs q\nLEFT JOIN users u ON q.userid = u.userid\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${user_filter:single}' = 'All' OR u.name = '${user_filter:single}')",
++          "rawSql": "SELECT SUM(q.prompt_tokens) AS total_tokens\nFROM query_logs q\nLEFT JOIN users u ON q.user_id = u.user_id\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${user_filter:single}' = 'All' OR u.name = '${user_filter:single}')",
+           "refId": "A",
+           "sql": {
+             "columns": [
+@@ -331,7 +331,7 @@
+           "editorMode": "code",
+           "format": "table",
+           "rawQuery": true,
+-          "rawSql": "SELECT SUM(q.completion_tokens) AS total_tokens\nFROM query_logs q\nLEFT JOIN users u ON q.userid = u.userid\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${user_filter:single}' = 'All' OR u.name = '${user_filter:single}')",
++          "rawSql": "SELECT SUM(q.completion_tokens) AS total_tokens\nFROM query_logs q\nLEFT JOIN users u ON q.user_id = u.user_id\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${user_filter:single}' = 'All' OR u.name = '${user_filter:single}')",
+           "refId": "A",
+           "sql": {
+             "columns": [
+@@ -397,4 +397,4 @@
+   "uid": "aex54yzf0nmyoc",
+   "version": 1,
+   "weekStart": ""
+-}
+\ No newline at end of file
++}
+diff --git a/grafana/runtime-data/dashboards/usage-data.json b/grafana/runtime-data/dashboards/usage-data.json
+index 88857f9..a22bf91 100644
+--- a/grafana/runtime-data/dashboards/usage-data.json
++++ b/grafana/runtime-data/dashboards/usage-data.json
+@@ -299,7 +299,7 @@
+           "editorMode": "code",
+           "format": "table",
+           "rawQuery": true,
+-          "rawSql": "SELECT \n  u.email AS \"User ID\", \n  COUNT(q.id) AS \"Queries\" \nFROM query_logs q \nJOIN users u ON q.userid = u.userid\nWHERE q.query_timestamp >= NOW() - INTERVAL '1 hours'\nGROUP BY u.email;",
++          "rawSql": "SELECT \n  u.email AS \"User ID\", \n  COUNT(q.id) AS \"Queries\" \nFROM query_logs q \nJOIN users u ON q.user_id = u.user_id\nWHERE q.query_timestamp >= NOW() - INTERVAL '1 hours'\nGROUP BY u.email;",
+           "refId": "A",
+           "sql": {
+             "columns": [
+@@ -307,7 +307,7 @@
+                 "alias": "\"User ID\"",
+                 "parameters": [
+                   {
+-                    "name": "userid",
++                    "name": "user_id",
+                     "type": "functionParameter"
+                   }
+                 ],
+@@ -328,7 +328,7 @@
+             "groupBy": [
+               {
+                 "property": {
+-                  "name": "userid",
++                  "name": "user_id",
+                   "type": "string"
+                 },
+                 "type": "groupBy"
+@@ -430,7 +430,7 @@
+           "editorMode": "code",
+           "format": "table",
+           "rawQuery": true,
+-          "rawSql": "SELECT \n  u.email AS \"User ID\", \n  COUNT(q.id) AS \"Queries\" \nFROM query_logs q \nJOIN users u ON q.userid = u.userid\nWHERE q.query_timestamp >= NOW() - INTERVAL '7 days'\nGROUP BY u.email;",
++          "rawSql": "SELECT \n  u.email AS \"User ID\", \n  COUNT(q.id) AS \"Queries\" \nFROM query_logs q \nJOIN users u ON q.user_id = u.user_id\nWHERE q.query_timestamp >= NOW() - INTERVAL '7 days'\nGROUP BY u.email;",
+           "refId": "A",
+           "sql": {
+             "columns": [
+diff --git a/nilai-api/alembic/versions/0ba073468afc_chore_improved_database_schema.py b/nilai-api/alembic/versions/0ba073468afc_chore_improved_database_schema.py
+new file mode 100644
+index 0000000..ebaca5a
+--- /dev/null
++++ b/nilai-api/alembic/versions/0ba073468afc_chore_improved_database_schema.py
+@@ -0,0 +1,206 @@
++"""chore: merged database schema updates
++
++Revision ID: 0ba073468afc
++Revises: ea942d6c7a00
++Create Date: 2025-10-31 09:43:12.022675
++
++"""
++
++from typing import Sequence, Union
++
++from alembic import op
++import sqlalchemy as sa
++from sqlalchemy.dialects import postgresql
++
++# revision identifiers, used by Alembic.
++revision: str = "0ba073468afc"
++down_revision: Union[str, None] = "9ddf28cf6b6f"
++branch_labels: Union[str, Sequence[str], None] = None
++depends_on: Union[str, Sequence[str], None] = None
++
++
++def upgrade() -> None:
++    # ### merged commands from ea942d6c7a00 and 0ba073468afc ###
++    # query_logs: new telemetry columns (with defaults to backfill existing rows)
++    op.add_column(
++        "query_logs",
++        sa.Column(
++            "tool_calls", sa.Integer(), server_default=sa.text("0"), nullable=False
++        ),
++    )
++    op.add_column(
++        "query_logs",
++        sa.Column(
++            "temperature", sa.Float(), server_default=sa.text("0.9"), nullable=True
++        ),
++    )
++    op.add_column(
++        "query_logs",
++        sa.Column(
++            "max_tokens", sa.Integer(), server_default=sa.text("4096"), nullable=True
++        ),
++    )
++    op.add_column(
++        "query_logs",
++        sa.Column(
++            "response_time_ms",
++            sa.Integer(),
++            server_default=sa.text("-1"),
++            nullable=False,
++        ),
++    )
++    op.add_column(
++        "query_logs",
++        sa.Column(
++            "model_response_time_ms",
++            sa.Integer(),
++            server_default=sa.text("-1"),
++            nullable=False,
++        ),
++    )
++    op.add_column(
++        "query_logs",
++        sa.Column(
++            "tool_response_time_ms",
++            sa.Integer(),
++            server_default=sa.text("-1"),
++            nullable=False,
++        ),
++    )
++    op.add_column(
++        "query_logs",
++        sa.Column(
++            "was_streamed",
++            sa.Boolean(),
++            server_default=sa.text("False"),
++            nullable=False,
++        ),
++    )
++    op.add_column(
++        "query_logs",
++        sa.Column(
++            "was_multimodal",
++            sa.Boolean(),
++            server_default=sa.text("False"),
++            nullable=False,
++        ),
++    )
++    op.add_column(
++        "query_logs",
++        sa.Column(
++            "was_nildb", sa.Boolean(), server_default=sa.text("False"), nullable=False
++        ),
++    )
++    op.add_column(
++        "query_logs",
++        sa.Column(
++            "was_nilrag", sa.Boolean(), server_default=sa.text("False"), nullable=False
++        ),
++    )
++    op.add_column(
++        "query_logs",
++        sa.Column(
++            "error_code", sa.Integer(), server_default=sa.text("200"), nullable=False
++        ),
++    )
++    op.add_column(
++        "query_logs",
++        sa.Column(
++            "error_message", sa.Text(), server_default=sa.text("'OK'"), nullable=False
++        ),
++    )
++
++    # query_logs: remove FK to users.userid before dropping the column later
++    op.drop_constraint("query_logs_userid_fkey", "query_logs", type_="foreignkey")
++
++    # query_logs: add lockid and index, drop legacy userid and its index
++    op.add_column(
++        "query_logs", sa.Column("lockid", sa.String(length=75), nullable=False)
++    )
++    op.drop_index("ix_query_logs_userid", table_name="query_logs")
++    op.create_index(
++        op.f("ix_query_logs_lockid"), "query_logs", ["lockid"], unique=False
++    )
++    op.drop_column("query_logs", "userid")
++
++    # users: drop legacy token counters
++    op.drop_column("users", "prompt_tokens")
++    op.drop_column("users", "completion_tokens")
++
++    # users: reshape identity columns and indexes
++    op.add_column("users", sa.Column("user_id", sa.String(length=75), nullable=False))
++    op.drop_index("ix_users_apikey", table_name="users")
++    op.drop_index("ix_users_userid", table_name="users")
++    op.create_index(op.f("ix_users_user_id"), "users", ["user_id"], unique=False)
++    op.drop_column("users", "last_activity")
++    op.drop_column("users", "userid")
++    op.drop_column("users", "apikey")
++    op.drop_column("users", "signup_date")
++    op.drop_column("users", "queries")
++    op.drop_column("users", "name")
++    # ### end merged commands ###
++
++
++def downgrade() -> None:
++    # ### revert merged commands back to 9ddf28cf6b6f ###
++    # users: restore legacy columns and indexes
++    op.add_column("users", sa.Column("name", sa.VARCHAR(length=100), nullable=False))
++    op.add_column("users", sa.Column("queries", sa.INTEGER(), nullable=False))
++    op.add_column(
++        "users",
++        sa.Column(
++            "signup_date",
++            postgresql.TIMESTAMP(timezone=True),
++            server_default=sa.text("now()"),
++            nullable=False,
++        ),
++    )
++    op.add_column("users", sa.Column("apikey", sa.VARCHAR(length=75), nullable=False))
++    op.add_column("users", sa.Column("userid", sa.VARCHAR(length=75), nullable=False))
++    op.add_column(
++        "users",
++        sa.Column("last_activity", postgresql.TIMESTAMP(timezone=True), nullable=True),
++    )
++    op.drop_index(op.f("ix_users_user_id"), table_name="users")
++    op.create_index("ix_users_userid", "users", ["userid"], unique=False)
++    op.create_index("ix_users_apikey", "users", ["apikey"], unique=False)
++    op.drop_column("users", "user_id")
++    op.add_column(
++        "users",
++        sa.Column(
++            "completion_tokens",
++            sa.INTEGER(),
++            server_default=sa.text("0"),
++            nullable=False,
++        ),
++    )
++    op.add_column(
++        "users",
++        sa.Column(
++            "prompt_tokens", sa.INTEGER(), server_default=sa.text("0"), nullable=False
++        ),
++    )
++
++    # query_logs: restore userid, index and FK; drop new columns
++    op.add_column(
++        "query_logs", sa.Column("userid", sa.VARCHAR(length=75), nullable=False)
++    )
++    op.drop_index(op.f("ix_query_logs_lockid"), table_name="query_logs")
++    op.create_index("ix_query_logs_userid", "query_logs", ["userid"], unique=False)
++    op.create_foreign_key(
++        "query_logs_userid_fkey", "query_logs", "users", ["userid"], ["userid"]
++    )
++    op.drop_column("query_logs", "lockid")
++    op.drop_column("query_logs", "error_message")
++    op.drop_column("query_logs", "error_code")
++    op.drop_column("query_logs", "was_nilrag")
++    op.drop_column("query_logs", "was_nildb")
++    op.drop_column("query_logs", "was_multimodal")
++    op.drop_column("query_logs", "was_streamed")
++    op.drop_column("query_logs", "tool_response_time_ms")
++    op.drop_column("query_logs", "model_response_time_ms")
++    op.drop_column("query_logs", "response_time_ms")
++    op.drop_column("query_logs", "max_tokens")
++    op.drop_column("query_logs", "temperature")
++    op.drop_column("query_logs", "tool_calls")
++    # ### end revert ###
+diff --git a/nilai-api/alembic/versions/43b23c73035b_fix_userid_change_to_user_id.py b/nilai-api/alembic/versions/43b23c73035b_fix_userid_change_to_user_id.py
+new file mode 100644
+index 0000000..4c20bb6
+--- /dev/null
++++ b/nilai-api/alembic/versions/43b23c73035b_fix_userid_change_to_user_id.py
+@@ -0,0 +1,37 @@
++"""fix: userid change to user_id
++
++Revision ID: 43b23c73035b
++Revises: 0ba073468afc
++Create Date: 2025-11-03 11:33:03.006101
++
++"""
++
++from typing import Sequence, Union
++
++from alembic import op
++import sqlalchemy as sa
++
++
++# revision identifiers, used by Alembic.
++revision: str = "43b23c73035b"
++down_revision: Union[str, None] = "0ba073468afc"
++branch_labels: Union[str, Sequence[str], None] = None
++depends_on: Union[str, Sequence[str], None] = None
++
++
++def upgrade() -> None:
++    # ### commands auto generated by Alembic - please adjust! ###
++    op.add_column(
++        "query_logs", sa.Column("user_id", sa.String(length=75), nullable=False)
++    )
++    op.create_index(
++        op.f("ix_query_logs_user_id"), "query_logs", ["user_id"], unique=False
++    )
++    # ### end Alembic commands ###
++
++
++def downgrade() -> None:
++    # ### commands auto generated by Alembic - please adjust! ###
++    op.drop_index(op.f("ix_query_logs_user_id"), table_name="query_logs")
++    op.drop_column("query_logs", "user_id")
++    # ### end Alembic commands ###
+diff --git a/nilai-api/examples/users.py b/nilai-api/examples/users.py
+deleted file mode 100644
+index b6b206d..0000000
+--- a/nilai-api/examples/users.py
++++ /dev/null
+@@ -1,43 +0,0 @@
+-#!/usr/bin/python
+-
+-from nilai_api.db.logs import QueryLogManager
+-from nilai_api.db.users import UserManager
+-
+-
+-# Example Usage
+-async def main():
+-    # Add some users
+-    bob = await UserManager.insert_user("Bob", "bob@example.com")
+-    alice = await UserManager.insert_user("Alice", "alice@example.com")
+-
+-    print(f"Bob's details: {bob}")
+-    print(f"Alice's details: {alice}")
+-
+-    # Check API key
+-    user_name = await UserManager.check_api_key(bob.apikey)
+-    print(f"API key validation: {user_name}")
+-
+-    # Update and retrieve token usage
+-    await UserManager.update_token_usage(
+-        bob.userid, prompt_tokens=50, completion_tokens=20
+-    )
+-    usage = await UserManager.get_user_token_usage(bob.userid)
+-    print(f"Bob's token usage: {usage}")
+-
+-    # Log a query
+-    await QueryLogManager.log_query(
+-        userid=bob.userid,
+-        model="gpt-3.5-turbo",
+-        prompt_tokens=8,
+-        completion_tokens=7,
+-        web_search_calls=1,
+-    )
+-
+-
+-if __name__ == "__main__":
+-    import asyncio
+-    from dotenv import load_dotenv
+-
+-    load_dotenv()
+-
+-    asyncio.run(main())
+diff --git a/nilai-api/pyproject.toml b/nilai-api/pyproject.toml
+index 0bbfba3..9caae2a 100644
+--- a/nilai-api/pyproject.toml
++++ b/nilai-api/pyproject.toml
+@@ -35,7 +35,7 @@ dependencies = [
+     "trafilatura>=1.7.0",
+     "secretvaults",
+     "e2b-code-interpreter>=1.0.3",
+-    "nilauth-credit-middleware>=0.1.1",
++    "nilauth-credit-middleware>=0.1.2",
+ ]
+
+
+diff --git a/nilai-api/src/nilai_api/auth/__init__.py b/nilai-api/src/nilai_api/auth/__init__.py
+index 2e7cd6f..2123685 100644
+--- a/nilai-api/src/nilai_api/auth/__init__.py
++++ b/nilai-api/src/nilai_api/auth/__init__.py
+@@ -4,7 +4,6 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+ from logging import getLogger
+
+ from nilai_api.config import CONFIG
+-from nilai_api.db.users import UserManager
+ from nilai_api.auth.strategies import AuthenticationStrategy
+
+ from nuc.validate import ValidationException
+@@ -36,7 +35,6 @@ async def get_auth_info(
+             )
+
+         auth_info = await strategy(credentials.credentials)
+-        await UserManager.update_last_activity(userid=auth_info.user.userid)
+         return auth_info
+     except AuthenticationError as e:
+         raise e
+diff --git a/nilai-api/src/nilai_api/auth/nuc.py b/nilai-api/src/nilai_api/auth/nuc.py
+index 4645935..614d9ef 100644
+--- a/nilai-api/src/nilai_api/auth/nuc.py
++++ b/nilai-api/src/nilai_api/auth/nuc.py
+@@ -86,11 +86,11 @@ def validate_nuc(nuc_token: str) -> Tuple[str, str]:
+
+     # Validate the
+     # Return the subject of the token, the subscription holder
+-    subscription_holder = token.subject.public_key.hex()
+-    user = token.issuer.public_key.hex()
++    subscription_holder = token.subject
++    user = token.issuer
+     logger.info(f"Subscription holder: {subscription_holder}")
+     logger.info(f"User: {user}")
+-    return subscription_holder, user
++    return str(subscription_holder), str(user)
+
+
+ def get_token_rate_limit(nuc_token: str) -> Optional[TokenRateLimits]:
+diff --git a/nilai-api/src/nilai_api/auth/strategies.py b/nilai-api/src/nilai_api/auth/strategies.py
+index 9917ee3..089e7e9 100644
+--- a/nilai-api/src/nilai_api/auth/strategies.py
++++ b/nilai-api/src/nilai_api/auth/strategies.py
+@@ -1,6 +1,6 @@
+ from typing import Callable, Awaitable, Optional
+-from datetime import datetime, timezone
+
++from fastapi import HTTPException
+ from nilai_api.db.users import UserManager, UserModel, UserData
+ from nilai_api.auth.nuc import (
+     validate_nuc,
+@@ -11,11 +11,18 @@ from nilai_api.config import CONFIG
+ from nilai_api.auth.common import (
+     PromptDocument,
+     TokenRateLimits,
+-    AuthenticationInfo,
+     AuthenticationError,
++    AuthenticationInfo,
++)
++
++from nilauth_credit_middleware import (
++    CreditClientSingleton,
+ )
++from nilauth_credit_middleware.api_model import ValidateCredentialResponse
++
+
+ from enum import Enum
++
+ # All strategies must return a UserModel
+ # The strategies can raise any exception, which will be caught and converted to an AuthenticationError
+ # The exception detail will be passed to the client
+@@ -44,18 +51,10 @@ def allow_token(
+                 return await function(token)
+
+             if token == allowed_token:
+-                user_model: UserModel | None = await UserManager.check_user(
+-                    allowed_token
++                user_model = UserModel(
++                    user_id=allowed_token,
++                    rate_limits=None,
+                 )
+-                if user_model is None:
+-                    user_model = UserModel(
+-                        userid=allowed_token,
+-                        name=allowed_token,
+-                        apikey=allowed_token,
+-                        signup_date=datetime.now(timezone.utc),
+-                    )
+-                    await UserManager.insert_user_model(user_model)
+-
+                 return AuthenticationInfo(
+                     user=UserData.from_sqlalchemy(user_model),
+                     token_rate_limit=None,
+@@ -68,16 +67,41 @@ def allow_token(
+     return decorator
+
+
++async def validate_credential(credential: str, is_public: bool) -> UserModel:
++    """
++    Validate a credential with nilauth credit middleware and return the user model
++    """
++    credit_client = CreditClientSingleton.get_client()
++    try:
++        validate_response: ValidateCredentialResponse = (
++            await credit_client.validate_credential(credential, is_public=is_public)
++        )
++    except HTTPException as e:
++        if e.status_code == 404:
++            raise AuthenticationError(f"Credential not found: {e.detail}")
++        elif e.status_code == 401:
++            raise AuthenticationError(f"Credential is inactive: {e.detail}")
++        else:
++            raise AuthenticationError(f"Failed to validate credential: {e.detail}")
++
++    user_model = await UserManager.check_user(validate_response.user_id)
++    if user_model is None:
++        user_model = UserModel(
++            user_id=validate_response.user_id,
++            rate_limits=None,
++        )
++    return user_model
++
++
+ @allow_token(CONFIG.docs.token)
+ async def api_key_strategy(api_key: str) -> AuthenticationInfo:
+-    user_model: Optional[UserModel] = await UserManager.check_api_key(api_key)
+-    if user_model:
+-        return AuthenticationInfo(
+-            user=UserData.from_sqlalchemy(user_model),
+-            token_rate_limit=None,
+-            prompt_document=None,
+-        )
+-    raise AuthenticationError("Missing or invalid API key")
++    user_model = await validate_credential(api_key, is_public=False)
++
++    return AuthenticationInfo(
++        user=UserData.from_sqlalchemy(user_model),
++        token_rate_limit=None,
++        prompt_document=None,
++    )
+
+
+ @allow_token(CONFIG.docs.token)
+@@ -89,20 +113,7 @@ async def nuc_strategy(nuc_token) -> AuthenticationInfo:
+     token_rate_limits: Optional[TokenRateLimits] = get_token_rate_limit(nuc_token)
+     prompt_document: Optional[PromptDocument] = get_token_prompt_document(nuc_token)
+
+-    user_model: Optional[UserModel] = await UserManager.check_user(user)
+-    if user_model:
+-        return AuthenticationInfo(
+-            user=UserData.from_sqlalchemy(user_model),
+-            token_rate_limit=token_rate_limits,
+-            prompt_document=prompt_document,
+-        )
+-
+-    user_model = UserModel(
+-        userid=user,
+-        name=user,
+-        apikey=subscription_holder,
+-    )
+-    await UserManager.insert_user_model(user_model)
++    user_model = await validate_credential(subscription_holder, is_public=True)
+     return AuthenticationInfo(
+         user=UserData.from_sqlalchemy(user_model),
+         token_rate_limit=token_rate_limits,
+diff --git a/nilai-api/src/nilai_api/commands/add_user.py b/nilai-api/src/nilai_api/commands/add_user.py
+index e9f49e5..5bd488b 100644
+--- a/nilai-api/src/nilai_api/commands/add_user.py
++++ b/nilai-api/src/nilai_api/commands/add_user.py
+@@ -6,9 +6,7 @@ import click
+
+
+ @click.command()
+-@click.option("--name", type=str, required=True, help="User Name")
+-@click.option("--apikey", type=str, help="API Key")
+-@click.option("--userid", type=str, help="User Id")
++@click.option("--user_id", type=str, help="User Id")
+ @click.option("--ratelimit-day", type=int, help="number of request per day")
+ @click.option("--ratelimit-hour", type=int, help="number of request per hour")
+ @click.option("--ratelimit-minute", type=int, help="number of request per minute")
+@@ -26,9 +24,7 @@ import click
+     help="number of web search request per minute",
+ )
+ def main(
+-    name,
+-    apikey: str | None,
+-    userid: str | None,
++    user_id: str | None,
+     ratelimit_day: int | None,
+     ratelimit_hour: int | None,
+     ratelimit_minute: int | None,
+@@ -38,9 +34,7 @@ def main(
+ ):
+     async def add_user():
+         user: UserModel = await UserManager.insert_user(
+-            name,
+-            apikey,
+-            userid,
++            user_id,
+             RateLimits(
+                 user_rate_limit_day=ratelimit_day,
+                 user_rate_limit_hour=ratelimit_hour,
+@@ -52,7 +46,7 @@ def main(
+         )
+         json_user = json.dumps(
+             {
+-                "userid": user.userid,
++                "user_id": user.user_id,
+                 "name": user.name,
+                 "apikey": user.apikey,
+                 "ratelimit_day": user.rate_limits_obj.user_rate_limit_day,
+diff --git a/nilai-api/src/nilai_api/config/__init__.py b/nilai-api/src/nilai_api/config/__init__.py
+index 1939c74..b61a9fe 100644
+--- a/nilai-api/src/nilai_api/config/__init__.py
++++ b/nilai-api/src/nilai_api/config/__init__.py
+@@ -64,3 +64,4 @@ __all__ = [
+ ]
+
+ logging.info(CONFIG.prettify())
++print(CONFIG.prettify())
+diff --git a/nilai-api/src/nilai_api/credit.py b/nilai-api/src/nilai_api/credit.py
+index 3a06135..b9d7ea6 100644
+--- a/nilai-api/src/nilai_api/credit.py
++++ b/nilai-api/src/nilai_api/credit.py
+@@ -20,6 +20,9 @@ logger = logging.getLogger(__name__)
+ class NoOpMeteringContext:
+     """A no-op metering context for requests that should skip metering (e.g., Docs Token)."""
+
++    def __init__(self):
++        self.lock_id: str = "noop-lock-id"
++
+     def set_response(self, response_data: dict) -> None:
+         """No-op method that does nothing."""
+         pass
+diff --git a/nilai-api/src/nilai_api/db/logs.py b/nilai-api/src/nilai_api/db/logs.py
+index 030c869..4a78c8a 100644
+--- a/nilai-api/src/nilai_api/db/logs.py
++++ b/nilai-api/src/nilai_api/db/logs.py
+@@ -1,12 +1,14 @@
+ import logging
++import time
+ from datetime import datetime, timezone
++from typing import Optional
+
++from nilai_common import Usage
+ import sqlalchemy
+
+-from sqlalchemy import ForeignKey, Integer, String, DateTime, Text
++from sqlalchemy import Integer, String, DateTime, Text, Boolean, Float
+ from sqlalchemy.exc import SQLAlchemyError
+ from nilai_api.db import Base, Column, get_db_session
+-from nilai_api.db.users import UserModel
+
+ logger = logging.getLogger(__name__)
+
+@@ -16,9 +18,8 @@ class QueryLog(Base):
+     __tablename__ = "query_logs"
+
+     id: int = Column(Integer, primary_key=True, autoincrement=True)  # type: ignore
+-    userid: str = Column(
+-        String(75), ForeignKey(UserModel.userid), nullable=False, index=True
+-    )  # type: ignore
++    user_id: str = Column(String(75), nullable=False, index=True)  # type: ignore
++    lockid: str = Column(String(75), nullable=False, index=True)  # type: ignore
+     query_timestamp: datetime = Column(
+         DateTime(timezone=True), server_default=sqlalchemy.func.now(), nullable=False
+     )  # type: ignore
+@@ -26,51 +27,285 @@ class QueryLog(Base):
+     prompt_tokens: int = Column(Integer, nullable=False)  # type: ignore
+     completion_tokens: int = Column(Integer, nullable=False)  # type: ignore
+     total_tokens: int = Column(Integer, nullable=False)  # type: ignore
++    tool_calls: int = Column(Integer, nullable=False)  # type: ignore
+     web_search_calls: int = Column(Integer, nullable=False)  # type: ignore
++    temperature: Optional[float] = Column(Float, nullable=True)  # type: ignore
++    max_tokens: Optional[int] = Column(Integer, nullable=True)  # type: ignore
++
++    response_time_ms: int = Column(Integer, nullable=False)  # type: ignore
++    model_response_time_ms: int = Column(Integer, nullable=False)  # type: ignore
++    tool_response_time_ms: int = Column(Integer, nullable=False)  # type: ignore
++
++    was_streamed: bool = Column(Boolean, nullable=False)  # type: ignore
++    was_multimodal: bool = Column(Boolean, nullable=False)  # type: ignore
++    was_nildb: bool = Column(Boolean, nullable=False)  # type: ignore
++    was_nilrag: bool = Column(Boolean, nullable=False)  # type: ignore
++
++    error_code: int = Column(Integer, nullable=False)  # type: ignore
++    error_message: str = Column(Text, nullable=False)  # type: ignore
+
+     def __repr__(self):
+-        return f"<QueryLog(userid={self.userid}, query_timestamp={self.query_timestamp}, total_tokens={self.total_tokens})>"
++        return f"<QueryLog(user_id={self.user_id}, query_timestamp={self.query_timestamp}, total_tokens={self.total_tokens})>"
++
++
++class QueryLogContext:
++    """
++    Context manager for logging query metrics during a request.
++    Used as a FastAPI dependency to track request metrics.
++    """
++
++    def __init__(self):
++        self.user_id: Optional[str] = None
++        self.lockid: Optional[str] = None
++        self.model: Optional[str] = None
++        self.prompt_tokens: int = 0
++        self.completion_tokens: int = 0
++        self.tool_calls: int = 0
++        self.web_search_calls: int = 0
++        self.temperature: Optional[float] = None
++        self.max_tokens: Optional[int] = None
++        self.was_streamed: bool = False
++        self.was_multimodal: bool = False
++        self.was_nildb: bool = False
++        self.was_nilrag: bool = False
++        self.error_code: int = 0
++        self.error_message: str = ""
++
++        # Timing tracking
++        self.start_time: float = time.monotonic()
++        self.model_start_time: Optional[float] = None
++        self.model_end_time: Optional[float] = None
++        self.tool_start_time: Optional[float] = None
++        self.tool_end_time: Optional[float] = None
++
++    def set_user(self, user_id: str) -> None:
++        """Set the user ID for this query."""
++        self.user_id = user_id
++
++    def set_lockid(self, lockid: str) -> None:
++        """Set the lock ID for this query."""
++        self.lockid = lockid
++
++    def set_model(self, model: str) -> None:
++        """Set the model name for this query."""
++        self.model = model
++
++    def set_request_params(
++        self,
++        temperature: Optional[float] = None,
++        max_tokens: Optional[int] = None,
++        was_streamed: bool = False,
++        was_multimodal: bool = False,
++        was_nildb: bool = False,
++        was_nilrag: bool = False,
++    ) -> None:
++        """Set request parameters."""
++        self.temperature = temperature
++        self.max_tokens = max_tokens
++        self.was_streamed = was_streamed
++        self.was_multimodal = was_multimodal
++        self.was_nildb = was_nildb
++        self.was_nilrag = was_nilrag
++
++    def set_usage(
++        self,
++        prompt_tokens: int = 0,
++        completion_tokens: int = 0,
++        tool_calls: int = 0,
++        web_search_calls: int = 0,
++    ) -> None:
++        """Set token usage and feature usage."""
++        self.prompt_tokens = prompt_tokens
++        self.completion_tokens = completion_tokens
++        self.tool_calls = tool_calls
++        self.web_search_calls = web_search_calls
++
++    def set_error(self, error_code: int, error_message: str) -> None:
++        """Set error information."""
++        self.error_code = error_code
++        self.error_message = error_message
++
++    def start_model_timing(self) -> None:
++        """Mark the start of model inference."""
++        self.model_start_time = time.monotonic()
++
++    def end_model_timing(self) -> None:
++        """Mark the end of model inference."""
++        self.model_end_time = time.monotonic()
++
++    def start_tool_timing(self) -> None:
++        """Mark the start of tool execution."""
++        self.tool_start_time = time.monotonic()
++
++    def end_tool_timing(self) -> None:
++        """Mark the end of tool execution."""
++        self.tool_end_time = time.monotonic()
++
++    def _calculate_timings(self) -> tuple[int, int, int]:
++        """Calculate response times in milliseconds."""
++        total_ms = int((time.monotonic() - self.start_time) * 1000)
++
++        model_ms = 0
++        if self.model_start_time and self.model_end_time:
++            model_ms = int((self.model_end_time - self.model_start_time) * 1000)
++
++        tool_ms = 0
++        if self.tool_start_time and self.tool_end_time:
++            tool_ms = int((self.tool_end_time - self.tool_start_time) * 1000)
++
++        return total_ms, model_ms, tool_ms
++
++    async def commit(self) -> None:
++        """
++        Commit the query log to the database.
++        Should be called at the end of the request lifecycle.
++        """
++        if not self.user_id or not self.model:
++            logger.warning(
++                "Skipping query log: user_id or model not set "
++                f"(user_id={self.user_id}, model={self.model})"
++            )
++            return
++
++        total_ms, model_ms, tool_ms = self._calculate_timings()
++        total_tokens = self.prompt_tokens + self.completion_tokens
++
++        try:
++            async with get_db_session() as session:
++                query_log = QueryLog(
++                    user_id=self.user_id,
++                    lockid=self.lockid,
++                    model=self.model,
++                    prompt_tokens=self.prompt_tokens,
++                    completion_tokens=self.completion_tokens,
++                    total_tokens=total_tokens,
++                    tool_calls=self.tool_calls,
++                    web_search_calls=self.web_search_calls,
++                    temperature=self.temperature,
++                    max_tokens=self.max_tokens,
++                    query_timestamp=datetime.now(timezone.utc),
++                    response_time_ms=total_ms,
++                    model_response_time_ms=model_ms,
++                    tool_response_time_ms=tool_ms,
++                    was_streamed=self.was_streamed,
++                    was_multimodal=self.was_multimodal,
++                    was_nilrag=self.was_nilrag,
++                    was_nildb=self.was_nildb,
++                    error_code=self.error_code,
++                    error_message=self.error_message,
++                )
++                session.add(query_log)
++                await session.commit()
++                logger.info(
++                    f"Query logged for user {self.user_id}: model={self.model}, "
++                    f"tokens={total_tokens}, total_ms={total_ms}"
++                )
++        except SQLAlchemyError as e:
++            logger.error(f"Error logging query: {e}")
++            # Don't raise - logging failure shouldn't break the request
+
+
+ class QueryLogManager:
++    """Static methods for direct query logging (legacy support)."""
++
+     @staticmethod
+     async def log_query(
+-        userid: str,
++        user_id: str,
++        lockid: str,
+         model: str,
+         prompt_tokens: int,
+         completion_tokens: int,
++        response_time_ms: int,
+         web_search_calls: int,
++        was_streamed: bool,
++        was_multimodal: bool,
++        was_nilrag: bool,
++        was_nildb: bool,
++        tool_calls: int = 0,
++        temperature: float = 1.0,
++        max_tokens: int = 0,
++        model_response_time_ms: int = 0,
++        tool_response_time_ms: int = 0,
++        error_code: int = 0,
++        error_message: str = "",
+     ):
+         """
+-        Log a user's query.
+-
+-        Args:
+-            userid (str): User's unique ID
+-            model (str): The model that generated the response
+-            prompt_tokens (int): Number of input tokens used
+-            completion_tokens (int): Number of tokens in the generated response
++        Log a user's query (legacy method).
++        Consider using QueryLogContext as a dependency instead.
+         """
+         total_tokens = prompt_tokens + completion_tokens
+
+         try:
+             async with get_db_session() as session:
+                 query_log = QueryLog(
+-                    userid=userid,
++                    user_id=user_id,
++                    lockid=lockid,
+                     model=model,
+                     prompt_tokens=prompt_tokens,
+                     completion_tokens=completion_tokens,
+                     total_tokens=total_tokens,
+-                    query_timestamp=datetime.now(timezone.utc),
++                    tool_calls=tool_calls,
+                     web_search_calls=web_search_calls,
++                    temperature=temperature,
++                    max_tokens=max_tokens,
++                    query_timestamp=datetime.now(timezone.utc),
++                    response_time_ms=response_time_ms,
++                    model_response_time_ms=model_response_time_ms,
++                    tool_response_time_ms=tool_response_time_ms,
++                    was_streamed=was_streamed,
++                    was_multimodal=was_multimodal,
++                    was_nilrag=was_nilrag,
++                    was_nildb=was_nildb,
++                    error_code=error_code,
++                    error_message=error_message,
+                 )
+                 session.add(query_log)
+                 await session.commit()
+                 logger.info(
+-                    f"Query logged for user {userid} with total tokens {total_tokens}."
++                    f"Query logged for user {user_id} with total tokens {total_tokens}."
+                 )
+         except SQLAlchemyError as e:
+             logger.error(f"Error logging query: {e}")
+             raise
+
++    @staticmethod
++    async def get_user_token_usage(user_id: str) -> Optional[Usage]:
++        """
++        Get aggregated token usage for a specific user using server-side SQL aggregation.
++        This is more efficient than fetching all records and calculating in Python.
++        """
++        try:
++            async with get_db_session() as session:
++                # Use SQL aggregation functions to calculate on the database server
++                query = (
++                    sqlalchemy.select(
++                        sqlalchemy.func.coalesce(
++                            sqlalchemy.func.sum(QueryLog.prompt_tokens), 0
++                        ).label("prompt_tokens"),
++                        sqlalchemy.func.coalesce(
++                            sqlalchemy.func.sum(QueryLog.completion_tokens), 0
++                        ).label("completion_tokens"),
++                        sqlalchemy.func.coalesce(
++                            sqlalchemy.func.sum(QueryLog.total_tokens), 0
++                        ).label("total_tokens"),
++                        sqlalchemy.func.count().label("queries"),
++                    ).where(QueryLog.user_id == user_id)  # type: ignore[arg-type]
++                )
++
++                result = await session.execute(query)
++                row = result.one_or_none()
++
++                if row is None:
++                    return None
++
++                return Usage(
++                    prompt_tokens=int(row.prompt_tokens),
++                    completion_tokens=int(row.completion_tokens),
++                    total_tokens=int(row.total_tokens),
++                )
++        except SQLAlchemyError as e:
++            logger.error(f"Error getting token usage: {e}")
++            return None
++
+
+-__all__ = ["QueryLogManager", "QueryLog"]
++__all__ = ["QueryLogManager", "QueryLog", "QueryLogContext"]
+diff --git a/nilai-api/src/nilai_api/db/users.py b/nilai-api/src/nilai_api/db/users.py
+index 515ba38..e475c42 100644
+--- a/nilai-api/src/nilai_api/db/users.py
++++ b/nilai-api/src/nilai_api/db/users.py
+@@ -2,11 +2,10 @@ import logging
+ import uuid
+ from pydantic import BaseModel, ConfigDict, Field
+
+-from datetime import datetime, timezone
+-from typing import Any, Dict, List, Optional
++from typing import Optional
+
+ import sqlalchemy
+-from sqlalchemy import Integer, String, DateTime, JSON
++from sqlalchemy import String, JSON
+ from sqlalchemy.exc import SQLAlchemyError
+
+ from nilai_api.db import Base, Column, get_db_session
+@@ -57,21 +56,11 @@ class RateLimits(BaseModel):
+ # Enhanced User Model with additional constraints and validation
+ class UserModel(Base):
+     __tablename__ = "users"
+-
+-    userid: str = Column(String(75), primary_key=True, index=True)  # type: ignore
+-    name: str = Column(String(100), nullable=False)  # type: ignore
+-    apikey: str = Column(String(75), unique=False, nullable=False, index=True)  # type: ignore
+-    prompt_tokens: int = Column(Integer, default=0, nullable=False)  # type: ignore
+-    completion_tokens: int = Column(Integer, default=0, nullable=False)  # type: ignore
+-    queries: int = Column(Integer, default=0, nullable=False)  # type: ignore
+-    signup_date: datetime = Column(
+-        DateTime(timezone=True), server_default=sqlalchemy.func.now(), nullable=False
+-    )  # type: ignore
+-    last_activity: datetime = Column(DateTime(timezone=True), nullable=True)  # type: ignore
++    user_id: str = Column(String(75), primary_key=True, index=True)  # type: ignore
+     rate_limits: dict = Column(JSON, nullable=True)  # type: ignore
+
+     def __repr__(self):
+-        return f"<User(userid={self.userid}, name={self.name})>"
++        return f"<User(user_id={self.user_id})>"
+
+     @property
+     def rate_limits_obj(self) -> RateLimits:
+@@ -85,14 +74,7 @@ class UserModel(Base):
+
+
+ class UserData(BaseModel):
+-    userid: str
+-    name: str
+-    apikey: str
+-    prompt_tokens: int = 0
+-    completion_tokens: int = 0
+-    queries: int = 0
+-    signup_date: datetime
+-    last_activity: Optional[datetime] = None
++    user_id: str  # apikey or subscription holder public key
+     rate_limits: RateLimits = Field(default_factory=RateLimits().get_effective_limits)
+
+     model_config = ConfigDict(from_attributes=True)
+@@ -100,21 +82,10 @@ class UserData(BaseModel):
+     @classmethod
+     def from_sqlalchemy(cls, user: UserModel) -> "UserData":
+         return cls(
+-            userid=user.userid,
+-            name=user.name,
+-            apikey=user.apikey,
+-            prompt_tokens=user.prompt_tokens or 0,
+-            completion_tokens=user.completion_tokens or 0,
+-            queries=user.queries or 0,
+-            signup_date=user.signup_date or datetime.now(timezone.utc),
+-            last_activity=user.last_activity,
++            user_id=user.user_id,
+             rate_limits=user.rate_limits_obj,
+         )
+
+-    @property
+-    def is_subscription_owner(self):
+-        return self.userid == self.apikey
+-
+
+ class UserManager:
+     @staticmethod
+@@ -127,31 +98,9 @@ class UserManager:
+         """Generate a unique API key."""
+         return str(uuid.uuid4())
+
+-    @staticmethod
+-    async def update_last_activity(userid: str):
+-        """
+-        Update the last activity timestamp for a user.
+-
+-        Args:
+-            userid (str): User's unique ID
+-        """
+-        try:
+-            async with get_db_session() as session:
+-                user = await session.get(UserModel, userid)
+-                if user:
+-                    user.last_activity = datetime.now(timezone.utc)
+-                    await session.commit()
+-                    logger.info(f"Updated last activity for user {userid}")
+-                else:
+-                    logger.warning(f"User {userid} not found")
+-        except SQLAlchemyError as e:
+-            logger.error(f"Error updating last activity: {e}")
+-
+     @staticmethod
+     async def insert_user(
+-        name: str,
+-        apikey: str | None = None,
+-        userid: str | None = None,
++        user_id: str | None = None,
+         rate_limits: RateLimits | None = None,
+     ) -> UserModel:
+         """
+@@ -160,19 +109,16 @@ class UserManager:
+         Args:
+             name (str): Name of the user
+             apikey (str): API key for the user
+-            userid (str): Unique ID for the user
++            user_id (str): Unique ID for the user
+             rate_limits (RateLimits): Rate limit configuration
+
+         Returns:
+             UserModel: The created user model
+         """
+-        userid = userid if userid else UserManager.generate_user_id()
+-        apikey = apikey if apikey else UserManager.generate_api_key()
++        user_id = user_id if user_id else UserManager.generate_user_id()
+
+         user = UserModel(
+-            userid=userid,
+-            name=name,
+-            apikey=apikey,
++            user_id=user_id,
+             rate_limits=rate_limits.model_dump() if rate_limits else None,
+         )
+         return await UserManager.insert_user_model(user)
+@@ -189,35 +135,14 @@ class UserManager:
+             async with get_db_session() as session:
+                 session.add(user)
+                 await session.commit()
+-                logger.info(f"User {user.name} added successfully.")
++                logger.info(f"User {user.user_id} added successfully.")
+                 return user
+         except SQLAlchemyError as e:
+             logger.error(f"Error inserting user: {e}")
+             raise
+
+     @staticmethod
+-    async def check_user(userid: str) -> Optional[UserModel]:
+-        """
+-        Validate a user.
+-
+-        Args:
+-            userid (str): User ID to validate
+-
+-        Returns:
+-            User's name if user is valid, None otherwise
+-        """
+-        try:
+-            async with get_db_session() as session:
+-                query = sqlalchemy.select(UserModel).filter(UserModel.userid == userid)  # type: ignore
+-                user = await session.execute(query)
+-                user = user.scalar_one_or_none()
+-                return user
+-        except SQLAlchemyError as e:
+-            logger.error(f"Error checking API key: {e}")
+-            return None
+-
+-    @staticmethod
+-    async def check_api_key(api_key: str) -> Optional[UserModel]:
++    async def check_user(user_id: str) -> Optional[UserModel]:
+         """
+         Validate an API key.
+
+@@ -225,118 +150,27 @@ class UserManager:
+             api_key (str): API key to validate
+
+         Returns:
+-            User's name if API key is valid, None otherwise
++            User's rate limits if user id is valid, None otherwise
+         """
+         try:
+             async with get_db_session() as session:
+-                query = sqlalchemy.select(UserModel).filter(UserModel.apikey == api_key)  # type: ignore
++                query = sqlalchemy.select(UserModel).filter(
++                    UserModel.user_id == user_id  # type: ignore
++                )
+                 user = await session.execute(query)
+                 user = user.scalar_one_or_none()
+                 return user
+         except SQLAlchemyError as e:
+-            logger.error(f"Error checking API key: {e}")
+-            return None
+-
+-    @staticmethod
+-    async def update_token_usage(
+-        userid: str, prompt_tokens: int, completion_tokens: int
+-    ):
+-        """
+-        Update token usage for a specific user.
+-
+-        Args:
+-            userid (str): User's unique ID
+-            prompt_tokens (int): Number of input tokens
+-            completion_tokens (int): Number of generated tokens
+-        """
+-        try:
+-            async with get_db_session() as session:
+-                user = await session.get(UserModel, userid)
+-                if user:
+-                    user.prompt_tokens += prompt_tokens
+-                    user.completion_tokens += completion_tokens
+-                    user.queries += 1
+-                    await session.commit()
+-                    logger.info(f"Updated token usage for user {userid}")
+-                else:
+-                    logger.warning(f"User {userid} not found")
+-        except SQLAlchemyError as e:
+-            logger.error(f"Error updating token usage: {e}")
+-
+-    @staticmethod
+-    async def get_token_usage(userid: str) -> Optional[Dict[str, Any]]:
+-        """
+-        Get token usage for a specific user.
+-
+-        Args:
+-            userid (str): User's unique ID
+-        """
+-        try:
+-            async with get_db_session() as session:
+-                user = await session.get(UserModel, userid)
+-                if user:
+-                    return {
+-                        "prompt_tokens": user.prompt_tokens,
+-                        "completion_tokens": user.completion_tokens,
+-                        "total_tokens": user.prompt_tokens + user.completion_tokens,
+-                        "queries": user.queries,
+-                    }
+-                else:
+-                    logger.warning(f"User {userid} not found")
+-                    return None
+-        except SQLAlchemyError as e:
+-            logger.error(f"Error updating token usage: {e}")
+-            return None
+-
+-    @staticmethod
+-    async def get_all_users() -> Optional[List[UserData]]:
+-        """
+-        Retrieve all users from the database.
+-
+-        Returns:
+-            List of UserData or None if no users found
+-        """
+-        try:
+-            async with get_db_session() as session:
+-                users = await session.execute(sqlalchemy.select(UserModel))
+-                users = users.scalars().all()
+-                return [UserData.from_sqlalchemy(user) for user in users]
+-        except SQLAlchemyError as e:
+-            logger.error(f"Error retrieving all users: {e}")
+-            return None
+-
+-    @staticmethod
+-    async def get_user_token_usage(userid: str) -> Optional[Dict[str, int]]:
+-        """
+-        Retrieve total token usage for a user.
+-
+-        Args:
+-            userid (str): User's unique ID
+-
+-        Returns:
+-            Dict of token usage or None if user not found
+-        """
+-        try:
+-            async with get_db_session() as session:
+-                user = await session.get(UserModel, userid)
+-                if user:
+-                    return {
+-                        "prompt_tokens": user.prompt_tokens,
+-                        "completion_tokens": user.completion_tokens,
+-                        "queries": user.queries,
+-                    }
+-                return None
+-        except SQLAlchemyError as e:
+-            logger.error(f"Error retrieving token usage: {e}")
++            logger.error(f"Rate limit checking user id: {e}")
+             return None
+
+     @staticmethod
+-    async def update_rate_limits(userid: str, rate_limits: RateLimits) -> bool:
++    async def update_rate_limits(user_id: str, rate_limits: RateLimits) -> bool:
+         """
+         Update rate limits for a specific user.
+
+         Args:
+-            userid (str): User's unique ID
++            user_id (str): User's unique ID
+             rate_limits (RateLimits): New rate limit configuration
+
+         Returns:
+@@ -344,14 +178,14 @@ class UserManager:
+         """
+         try:
+             async with get_db_session() as session:
+-                user = await session.get(UserModel, userid)
++                user = await session.get(UserModel, user_id)
+                 if user:
+                     user.rate_limits = rate_limits.model_dump()
+                     await session.commit()
+-                    logger.info(f"Updated rate limits for user {userid}")
++                    logger.info(f"Updated rate limits for user {user_id}")
+                     return True
+                 else:
+-                    logger.warning(f"User {userid} not found")
++                    logger.warning(f"User {user_id} not found")
+                     return False
+         except SQLAlchemyError as e:
+             logger.error(f"Error updating rate limits: {e}")
+diff --git a/nilai-api/src/nilai_api/rate_limiting.py b/nilai-api/src/nilai_api/rate_limiting.py
+index 8205b55..347f162 100644
+--- a/nilai-api/src/nilai_api/rate_limiting.py
++++ b/nilai-api/src/nilai_api/rate_limiting.py
+@@ -53,7 +53,7 @@ async def _extract_coroutine_result(maybe_future, request: Request):
+
+
+ class UserRateLimits(BaseModel):
+-    subscription_holder: str
++    user_id: str
+     token_rate_limit: TokenRateLimits | None
+     rate_limits: RateLimits
+
+@@ -61,14 +61,13 @@ class UserRateLimits(BaseModel):
+ def get_user_limits(
+     auth_info: Annotated[AuthenticationInfo, Depends(get_auth_info)],
+ ) -> UserRateLimits:
+-    # TODO: When the only allowed strategy is NUC, we can change the apikey name to subscription_holder
+-    # In apikey mode, the apikey is unique as the userid.
+-    # In nuc mode, the apikey is associated with a subscription holder and the userid is the user
++    # In apikey mode, the apikey is unique as the user_id.
++    # In nuc mode, the apikey is associated with a subscription holder and the user_id is the user
+     # For NUCs we want the rate limit to be per subscription holder, not per user
+-    # In JWT mode, the apikey is the userid too
++    # In JWT mode, the apikey is the user_id too
+     # So we use the apikey as the id
+     return UserRateLimits(
+-        subscription_holder=auth_info.user.apikey,
++        user_id=auth_info.user.user_id,
+         token_rate_limit=auth_info.token_rate_limit,
+         rate_limits=auth_info.user.rate_limits,
+     )
+@@ -106,21 +105,21 @@ class RateLimit:
+         await self.check_bucket(
+             redis,
+             redis_rate_limit_command,
+-            f"minute:{user_limits.subscription_holder}",
++            f"minute:{user_limits.user_id}",
+             user_limits.rate_limits.user_rate_limit_minute,
+             MINUTE_MS,
+         )
+         await self.check_bucket(
+             redis,
+             redis_rate_limit_command,
+-            f"hour:{user_limits.subscription_holder}",
++            f"hour:{user_limits.user_id}",
+             user_limits.rate_limits.user_rate_limit_hour,
+             HOUR_MS,
+         )
+         await self.check_bucket(
+             redis,
+             redis_rate_limit_command,
+-            f"day:{user_limits.subscription_holder}",
++            f"day:{user_limits.user_id}",
+             user_limits.rate_limits.user_rate_limit_day,
+             DAY_MS,
+         )
+@@ -128,7 +127,7 @@ class RateLimit:
+         await self.check_bucket(
+             redis,
+             redis_rate_limit_command,
+-            f"user:{user_limits.subscription_holder}",
++            f"user:{user_limits.user_id}",
+             user_limits.rate_limits.user_rate_limit,
+             0,  # No expiration for for-good rate limit
+         )
+@@ -176,7 +175,7 @@ class RateLimit:
+                 await self.check_bucket(
+                     redis,
+                     redis_rate_limit_command,
+-                    f"web_search:{user_limits.subscription_holder}",
++                    f"web_search:{user_limits.user_id}",
+                     user_limits.rate_limits.web_search_rate_limit,
+                     0,  # No expiration for for-good rate limit
+                 )
+@@ -199,7 +198,7 @@ class RateLimit:
+                     await self.check_bucket(
+                         redis,
+                         redis_rate_limit_command,
+-                        f"web_search_{time_unit}:{user_limits.subscription_holder}",
++                        f"web_search_{time_unit}:{user_limits.user_id}",
+                         limit,
+                         milliseconds,
+                     )
+diff --git a/nilai-api/src/nilai_api/routers/private.py b/nilai-api/src/nilai_api/routers/private.py
+index db75067..038f8db 100644
+--- a/nilai-api/src/nilai_api/routers/private.py
++++ b/nilai-api/src/nilai_api/routers/private.py
+@@ -11,13 +11,20 @@ from nilai_api.handlers.nilrag import handle_nilrag
+ from nilai_api.handlers.web_search import handle_web_search
+ from nilai_api.handlers.tools.tool_router import handle_tool_workflow
+
+-from fastapi import APIRouter, Body, Depends, HTTPException, status, Request
++from fastapi import (
++    APIRouter,
++    BackgroundTasks,
++    Body,
++    Depends,
++    HTTPException,
++    status,
++    Request,
++)
+ from fastapi.responses import StreamingResponse
+ from nilai_api.auth import get_auth_info, AuthenticationInfo
+ from nilai_api.config import CONFIG
+ from nilai_api.crypto import sign_message
+-from nilai_api.db.logs import QueryLogManager
+-from nilai_api.db.users import UserManager
++from nilai_api.db.logs import QueryLogContext, QueryLogManager
+ from nilai_api.rate_limiting import RateLimit
+ from nilai_api.state import state
+
+@@ -53,14 +60,10 @@ router = APIRouter()
+ @router.get("/v1/delegation")
+ async def get_prompt_store_delegation(
+     prompt_delegation_request: PromptDelegationRequest,
+-    auth_info: AuthenticationInfo = Depends(get_auth_info),
++    _: AuthenticationInfo = Depends(
++        get_auth_info
++    ),  # This is to satisfy that the user is authenticated
+ ) -> PromptDelegationToken:
+-    if not auth_info.user.is_subscription_owner:
+-        raise HTTPException(
+-            status_code=status.HTTP_403_FORBIDDEN,
+-            detail=f"Prompt storage is reserved to subscription owners: {auth_info.user} is not a subscription owner, apikey: {auth_info.user}",
+-        )
+-
+     try:
+         return await get_nildb_delegation_token(prompt_delegation_request)
+     except Exception as e:
+@@ -84,12 +87,15 @@ async def get_usage(auth_info: AuthenticationInfo = Depends(get_auth_info)) -> U
+     usage = await get_usage(user)
+     ```
+     """
+-    return Usage(
+-        prompt_tokens=auth_info.user.prompt_tokens,
+-        completion_tokens=auth_info.user.completion_tokens,
+-        total_tokens=auth_info.user.prompt_tokens + auth_info.user.completion_tokens,
+-        queries=auth_info.user.queries,  # type: ignore # FIXME this field is not part of Usage
++    user_usage: Optional[Usage] = await QueryLogManager.get_user_token_usage(
++        auth_info.user.user_id
+     )
++    if user_usage is None:
++        raise HTTPException(
++            status_code=status.HTTP_404_NOT_FOUND,
++            detail="User not found",
++        )
++    return user_usage
+
+
+ @router.get("/v1/attestation/report", tags=["Attestation"])
+@@ -173,6 +179,7 @@ async def chat_completion(
+             ],
+         )
+     ),
++    background_tasks: BackgroundTasks = BackgroundTasks(),
+     _rate_limit=Depends(
+         RateLimit(
+             concurrent_extractor=chat_completion_concurrent_rate_limit,
+@@ -181,6 +188,7 @@ async def chat_completion(
+     ),
+     auth_info: AuthenticationInfo = Depends(get_auth_info),
+     meter: MeteringContext = Depends(LLMMeter),
++    log_ctx: QueryLogContext = Depends(QueryLogContext),
+ ) -> Union[SignedChatCompletion, StreamingResponse]:
+     """
+     Generate a chat completion response from the AI model.
+@@ -234,249 +242,312 @@ async def chat_completion(
+     )
+     response = await chat_completion(request, user)
+     """
+-
+-    if len(req.messages) == 0:
+-        raise HTTPException(
+-            status_code=400,
+-            detail="Request contained 0 messages",
+-        )
++    # Initialize log context early so we can log any errors
++    log_ctx.set_user(auth_info.user.user_id)
++    log_ctx.set_lockid(meter.lock_id)
+     model_name = req.model
+     request_id = str(uuid.uuid4())
+     t_start = time.monotonic()
+-    logger.info(f"[chat] call start request_id={req.messages}")
+-    endpoint = await state.get_model(model_name)
+-    if endpoint is None:
+-        raise HTTPException(
+-            status_code=status.HTTP_400_BAD_REQUEST,
+-            detail=f"Invalid model name {model_name}, check /v1/models for options",
+-        )
+-
+-    if not endpoint.metadata.tool_support and req.tools:
+-        raise HTTPException(
+-            status_code=400,
+-            detail="Model does not support tool usage, remove tools from request",
+-        )
+
+-    has_multimodal = req.has_multimodal_content()
+-    logger.info(f"[chat] has_multimodal: {has_multimodal}")
+-    if has_multimodal and (not endpoint.metadata.multimodal_support or req.web_search):
+-        raise HTTPException(
+-            status_code=400,
+-            detail="Model does not support multimodal content, remove image inputs from request",
+-        )
+-
+-    model_url = endpoint.url + "/v1/"
++    try:
++        if len(req.messages) == 0:
++            raise HTTPException(
++                status_code=400,
++                detail="Request contained 0 messages",
++            )
++        logger.info(f"[chat] call start request_id={req.messages}")
++        endpoint = await state.get_model(model_name)
++        if endpoint is None:
++            raise HTTPException(
++                status_code=status.HTTP_400_BAD_REQUEST,
++                detail=f"Invalid model name {model_name}, check /v1/models for options",
++            )
+
+-    logger.info(
+-        f"[chat] start request_id={request_id} user={auth_info.user.userid} model={model_name} stream={req.stream} web_search={bool(req.web_search)} tools={bool(req.tools)} multimodal={has_multimodal} url={model_url}"
+-    )
++        # Now we have a valid model, set it in log context
++        log_ctx.set_model(model_name)
+
+-    client = AsyncOpenAI(base_url=model_url, api_key="<not-needed>")
+-    if auth_info.prompt_document:
+-        try:
+-            nildb_prompt: str = await get_prompt_from_nildb(auth_info.prompt_document)
+-            req.messages.insert(
+-                0, MessageAdapter.new_message(role="system", content=nildb_prompt)
+-            )
+-        except Exception as e:
++        if not endpoint.metadata.tool_support and req.tools:
+             raise HTTPException(
+-                status_code=status.HTTP_403_FORBIDDEN,
+-                detail=f"Unable to extract prompt from nilDB: {str(e)}",
++                status_code=400,
++                detail="Model does not support tool usage, remove tools from request",
+             )
+
+-    if req.nilrag:
+-        logger.info(f"[chat] nilrag start request_id={request_id}")
+-        t_nilrag = time.monotonic()
+-        await handle_nilrag(req)
+-        logger.info(
+-            f"[chat] nilrag done request_id={request_id} duration_ms={(time.monotonic() - t_nilrag) * 1000:.0f}"
+-        )
++        has_multimodal = req.has_multimodal_content()
++        logger.info(f"[chat] has_multimodal: {has_multimodal}")
++        if has_multimodal and (
++            not endpoint.metadata.multimodal_support or req.web_search
++        ):
++            raise HTTPException(
++                status_code=400,
++                detail="Model does not support multimodal content, remove image inputs from request",
++            )
+
+-    messages = req.messages
+-    sources: Optional[List[Source]] = None
++        model_url = endpoint.url + "/v1/"
+
+-    if req.web_search:
+-        logger.info(f"[chat] web_search start request_id={request_id}")
+-        t_ws = time.monotonic()
+-        web_search_result = await handle_web_search(req, model_name, client)
+-        messages = web_search_result.messages
+-        sources = web_search_result.sources
+         logger.info(
+-            f"[chat] web_search done request_id={request_id} sources={len(sources) if sources else 0} duration_ms={(time.monotonic() - t_ws) * 1000:.0f}"
++            f"[chat] start request_id={request_id} user={auth_info.user.user_id} model={model_name} stream={req.stream} web_search={bool(req.web_search)} tools={bool(req.tools)} multimodal={has_multimodal} url={model_url}"
++        )
++        log_ctx.set_request_params(
++            temperature=req.temperature,
++            max_tokens=req.max_tokens,
++            was_streamed=req.stream or False,
++            was_multimodal=has_multimodal,
++            was_nildb=bool(auth_info.prompt_document),
++            was_nilrag=bool(req.nilrag),
+         )
+-        logger.info(f"[chat] web_search messages: {messages}")
+
+-    if req.stream:
++        client = AsyncOpenAI(base_url=model_url, api_key="<not-needed>")
++        if auth_info.prompt_document:
++            try:
++                nildb_prompt: str = await get_prompt_from_nildb(
++                    auth_info.prompt_document
++                )
++                req.messages.insert(
++                    0, MessageAdapter.new_message(role="system", content=nildb_prompt)
++                )
++            except Exception as e:
++                raise HTTPException(
++                    status_code=status.HTTP_403_FORBIDDEN,
++                    detail=f"Unable to extract prompt from nilDB: {str(e)}",
++                )
+
+-        async def chat_completion_stream_generator() -> AsyncGenerator[str, None]:
+-            t_call = time.monotonic()
+-            prompt_token_usage = 0
+-            completion_token_usage = 0
++        if req.nilrag:
++            logger.info(f"[chat] nilrag start request_id={request_id}")
++            t_nilrag = time.monotonic()
++            await handle_nilrag(req)
++            logger.info(
++                f"[chat] nilrag done request_id={request_id} duration_ms={(time.monotonic() - t_nilrag) * 1000:.0f}"
++            )
+
+-            try:
+-                logger.info(f"[chat] stream start request_id={request_id}")
+-
+-                request_kwargs = {
+-                    "model": req.model,
+-                    "messages": messages,
+-                    "stream": True,
+-                    "top_p": req.top_p,
+-                    "temperature": req.temperature,
+-                    "max_tokens": req.max_tokens,
+-                    "extra_body": {
+-                        "stream_options": {
+-                            "include_usage": True,
+-                            "continuous_usage_stats": False,
+-                        }
+-                    },
+-                }
+-                if req.tools:
+-                    request_kwargs["tools"] = req.tools
++        messages = req.messages
++        sources: Optional[List[Source]] = None
++
++        if req.web_search:
++            logger.info(f"[chat] web_search start request_id={request_id}")
++            t_ws = time.monotonic()
++            web_search_result = await handle_web_search(req, model_name, client)
++            messages = web_search_result.messages
++            sources = web_search_result.sources
++            logger.info(
++                f"[chat] web_search done request_id={request_id} sources={len(sources) if sources else 0} duration_ms={(time.monotonic() - t_ws) * 1000:.0f}"
++            )
++            logger.info(f"[chat] web_search messages: {messages}")
++
++        if req.stream:
++
++            async def chat_completion_stream_generator() -> AsyncGenerator[str, None]:
++                t_call = time.monotonic()
++                prompt_token_usage = 0
++                completion_token_usage = 0
++
++                try:
++                    logger.info(f"[chat] stream start request_id={request_id}")
++
++                    log_ctx.start_model_timing()
++
++                    request_kwargs = {
++                        "model": req.model,
++                        "messages": messages,
++                        "stream": True,
++                        "top_p": req.top_p,
++                        "temperature": req.temperature,
++                        "max_tokens": req.max_tokens,
++                        "extra_body": {
++                            "stream_options": {
++                                "include_usage": True,
++                                "continuous_usage_stats": False,
++                            }
++                        },
++                    }
++                    if req.tools:
++                        request_kwargs["tools"] = req.tools
+
+-                response = await client.chat.completions.create(**request_kwargs)
++                    response = await client.chat.completions.create(**request_kwargs)
+
+-                async for chunk in response:
+-                    if chunk.usage is not None:
+-                        prompt_token_usage = chunk.usage.prompt_tokens
+-                        completion_token_usage = chunk.usage.completion_tokens
++                    async for chunk in response:
++                        if chunk.usage is not None:
++                            prompt_token_usage = chunk.usage.prompt_tokens
++                            completion_token_usage = chunk.usage.completion_tokens
+
+-                    payload = chunk.model_dump(exclude_unset=True)
++                        payload = chunk.model_dump(exclude_unset=True)
+
+-                    if chunk.usage is not None and sources:
+-                        payload["sources"] = [
+-                            s.model_dump(mode="json") for s in sources
+-                        ]
++                        if chunk.usage is not None and sources:
++                            payload["sources"] = [
++                                s.model_dump(mode="json") for s in sources
++                            ]
+
+-                    yield f"data: {json.dumps(payload)}\n\n"
++                        yield f"data: {json.dumps(payload)}\n\n"
+
+-                await UserManager.update_token_usage(
+-                    auth_info.user.userid,
+-                    prompt_tokens=prompt_token_usage,
+-                    completion_tokens=completion_token_usage,
+-                )
+-                meter.set_response(
+-                    {
+-                        "usage": LLMUsage(
+-                            prompt_tokens=prompt_token_usage,
+-                            completion_tokens=completion_token_usage,
+-                            web_searches=len(sources) if sources else 0,
+-                        )
+-                    }
+-                )
+-                await QueryLogManager.log_query(
+-                    auth_info.user.userid,
+-                    model=req.model,
+-                    prompt_tokens=prompt_token_usage,
+-                    completion_tokens=completion_token_usage,
+-                    web_search_calls=len(sources) if sources else 0,
+-                )
+-                logger.info(
+-                    "[chat] stream done request_id=%s prompt_tokens=%d completion_tokens=%d "
+-                    "duration_ms=%.0f total_ms=%.0f",
+-                    request_id,
+-                    prompt_token_usage,
+-                    completion_token_usage,
+-                    (time.monotonic() - t_call) * 1000,
+-                    (time.monotonic() - t_start) * 1000,
+-                )
++                    log_ctx.end_model_timing()
++                    meter.set_response(
++                        {
++                            "usage": LLMUsage(
++                                prompt_tokens=prompt_token_usage,
++                                completion_tokens=completion_token_usage,
++                                web_searches=len(sources) if sources else 0,
++                            )
++                        }
++                    )
++                    log_ctx.set_usage(
++                        prompt_tokens=prompt_token_usage,
++                        completion_tokens=completion_token_usage,
++                        web_search_calls=len(sources) if sources else 0,
++                    )
++                    await log_ctx.commit()
++                    logger.info(
++                        "[chat] stream done request_id=%s prompt_tokens=%d completion_tokens=%d "
++                        "duration_ms=%.0f total_ms=%.0f",
++                        request_id,
++                        prompt_token_usage,
++                        completion_token_usage,
++                        (time.monotonic() - t_call) * 1000,
++                        (time.monotonic() - t_start) * 1000,
++                    )
++
++                except Exception as e:
++                    logger.error(
++                        "[chat] stream error request_id=%s error=%s", request_id, e
++                    )
++                    log_ctx.set_error(error_code=500, error_message=str(e))
++                    await log_ctx.commit()
++                    yield f"data: {json.dumps({'error': 'stream_failed', 'message': str(e)})}\n\n"
++
++            return StreamingResponse(
++                chat_completion_stream_generator(),
++                media_type="text/event-stream",
++            )
+
+-            except Exception as e:
+-                logger.error(
+-                    "[chat] stream error request_id=%s error=%s", request_id, e
+-                )
+-                yield f"data: {json.dumps({'error': 'stream_failed', 'message': str(e)})}\n\n"
++        current_messages = messages
++        request_kwargs = {
++            "model": req.model,
++            "messages": current_messages,  # type: ignore
++            "top_p": req.top_p,
++            "temperature": req.temperature,
++            "max_tokens": req.max_tokens,
++        }
++        if req.tools:
++            request_kwargs["tools"] = req.tools  # type: ignore
++            request_kwargs["tool_choice"] = req.tool_choice
++
++        logger.info(f"[chat] call start request_id={request_id}")
++        logger.info(f"[chat] call message: {current_messages}")
++        t_call = time.monotonic()
++        log_ctx.start_model_timing()
++        response = await client.chat.completions.create(**request_kwargs)  # type: ignore
++        log_ctx.end_model_timing()
++        logger.info(
++            f"[chat] call done request_id={request_id} duration_ms={(time.monotonic() - t_call) * 1000:.0f}"
++        )
++        logger.info(f"[chat] call response: {response}")
++
++        # Handle tool workflow fully inside tools.router
++        log_ctx.start_tool_timing()
++        (
++            final_completion,
++            agg_prompt_tokens,
++            agg_completion_tokens,
++        ) = await handle_tool_workflow(client, req, current_messages, response)
++        log_ctx.end_tool_timing()
++        logger.info(f"[chat] call final_completion: {final_completion}")
++        model_response = SignedChatCompletion(
++            **final_completion.model_dump(),
++            signature="",
++            sources=sources,
++        )
+
+-        return StreamingResponse(
+-            chat_completion_stream_generator(),
+-            media_type="text/event-stream",
++        logger.info(
++            f"[chat] model_response request_id={request_id} duration_ms={(time.monotonic() - t_call) * 1000:.0f}"
+         )
+
+-    current_messages = messages
+-    request_kwargs = {
+-        "model": req.model,
+-        "messages": current_messages,  # type: ignore
+-        "top_p": req.top_p,
+-        "temperature": req.temperature,
+-        "max_tokens": req.max_tokens,
+-    }
+-    if req.tools:
+-        request_kwargs["tools"] = req.tools  # type: ignore
+-        request_kwargs["tool_choice"] = req.tool_choice
+-
+-    logger.info(f"[chat] call start request_id={request_id}")
+-    logger.info(f"[chat] call message: {current_messages}")
+-    t_call = time.monotonic()
+-    response = await client.chat.completions.create(**request_kwargs)  # type: ignore
+-    logger.info(
+-        f"[chat] call done request_id={request_id} duration_ms={(time.monotonic() - t_call) * 1000:.0f}"
+-    )
+-    logger.info(f"[chat] call response: {response}")
+-
+-    # Handle tool workflow fully inside tools.router
+-    (
+-        final_completion,
+-        agg_prompt_tokens,
+-        agg_completion_tokens,
+-    ) = await handle_tool_workflow(client, req, current_messages, response)
+-    logger.info(f"[chat] call final_completion: {final_completion}")
+-    model_response = SignedChatCompletion(
+-        **final_completion.model_dump(),
+-        signature="",
+-        sources=sources,
+-    )
++        if model_response.usage is None:
++            raise HTTPException(
++                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
++                detail="Model response does not contain usage statistics",
++            )
+
+-    logger.info(
+-        f"[chat] model_response request_id={request_id} duration_ms={(time.monotonic() - t_call) * 1000:.0f}"
+-    )
++        if agg_prompt_tokens or agg_completion_tokens:
++            total_prompt_tokens = response.usage.prompt_tokens
++            total_completion_tokens = response.usage.completion_tokens
+
+-    if model_response.usage is None:
+-        raise HTTPException(
+-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+-            detail="Model response does not contain usage statistics",
+-        )
++            total_prompt_tokens += agg_prompt_tokens
++            total_completion_tokens += agg_completion_tokens
+
+-    if agg_prompt_tokens or agg_completion_tokens:
+-        total_prompt_tokens = response.usage.prompt_tokens
+-        total_completion_tokens = response.usage.completion_tokens
++            model_response.usage.prompt_tokens = total_prompt_tokens
++            model_response.usage.completion_tokens = total_completion_tokens
++            model_response.usage.total_tokens = (
++                total_prompt_tokens + total_completion_tokens
++            )
++
++        # Update token usage in DB
++        meter.set_response(
++            {
++                "usage": LLMUsage(
++                    prompt_tokens=model_response.usage.prompt_tokens,
++                    completion_tokens=model_response.usage.completion_tokens,
++                    web_searches=len(sources) if sources else 0,
++                )
++            }
++        )
+
+-        total_prompt_tokens += agg_prompt_tokens
+-        total_completion_tokens += agg_completion_tokens
++        # Log query with context
++        tool_calls_count = 0
++        if final_completion.choices and final_completion.choices[0].message.tool_calls:
++            tool_calls_count = len(final_completion.choices[0].message.tool_calls)
+
+-        model_response.usage.prompt_tokens = total_prompt_tokens
+-        model_response.usage.completion_tokens = total_completion_tokens
+-        model_response.usage.total_tokens = (
+-            total_prompt_tokens + total_completion_tokens
++        log_ctx.set_usage(
++            prompt_tokens=model_response.usage.prompt_tokens,
++            completion_tokens=model_response.usage.completion_tokens,
++            tool_calls=tool_calls_count,
++            web_search_calls=len(sources) if sources else 0,
+         )
++        # Use background task for successful requests to avoid blocking response
++        background_tasks.add_task(log_ctx.commit)
+
+-    # Update token usage in DB
+-    await UserManager.update_token_usage(
+-        auth_info.user.userid,
+-        prompt_tokens=model_response.usage.prompt_tokens,
+-        completion_tokens=model_response.usage.completion_tokens,
+-    )
+-    meter.set_response(
+-        {
+-            "usage": LLMUsage(
+-                prompt_tokens=model_response.usage.prompt_tokens,
+-                completion_tokens=model_response.usage.completion_tokens,
+-                web_searches=len(sources) if sources else 0,
+-            )
+-        }
+-    )
+-    await QueryLogManager.log_query(
+-        auth_info.user.userid,
+-        model=req.model,
+-        prompt_tokens=model_response.usage.prompt_tokens,
+-        completion_tokens=model_response.usage.completion_tokens,
+-        web_search_calls=len(sources) if sources else 0,
+-    )
++        # Sign the response
++        response_json = model_response.model_dump_json()
++        signature = sign_message(state.private_key, response_json)
++        model_response.signature = b64encode(signature).decode()
+
+-    # Sign the response
+-    response_json = model_response.model_dump_json()
+-    signature = sign_message(state.private_key, response_json)
+-    model_response.signature = b64encode(signature).decode()
++        logger.info(
++            f"[chat] done request_id={request_id} prompt_tokens={model_response.usage.prompt_tokens} completion_tokens={model_response.usage.completion_tokens} total_ms={(time.monotonic() - t_start) * 1000:.0f}"
++        )
++        return model_response
++    except HTTPException as e:
++        # Extract error code from HTTPException, default to status code
++        error_code = e.status_code
++        error_message = str(e.detail) if e.detail else str(e)
++        logger.error(
++            f"[chat] HTTPException request_id={request_id} user={auth_info.user.user_id} "
++            f"model={model_name} error_code={error_code} error={error_message}",
++            exc_info=True,
++        )
+
+-    logger.info(
+-        f"[chat] done request_id={request_id} prompt_tokens={model_response.usage.prompt_tokens} completion_tokens={model_response.usage.completion_tokens} total_ms={(time.monotonic() - t_start) * 1000:.0f}"
+-    )
+-    return model_response
++        # Only log server errors (5xx) to database to prevent DoS attacks via client errors
++        # Client errors (4xx) are logged to application logs only
++        if error_code >= 500:
++            # Set model if not already set (e.g., for validation errors before model validation)
++            if log_ctx.model is None:
++                log_ctx.set_model(model_name)
++            log_ctx.set_error(error_code=error_code, error_message=error_message)
++            await log_ctx.commit()
++        # For 4xx errors, we skip DB logging - they're logged above via logger.error()
++        # This prevents DoS attacks where attackers send many invalid requests
++
++        raise
++    except Exception as e:
++        # Catch any other unexpected exceptions
++        error_message = str(e)
++        logger.error(
++            f"[chat] unexpected error request_id={request_id} user={auth_info.user.user_id} "
++            f"model={model_name} error={error_message}",
++            exc_info=True,
++        )
++        # Set model if not already set
++        if log_ctx.model is None:
++            log_ctx.set_model(model_name)
++        log_ctx.set_error(error_code=500, error_message=error_message)
++        await log_ctx.commit()
++        raise HTTPException(
++            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
++            detail=f"Internal server error: {error_message}",
++        )
+diff --git a/tests/e2e/config.py b/tests/e2e/config.py
+index e06f9d4..3111902 100644
+--- a/tests/e2e/config.py
++++ b/tests/e2e/config.py
+@@ -38,7 +38,7 @@ models = {
+         "meta-llama/Llama-3.1-8B-Instruct",
+     ],
+     "ci": [
+-        "meta-llama/Llama-3.2-1B-Instruct",
++        "llama-3.2-1b-instruct",
+     ],
+ }
+
+diff --git a/tests/integration/nilai_api/test_users_db_integration.py b/tests/integration/nilai_api/test_users_db_integration.py
+index 82d8d02..892a3af 100644
+--- a/tests/integration/nilai_api/test_users_db_integration.py
++++ b/tests/integration/nilai_api/test_users_db_integration.py
+@@ -17,37 +17,17 @@ class TestUserManagerIntegration:
+     async def test_simple_user_creation(self, clean_database):
+         """Test creating a simple user and retrieving it."""
+         # Insert user with minimal data
+-        user = await UserManager.insert_user(name="Simple Test User")
++        user = await UserManager.insert_user(user_id="Simple Test User")
+
+         # Verify user creation
+-        assert user.name == "Simple Test User"
+-        assert user.userid is not None
+-        assert user.apikey is not None
+-        assert user.userid != user.apikey  # Should be different UUIDs
++        assert user.user_id == "Simple Test User"
++        assert user.rate_limits is not None
+
+         # Retrieve user by ID
+-        found_user = await UserManager.check_user(user.userid)
++        found_user = await UserManager.check_user(user.user_id)
+         assert found_user is not None
+-        assert found_user.userid == user.userid
+-        assert found_user.name == "Simple Test User"
+-        assert found_user.apikey == user.apikey
+-
+-    @pytest.mark.asyncio
+-    async def test_api_key_validation(self, clean_database):
+-        """Test API key validation functionality."""
+-        # Create user
+-        user = await UserManager.insert_user("API Test User")
+-
+-        # Validate correct API key
+-        api_user = await UserManager.check_api_key(user.apikey)
+-        assert api_user is not None
+-        assert api_user.apikey == user.apikey
+-        assert api_user.userid == user.userid
+-        assert api_user.name == "API Test User"
+-
+-        # Test invalid API key
+-        invalid_user = await UserManager.check_api_key("invalid-api-key")
+-        assert invalid_user is None
++        assert found_user.user_id == user.user_id
++        assert found_user.rate_limits == user.rate_limits
+
+     @pytest.mark.asyncio
+     async def test_rate_limits_json_crud_basic(self, clean_database):
+@@ -66,14 +46,14 @@ class TestUserManagerIntegration:
+
+         # CREATE: Insert user with rate limits
+         user = await UserManager.insert_user(
+-            name="Rate Limits Test User", rate_limits=rate_limits
++            user_id="Rate Limits Test User", rate_limits=rate_limits
+         )
+
+         # Verify rate limits are stored as JSON
+         assert user.rate_limits == rate_limits.model_dump()
+
+         # READ: Retrieve user and verify rate limits JSON
+-        retrieved_user = await UserManager.check_user(user.userid)
++        retrieved_user = await UserManager.check_user(user.user_id)
+         assert retrieved_user is not None
+         assert retrieved_user.rate_limits == rate_limits.model_dump()
+
+@@ -98,11 +78,11 @@ class TestUserManagerIntegration:
+         )
+
+         user = await UserManager.insert_user(
+-            name="Update Rate Limits User", rate_limits=initial_rate_limits
++            user_id="Update Rate Limits User", rate_limits=initial_rate_limits
+         )
+
+         # Verify initial rate limits
+-        retrieved_user = await UserManager.check_user(user.userid)
++        retrieved_user = await UserManager.check_user(user.user_id)
+         assert retrieved_user is not None
+         assert retrieved_user.rate_limits == initial_rate_limits.model_dump()
+
+@@ -125,19 +105,19 @@ class TestUserManagerIntegration:
+             stmt = sa.text("""
+                 UPDATE users
+                 SET rate_limits = :rate_limits_json
+-                WHERE userid = :userid
++                WHERE user_id = :user_id
+             """)
+             await session.execute(
+                 stmt,
+                 {
+                     "rate_limits_json": updated_rate_limits.model_dump_json(),
+-                    "userid": user.userid,
++                    "user_id": user.user_id,
+                 },
+             )
+             await session.commit()
+
+         # READ: Verify the update worked
+-        updated_user = await UserManager.check_user(user.userid)
++        updated_user = await UserManager.check_user(user.user_id)
+         assert updated_user is not None
+         assert updated_user.rate_limits == updated_rate_limits.model_dump()
+
+@@ -162,11 +142,11 @@ class TestUserManagerIntegration:
+         )
+
+         user = await UserManager.insert_user(
+-            name="Partial Rate Limits User", rate_limits=partial_rate_limits
++            user_id="Partial Rate Limits User", rate_limits=partial_rate_limits
+         )
+
+         # Verify partial data is stored correctly
+-        retrieved_user = await UserManager.check_user(user.userid)
++        retrieved_user = await UserManager.check_user(user.user_id)
+         assert retrieved_user is not None
+         assert retrieved_user.rate_limits == partial_rate_limits.model_dump()
+
+@@ -183,13 +163,13 @@ class TestUserManagerIntegration:
+                     '{user_rate_limit_hour}',
+                     '75'
+                 )
+-                WHERE userid = :userid
++                WHERE user_id = :user_id
+             """)
+-            await session.execute(stmt, {"userid": user.userid})
++            await session.execute(stmt, {"user_id": user.user_id})
+             await session.commit()
+
+         # Verify partial update worked
+-        updated_user = await UserManager.check_user(user.userid)
++        updated_user = await UserManager.check_user(user.user_id)
+         assert updated_user is not None
+
+         expected_data = partial_rate_limits.model_dump()
+@@ -211,7 +191,7 @@ class TestUserManagerIntegration:
+         )
+
+         user = await UserManager.insert_user(
+-            name="Delete Rate Limits User", rate_limits=rate_limits
++            user_id="Delete Rate Limits User", rate_limits=rate_limits
+         )
+
+         # DELETE: Set rate_limits to NULL
+@@ -219,12 +199,14 @@ class TestUserManagerIntegration:
+         import sqlalchemy as sa
+
+         async with get_db_session() as session:
+-            stmt = sa.text("UPDATE users SET rate_limits = NULL WHERE userid = :userid")
+-            await session.execute(stmt, {"userid": user.userid})
++            stmt = sa.text(
++                "UPDATE users SET rate_limits = NULL WHERE user_id = :user_id"
++            )
++            await session.execute(stmt, {"user_id": user.user_id})
+             await session.commit()
+
+         # Verify NULL handling
+-        null_user = await UserManager.check_user(user.userid)
++        null_user = await UserManager.check_user(user.user_id)
+         assert null_user is not None
+         assert null_user.rate_limits is None
+
+@@ -239,15 +221,15 @@ class TestUserManagerIntegration:
+             # First set some data
+             new_data = {"user_rate_limit_day": 500, "web_search_rate_limit_day": 25}
+             stmt = sa.text(
+-                "UPDATE users SET rate_limits = :data WHERE userid = :userid"
++                "UPDATE users SET rate_limits = :data WHERE user_id = :user_id"
+             )
+             await session.execute(
+-                stmt, {"data": json.dumps(new_data), "userid": user.userid}
++                stmt, {"data": json.dumps(new_data), "user_id": user.user_id}
+             )
+             await session.commit()
+
+         # Verify data was set
+-        updated_user = await UserManager.check_user(user.userid)
++        updated_user = await UserManager.check_user(user.user_id)
+         assert updated_user is not None
+         assert updated_user.rate_limits == new_data
+
+@@ -256,13 +238,13 @@ class TestUserManagerIntegration:
+             stmt = sa.text("""
+                 UPDATE users
+                 SET rate_limits = rate_limits::jsonb - 'web_search_rate_limit_day'
+-                WHERE userid = :userid
++                WHERE user_id = :user_id
+             """)
+-            await session.execute(stmt, {"userid": user.userid})
++            await session.execute(stmt, {"user_id": user.user_id})
+             await session.commit()
+
+         # Verify field was removed
+-        final_user = await UserManager.check_user(user.userid)
++        final_user = await UserManager.check_user(user.user_id)
+         expected_final_data = {"user_rate_limit_day": 500}
+         assert final_user is not None
+         assert final_user.rate_limits == expected_final_data
+@@ -293,15 +275,15 @@ class TestUserManagerIntegration:
+         for i, test_data in enumerate(test_cases):
+             async with get_db_session() as session:
+                 stmt = sa.text(
+-                    "UPDATE users SET rate_limits = :data WHERE userid = :userid"
++                    "UPDATE users SET rate_limits = :data WHERE user_id = :user_id"
+                 )
+                 await session.execute(
+-                    stmt, {"data": json.dumps(test_data), "userid": user.userid}
++                    stmt, {"data": json.dumps(test_data), "user_id": user.user_id}
+                 )
+                 await session.commit()
+
+             # Retrieve and verify
+-            updated_user = await UserManager.check_user(user.userid)
++            updated_user = await UserManager.check_user(user.user_id)
+             assert updated_user is not None
+             assert updated_user.rate_limits == test_data
+
+@@ -327,11 +309,13 @@ class TestUserManagerIntegration:
+
+         # Test empty JSON object
+         async with get_db_session() as session:
+-            stmt = sa.text("UPDATE users SET rate_limits = '{}' WHERE userid = :userid")
+-            await session.execute(stmt, {"userid": user.userid})
++            stmt = sa.text(
++                "UPDATE users SET rate_limits = '{}' WHERE user_id = :user_id"
++            )
++            await session.execute(stmt, {"user_id": user.user_id})
+             await session.commit()
+
+-        empty_user = await UserManager.check_user(user.userid)
++        empty_user = await UserManager.check_user(user.user_id)
+         assert empty_user is not None
+         assert empty_user.rate_limits == {}
+         empty_rate_limits_obj = empty_user.rate_limits_obj
+@@ -343,18 +327,18 @@ class TestUserManagerIntegration:
+             async with get_db_session() as session:
+                 # This should work as PostgreSQL JSONB validates JSON
+                 stmt = sa.text(
+-                    "UPDATE users SET rate_limits = :data WHERE userid = :userid"
++                    "UPDATE users SET rate_limits = :data WHERE user_id = :user_id"
+                 )
+                 await session.execute(
+                     stmt,
+                     {
+                         "data": '{"user_rate_limit_day": 5000}',  # Valid JSON string
+-                        "userid": user.userid,
++                        "user_id": user.user_id,
+                     },
+                 )
+                 await session.commit()
+
+-            json_string_user = await UserManager.check_user(user.userid)
++            json_string_user = await UserManager.check_user(user.user_id)
+             assert json_string_user is not None
+             assert json_string_user.rate_limits == {"user_rate_limit_day": 5000}
+
+@@ -366,16 +350,16 @@ class TestUserManagerIntegration:
+     async def test_rate_limits_update_workflow(self, clean_database):
+         """Test complete workflow: create user with no rate limits -> update rate limits -> verify update."""
+         # Step 1: Create user with NO rate limits
+-        user = await UserManager.insert_user(name="Rate Limits Workflow User")
++        user = await UserManager.insert_user(user_id="Rate Limits Workflow User")
+
+         # Verify user was created with no rate limits
+         assert user.name == "Rate Limits Workflow User"
+-        assert user.userid is not None
++        assert user.user_id is not None
+         assert user.apikey is not None
+         assert user.rate_limits is None  # No rate limits initially
+
+         # Step 2: Retrieve user and confirm no rate limits
+-        retrieved_user = await UserManager.check_user(user.userid)
++        retrieved_user = await UserManager.check_user(user.user_id)
+         assert retrieved_user is not None
+         print(retrieved_user.to_pydantic())
+         assert retrieved_user is not None
+@@ -401,12 +385,12 @@ class TestUserManagerIntegration:
+
+         # Step 4: Update the user's rate limits using the new function
+         update_success = await UserManager.update_rate_limits(
+-            user.userid, new_rate_limits
++            user.user_id, new_rate_limits
+         )
+         assert update_success is True
+
+         # Step 5: Retrieve user again and verify rate limits were updated
+-        updated_user = await UserManager.check_user(user.userid)
++        updated_user = await UserManager.check_user(user.user_id)
+         assert updated_user is not None
+         assert updated_user.rate_limits is not None
+         assert updated_user.rate_limits == new_rate_limits.model_dump()
+@@ -431,12 +415,12 @@ class TestUserManagerIntegration:
+         )
+
+         partial_update_success = await UserManager.update_rate_limits(
+-            user.userid, partial_rate_limits
++            user.user_id, partial_rate_limits
+         )
+         assert partial_update_success is True
+
+         # Step 8: Verify partial update worked
+-        final_user = await UserManager.check_user(user.userid)
++        final_user = await UserManager.check_user(user.user_id)
+         assert final_user is not None
+         assert final_user.rate_limits == partial_rate_limits.model_dump()
+
+@@ -447,8 +431,8 @@ class TestUserManagerIntegration:
+         # Other fields should have config defaults (not None due to get_effective_limits)
+
+         # Step 9: Test error case - update non-existent user
+-        fake_userid = "non-existent-user-id"
++        fake_user_id = "non-existent-user-id"
+         error_update = await UserManager.update_rate_limits(
+-            fake_userid, new_rate_limits
++            fake_user_id, new_rate_limits
+         )
+         assert error_update is False
+diff --git a/tests/unit/nilai_api/__init__.py b/tests/unit/nilai_api/__init__.py
+index 0be5261..7cbc123 100644
+--- a/tests/unit/nilai_api/__init__.py
++++ b/tests/unit/nilai_api/__init__.py
+@@ -21,11 +21,11 @@ class MockUserDatabase:
+
+     async def insert_user(self, name: str, email: str) -> Dict[str, str]:
+         """Insert a new user into the mock database."""
+-        userid = self.generate_user_id()
++        user_id = self.generate_user_id()
+         apikey = self.generate_api_key()
+
+         user_data = {
+-            "userid": userid,
++            "user_id": user_id,
+             "name": name,
+             "email": email,
+             "apikey": apikey,
+@@ -36,34 +36,34 @@ class MockUserDatabase:
+             "last_activity": None,
+         }
+
+-        self.users[userid] = user_data
+-        return {"userid": userid, "apikey": apikey}
++        self.users[user_id] = user_data
++        return {"user_id": user_id, "apikey": apikey}
+
+     async def check_api_key(self, api_key: str) -> Optional[dict]:
+         """Validate an API key in the mock database."""
+         for user in self.users.values():
+             if user["apikey"] == api_key:
+-                return {"name": user["name"], "userid": user["userid"]}
++                return {"name": user["name"], "user_id": user["user_id"]}
+         return None
+
+     async def update_token_usage(
+-        self, userid: str, prompt_tokens: int, completion_tokens: int
++        self, user_id: str, prompt_tokens: int, completion_tokens: int
+     ):
+         """Update token usage for a specific user."""
+-        if userid in self.users:
+-            user = self.users[userid]
++        if user_id in self.users:
++            user = self.users[user_id]
+             user["prompt_tokens"] += prompt_tokens
+             user["completion_tokens"] += completion_tokens
+             user["queries"] += 1
+             user["last_activity"] = datetime.now(timezone.utc)
+
+     async def log_query(
+-        self, userid: str, model: str, prompt_tokens: int, completion_tokens: int
++        self, user_id: str, model: str, prompt_tokens: int, completion_tokens: int
+     ):
+         """Log a user's query in the mock database."""
+         query_log = {
+             "id": self._next_query_log_id,
+-            "userid": userid,
++            "user_id": user_id,
+             "query_timestamp": datetime.now(timezone.utc),
+             "model": model,
+             "prompt_tokens": prompt_tokens,
+@@ -74,9 +74,9 @@ class MockUserDatabase:
+         self.query_logs[self._next_query_log_id] = query_log
+         self._next_query_log_id += 1
+
+-    async def get_token_usage(self, userid: str) -> Optional[Dict[str, Any]]:
++    async def get_token_usage(self, user_id: str) -> Optional[Dict[str, Any]]:
+         """Get token usage for a specific user."""
+-        user = self.users.get(userid)
++        user = self.users.get(user_id)
+         if user:
+             return {
+                 "prompt_tokens": user["prompt_tokens"],
+@@ -90,9 +90,9 @@ class MockUserDatabase:
+         """Retrieve all users from the mock database."""
+         return list(self.users.values()) if self.users else None
+
+-    async def get_user_token_usage(self, userid: str) -> Optional[Dict[str, int]]:
++    async def get_user_token_usage(self, user_id: str) -> Optional[Dict[str, int]]:
+         """Retrieve total token usage for a user."""
+-        user = self.users.get(userid)
++        user = self.users.get(user_id)
+         if user:
+             return {
+                 "prompt_tokens": user["prompt_tokens"],
+diff --git a/tests/unit/nilai_api/auth/test_auth.py b/tests/unit/nilai_api/auth/test_auth.py
+index 591c447..ec1aabc 100644
+--- a/tests/unit/nilai_api/auth/test_auth.py
++++ b/tests/unit/nilai_api/auth/test_auth.py
+@@ -29,7 +29,7 @@ def mock_user_model():
+
+     mock = MagicMock(spec=UserModel)
+     mock.name = "Test User"
+-    mock.userid = "test-user-id"
++    mock.user_id = "test-user-id"
+     mock.apikey = "test-api-key"
+     mock.prompt_tokens = 0
+     mock.completion_tokens = 0
+@@ -72,11 +72,9 @@ async def test_get_auth_info_valid_token(
+
+     auth_info = await get_auth_info(credentials)
+     print(auth_info)
+-    assert auth_info.user.name == "Test User", (
+-        f"Expected Test User but got {auth_info.user.name}"
+-    )
+-    assert auth_info.user.userid == "test-user-id", (
+-        f"Expected test-user-id but got {auth_info.user.userid}"
++
++    assert auth_info.user.user_id == "test-user-id", (
++        f"Expected test-user-id but got {auth_info.user.user_id}"
+     )
+
+
+diff --git a/tests/unit/nilai_api/auth/test_strategies.py b/tests/unit/nilai_api/auth/test_strategies.py
+index 0c169f5..d362786 100644
+--- a/tests/unit/nilai_api/auth/test_strategies.py
++++ b/tests/unit/nilai_api/auth/test_strategies.py
+@@ -16,7 +16,7 @@ class TestAuthStrategies:
+         """Mock UserModel fixture"""
+         mock = MagicMock(spec=UserModel)
+         mock.name = "Test User"
+-        mock.userid = "test-user-id"
++        mock.user_id = "test-user-id"
+         mock.apikey = "test-api-key"
+         mock.prompt_tokens = 0
+         mock.completion_tokens = 0
+@@ -43,7 +43,6 @@ class TestAuthStrategies:
+             result = await api_key_strategy("test-api-key")
+
+             assert isinstance(result, AuthenticationInfo)
+-            assert result.user.name == "Test User"
+             assert result.token_rate_limit is None
+             assert result.prompt_document is None
+
+@@ -84,7 +83,6 @@ class TestAuthStrategies:
+             result = await nuc_strategy("nuc-token")
+
+             assert isinstance(result, AuthenticationInfo)
+-            assert result.user.name == "Test User"
+             assert result.token_rate_limit is None
+             assert result.prompt_document == mock_prompt_document
+
+@@ -154,7 +152,6 @@ class TestAuthStrategies:
+             result = await nuc_strategy("nuc-token")
+
+             assert isinstance(result, AuthenticationInfo)
+-            assert result.user.name == "Test User"
+             assert result.token_rate_limit is None
+             assert result.prompt_document is None
+
+@@ -201,7 +198,7 @@ class TestAuthStrategies:
+         """Test that all strategies return AuthenticationInfo with prompt_document field"""
+         mock_user_model = MagicMock(spec=UserModel)
+         mock_user_model.name = "Test"
+-        mock_user_model.userid = "test"
++        mock_user_model.user_id = "test"
+         mock_user_model.apikey = "test"
+         mock_user_model.prompt_tokens = 0
+         mock_user_model.completion_tokens = 0
+diff --git a/tests/unit/nilai_api/routers/test_nildb_endpoints.py b/tests/unit/nilai_api/routers/test_nildb_endpoints.py
+index c0103ea..0648980 100644
+--- a/tests/unit/nilai_api/routers/test_nildb_endpoints.py
++++ b/tests/unit/nilai_api/routers/test_nildb_endpoints.py
+@@ -18,8 +18,8 @@ class TestNilDBEndpoints:
+         """Mock user data for subscription owner"""
+         mock_user_model = MagicMock(spec=UserModel)
+         mock_user_model.name = "Subscription Owner"
+-        mock_user_model.userid = "owner-id"
+-        mock_user_model.apikey = "owner-id"  # Same as userid for subscription owner
++        mock_user_model.user_id = "owner-id"
++        mock_user_model.apikey = "owner-id"  # Same as user_id for subscription owner
+         mock_user_model.prompt_tokens = 0
+         mock_user_model.completion_tokens = 0
+         mock_user_model.queries = 0
+@@ -37,8 +37,8 @@ class TestNilDBEndpoints:
+         """Mock user data for regular user (not subscription owner)"""
+         mock_user_model = MagicMock(spec=UserModel)
+         mock_user_model.name = "Regular User"
+-        mock_user_model.userid = "user-id"
+-        mock_user_model.apikey = "different-api-key"  # Different from userid
++        mock_user_model.user_id = "user-id"
++        mock_user_model.apikey = "different-api-key"  # Different from user_id
+         mock_user_model.prompt_tokens = 0
+         mock_user_model.completion_tokens = 0
+         mock_user_model.queries = 0
+@@ -149,7 +149,7 @@ class TestNilDBEndpoints:
+         )
+
+         mock_user = MagicMock()
+-        mock_user.userid = "test-user-id"
++        mock_user.user_id = "test-user-id"
+         mock_user.name = "Test User"
+         mock_user.apikey = "test-api-key"
+         mock_user.rate_limits = RateLimits().get_effective_limits()
+@@ -256,7 +256,7 @@ class TestNilDBEndpoints:
+         )
+
+         mock_user = MagicMock()
+-        mock_user.userid = "test-user-id"
++        mock_user.user_id = "test-user-id"
+         mock_user.name = "Test User"
+         mock_user.apikey = "test-api-key"
+         mock_user.rate_limits = RateLimits().get_effective_limits()
+@@ -304,7 +304,7 @@ class TestNilDBEndpoints:
+         from nilai_common import ChatRequest
+
+         mock_user = MagicMock()
+-        mock_user.userid = "test-user-id"
++        mock_user.user_id = "test-user-id"
+         mock_user.name = "Test User"
+         mock_user.apikey = "test-api-key"
+         mock_user.rate_limits = RateLimits().get_effective_limits()
+@@ -419,8 +419,8 @@ class TestNilDBEndpoints:
+         self, mock_subscription_owner_user, mock_regular_user
+     ):
+         """Test the is_subscription_owner property"""
+-        # Subscription owner (userid == apikey)
++        # Subscription owner (user_id == apikey)
+         assert mock_subscription_owner_user.is_subscription_owner is True
+
+-        # Regular user (userid != apikey)
++        # Regular user (user_id != apikey)
+         assert mock_regular_user.is_subscription_owner is False
+diff --git a/tests/unit/nilai_api/routers/test_private.py b/tests/unit/nilai_api/routers/test_private.py
+index 1978e83..daafc86 100644
+--- a/tests/unit/nilai_api/routers/test_private.py
++++ b/tests/unit/nilai_api/routers/test_private.py
+@@ -20,7 +20,7 @@ async def test_runs_in_a_loop():
+ @pytest.fixture
+ def mock_user():
+     mock = MagicMock(spec=UserModel)
+-    mock.userid = "test-user-id"
++    mock.user_id = "test-user-id"
+     mock.name = "Test User"
+     mock.apikey = "test-api-key"
+     mock.prompt_tokens = 100
+@@ -66,7 +66,7 @@ def mock_user_manager(mock_user, mocker):
+         UserManager,
+         "insert_user",
+         return_value={
+-            "userid": "test-user-id",
++            "user_id": "test-user-id",
+             "apikey": "test-api-key",
+             "rate_limits": RateLimits().get_effective_limits().model_dump_json(),
+         },
+@@ -81,12 +81,12 @@ def mock_user_manager(mock_user, mocker):
+         "get_all_users",
+         return_value=[
+             {
+-                "userid": "test-user-id",
++                "user_id": "test-user-id",
+                 "apikey": "test-api-key",
+                 "rate_limits": RateLimits().get_effective_limits().model_dump_json(),
+             },
+             {
+-                "userid": "test-user-id-2",
++                "user_id": "test-user-id-2",
+                 "apikey": "test-api-key",
+                 "rate_limits": RateLimits().get_effective_limits().model_dump_json(),
+             },
+diff --git a/tests/unit/nilai_api/test_db.py b/tests/unit/nilai_api/test_db.py
+index dff0fd8..3979321 100644
+--- a/tests/unit/nilai_api/test_db.py
++++ b/tests/unit/nilai_api/test_db.py
+@@ -15,7 +15,7 @@ async def test_insert_user(mock_db):
+     """Test user insertion functionality."""
+     user = await mock_db.insert_user("Test User", "test@example.com")
+
+-    assert "userid" in user
++    assert "user_id" in user
+     assert "apikey" in user
+     assert len(mock_db.users) == 1
+
+@@ -38,9 +38,9 @@ async def test_token_usage(mock_db):
+     """Test token usage tracking."""
+     user = await mock_db.insert_user("Test User", "test@example.com")
+
+-    await mock_db.update_token_usage(user["userid"], 50, 20)
++    await mock_db.update_token_usage(user["user_id"], 50, 20)
+
+-    token_usage = await mock_db.get_token_usage(user["userid"])
++    token_usage = await mock_db.get_token_usage(user["user_id"])
+     assert token_usage["prompt_tokens"] == 50
+     assert token_usage["completion_tokens"] == 20
+     assert token_usage["queries"] == 1
+@@ -51,9 +51,9 @@ async def test_query_logging(mock_db):
+     """Test query logging functionality."""
+     user = await mock_db.insert_user("Test User", "test@example.com")
+
+-    await mock_db.log_query(user["userid"], "test-model", 10, 15)
++    await mock_db.log_query(user["user_id"], "test-model", 10, 15)
+
+     assert len(mock_db.query_logs) == 1
+     log_entry = list(mock_db.query_logs.values())[0]
+-    assert log_entry["userid"] == user["userid"]
++    assert log_entry["user_id"] == user["user_id"]
+     assert log_entry["model"] == "test-model"
+diff --git a/tests/unit/nilai_api/test_rate_limiting.py b/tests/unit/nilai_api/test_rate_limiting.py
+index 4cf53b0..82d2119 100644
+--- a/tests/unit/nilai_api/test_rate_limiting.py
++++ b/tests/unit/nilai_api/test_rate_limiting.py
+@@ -44,7 +44,7 @@ async def test_concurrent_rate_limit(req):
+     rate_limit = RateLimit(concurrent_extractor=lambda _: (5, "test"))
+
+     user_limits = UserRateLimits(
+-        subscription_holder=random_id(),
++        user_id=random_id(),
+         token_rate_limit=None,
+         rate_limits=RateLimits(
+             user_rate_limit_day=None,
+@@ -77,7 +77,7 @@ async def test_concurrent_rate_limit(req):
+     "user_limits",
+     [
+         UserRateLimits(
+-            subscription_holder=random_id(),
++            user_id=random_id(),
+             token_rate_limit=None,
+             rate_limits=RateLimits(
+                 user_rate_limit_day=10,
+@@ -91,7 +91,7 @@ async def test_concurrent_rate_limit(req):
+             ),
+         ),
+         UserRateLimits(
+-            subscription_holder=random_id(),
++            user_id=random_id(),
+             token_rate_limit=None,
+             rate_limits=RateLimits(
+                 user_rate_limit_day=None,
+@@ -105,7 +105,7 @@ async def test_concurrent_rate_limit(req):
+             ),
+         ),
+         UserRateLimits(
+-            subscription_holder=random_id(),
++            user_id=random_id(),
+             token_rate_limit=None,
+             rate_limits=RateLimits(
+                 user_rate_limit_day=None,
+@@ -119,7 +119,7 @@ async def test_concurrent_rate_limit(req):
+             ),
+         ),
+         UserRateLimits(
+-            subscription_holder=random_id(),
++            user_id=random_id(),
+             token_rate_limit=TokenRateLimits(
+                 limits=[
+                     TokenRateLimit(
+@@ -180,7 +180,7 @@ async def test_web_search_rate_limits(redis_client):
+
+     rate_limit = RateLimit(web_search_extractor=web_search_extractor)
+     user_limits = UserRateLimits(
+-        subscription_holder=apikey,
++        user_id=apikey,
+         token_rate_limit=None,
+         rate_limits=RateLimits(
+             user_rate_limit_day=None,
+@@ -212,7 +212,7 @@ async def test_global_web_search_rps_limit(req, redis_client, monkeypatch):
+
+     rate_limit = RateLimit(web_search_extractor=lambda _: True)
+     user_limits = UserRateLimits(
+-        subscription_holder=random_id(),
++        user_id=random_id(),
+         token_rate_limit=None,
+         rate_limits=RateLimits(
+             user_rate_limit_day=None,
+@@ -253,7 +253,7 @@ async def test_queueing_across_seconds(req, redis_client, monkeypatch):
+
+     rate_limit = RateLimit(web_search_extractor=lambda _: True)
+     user_limits = UserRateLimits(
+-        subscription_holder=random_id(),
++        user_id=random_id(),
+         token_rate_limit=None,
+         rate_limits=RateLimits(
+             user_rate_limit_day=None,
+diff --git a/uv.lock b/uv.lock
+index d54a2ef..1482449 100644
+--- a/uv.lock
++++ b/uv.lock
+@@ -1649,7 +1649,7 @@ requires-dist = [
+     { name = "gunicorn", specifier = ">=23.0.0" },
+     { name = "httpx", specifier = ">=0.27.2" },
+     { name = "nilai-common", editable = "packages/nilai-common" },
+-    { name = "nilauth-credit-middleware", specifier = ">=0.1.1" },
++    { name = "nilauth-credit-middleware", specifier = ">=0.1.2" },
+     { name = "nilrag", specifier = ">=0.1.11" },
+     { name = "nuc", specifier = ">=0.1.0" },
+     { name = "openai", specifier = ">=1.59.9" },
+@@ -1658,7 +1658,7 @@ requires-dist = [
+     { name = "python-dotenv", specifier = ">=1.0.1" },
+     { name = "pyyaml", specifier = ">=6.0.1" },
+     { name = "redis", specifier = ">=5.2.1" },
+-    { name = "secretvaults", git = "https://github.com/NillionNetwork/secretvaults-py?rev=feat%2Fbackport-did-key-and-ethr-parsing" },
++    { name = "secretvaults", git = "https://github.com/jcabrero/secretvaults-py?rev=main" },
+     { name = "sqlalchemy", specifier = ">=2.0.36" },
+     { name = "trafilatura", specifier = ">=1.7.0" },
+     { name = "uvicorn", specifier = ">=0.32.1" },
+@@ -1739,7 +1739,7 @@ dev = [
+
+ [[package]]
+ name = "nilauth-credit-middleware"
+-version = "0.1.1"
++version = "0.1.2"
+ source = { registry = "https://pypi.org/simple" }
+ dependencies = [
+     { name = "fastapi", extra = ["standard"] },
+@@ -1747,9 +1747,9 @@ dependencies = [
+     { name = "nuc" },
+     { name = "pydantic" },
+ ]
+-sdist = { url = "https://files.pythonhosted.org/packages/9f/cf/7716fa5f4aca83ef39d6f9f8bebc1d80d194c52c9ce6e75ee6bd1f401217/nilauth_credit_middleware-0.1.1.tar.gz", hash = "sha256:ae32c4c1e6bc083c8a7581d72a6da271ce9c0f0f9271a1694acb81ccd0a4a8bd", size = 10259, upload-time = "2025-10-16T11:15:03.918Z" }
++sdist = { url = "https://files.pythonhosted.org/packages/46/bc/ae9b2c26919151fc7193b406a98831eeef197f6ec46b0c075138e66ec016/nilauth_credit_middleware-0.1.2.tar.gz", hash = "sha256:66423a4d18aba1eb5f5d47a04c8f7ae6a19ab4e34433475aa9dc1ba398483fdd", size = 11979, upload-time = "2025-10-30T16:21:20.538Z" }
+ wheels = [
+-    { url = "https://files.pythonhosted.org/packages/a7/b5/6e4090ae2ae8848d12e43f82d8d995cd1dff9de8e947cf5fb2b8a72a828e/nilauth_credit_middleware-0.1.1-py3-none-any.whl", hash = "sha256:10a0fda4ac11f51b9a5dd7b3a8fbabc0b28ff92a170a7729ac11eb15c7b37887", size = 14919, upload-time = "2025-10-16T11:15:02.201Z" },
++    { url = "https://files.pythonhosted.org/packages/05/c3/73d55667aad701a64f3d1330d66c90a8c292fd19f054093ca74960aca1fb/nilauth_credit_middleware-0.1.2-py3-none-any.whl", hash = "sha256:31f3233e6706c6167b6246a4edb9a405d587eccb1399231223f95c0cdf1ce57c", size = 18121, upload-time = "2025-10-30T16:21:19.547Z" },
+ ]
+
+ [[package]]
+@@ -2854,8 +2854,8 @@ sdist = { url = "https://files.pythonhosted.org/packages/9b/41/bb668a6e419230354
+
+ [[package]]
+ name = "secretvaults"
+-version = "0.3.0"
+-source = { git = "https://github.com/NillionNetwork/secretvaults-py?rev=feat%2Fbackport-did-key-and-ethr-parsing#b40aebf572c6d4c94dc381e022b82724d727df23" }
++version = "0.2.1"
++source = { git = "https://github.com/jcabrero/secretvaults-py?rev=main#498ee5304fdcc730d1810fcf6172e56fa6dd7d16" }
+ dependencies = [
+     { name = "aiohttp" },
+     { name = "blindfold" },

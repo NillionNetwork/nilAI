@@ -2,11 +2,10 @@ import logging
 import uuid
 from pydantic import BaseModel, ConfigDict, Field
 
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Optional
 
 import sqlalchemy
-from sqlalchemy import Integer, String, DateTime, JSON
+from sqlalchemy import String, JSON
 from sqlalchemy.exc import SQLAlchemyError
 
 from nilai_api.db import Base, Column, get_db_session
@@ -57,21 +56,11 @@ class RateLimits(BaseModel):
 # Enhanced User Model with additional constraints and validation
 class UserModel(Base):
     __tablename__ = "users"
-
-    userid: str = Column(String(75), primary_key=True, index=True)  # type: ignore
-    name: str = Column(String(100), nullable=False)  # type: ignore
-    apikey: str = Column(String(75), unique=False, nullable=False, index=True)  # type: ignore
-    prompt_tokens: int = Column(Integer, default=0, nullable=False)  # type: ignore
-    completion_tokens: int = Column(Integer, default=0, nullable=False)  # type: ignore
-    queries: int = Column(Integer, default=0, nullable=False)  # type: ignore
-    signup_date: datetime = Column(
-        DateTime(timezone=True), server_default=sqlalchemy.func.now(), nullable=False
-    )  # type: ignore
-    last_activity: datetime = Column(DateTime(timezone=True), nullable=True)  # type: ignore
+    user_id: str = Column(String(75), primary_key=True, index=True)  # type: ignore
     rate_limits: dict = Column(JSON, nullable=True)  # type: ignore
 
     def __repr__(self):
-        return f"<User(userid={self.userid}, name={self.name})>"
+        return f"<User(user_id={self.user_id})>"
 
     @property
     def rate_limits_obj(self) -> RateLimits:
@@ -85,14 +74,7 @@ class UserModel(Base):
 
 
 class UserData(BaseModel):
-    userid: str
-    name: str
-    apikey: str
-    prompt_tokens: int = 0
-    completion_tokens: int = 0
-    queries: int = 0
-    signup_date: datetime
-    last_activity: Optional[datetime] = None
+    user_id: str  # apikey or subscription holder public key
     rate_limits: RateLimits = Field(default_factory=RateLimits().get_effective_limits)
 
     model_config = ConfigDict(from_attributes=True)
@@ -100,20 +82,9 @@ class UserData(BaseModel):
     @classmethod
     def from_sqlalchemy(cls, user: UserModel) -> "UserData":
         return cls(
-            userid=user.userid,
-            name=user.name,
-            apikey=user.apikey,
-            prompt_tokens=user.prompt_tokens or 0,
-            completion_tokens=user.completion_tokens or 0,
-            queries=user.queries or 0,
-            signup_date=user.signup_date or datetime.now(timezone.utc),
-            last_activity=user.last_activity,
+            user_id=user.user_id,
             rate_limits=user.rate_limits_obj,
         )
-
-    @property
-    def is_subscription_owner(self):
-        return self.userid == self.apikey
 
 
 class UserManager:
@@ -128,30 +99,8 @@ class UserManager:
         return str(uuid.uuid4())
 
     @staticmethod
-    async def update_last_activity(userid: str):
-        """
-        Update the last activity timestamp for a user.
-
-        Args:
-            userid (str): User's unique ID
-        """
-        try:
-            async with get_db_session() as session:
-                user = await session.get(UserModel, userid)
-                if user:
-                    user.last_activity = datetime.now(timezone.utc)
-                    await session.commit()
-                    logger.info(f"Updated last activity for user {userid}")
-                else:
-                    logger.warning(f"User {userid} not found")
-        except SQLAlchemyError as e:
-            logger.error(f"Error updating last activity: {e}")
-
-    @staticmethod
     async def insert_user(
-        name: str,
-        apikey: str | None = None,
-        userid: str | None = None,
+        user_id: str | None = None,
         rate_limits: RateLimits | None = None,
     ) -> UserModel:
         """
@@ -160,19 +109,16 @@ class UserManager:
         Args:
             name (str): Name of the user
             apikey (str): API key for the user
-            userid (str): Unique ID for the user
+            user_id (str): Unique ID for the user
             rate_limits (RateLimits): Rate limit configuration
 
         Returns:
             UserModel: The created user model
         """
-        userid = userid if userid else UserManager.generate_user_id()
-        apikey = apikey if apikey else UserManager.generate_api_key()
+        user_id = user_id if user_id else UserManager.generate_user_id()
 
         user = UserModel(
-            userid=userid,
-            name=name,
-            apikey=apikey,
+            user_id=user_id,
             rate_limits=rate_limits.model_dump() if rate_limits else None,
         )
         return await UserManager.insert_user_model(user)
@@ -189,35 +135,14 @@ class UserManager:
             async with get_db_session() as session:
                 session.add(user)
                 await session.commit()
-                logger.info(f"User {user.name} added successfully.")
+                logger.info(f"User {user.user_id} added successfully.")
                 return user
         except SQLAlchemyError as e:
             logger.error(f"Error inserting user: {e}")
             raise
 
     @staticmethod
-    async def check_user(userid: str) -> Optional[UserModel]:
-        """
-        Validate a user.
-
-        Args:
-            userid (str): User ID to validate
-
-        Returns:
-            User's name if user is valid, None otherwise
-        """
-        try:
-            async with get_db_session() as session:
-                query = sqlalchemy.select(UserModel).filter(UserModel.userid == userid)  # type: ignore
-                user = await session.execute(query)
-                user = user.scalar_one_or_none()
-                return user
-        except SQLAlchemyError as e:
-            logger.error(f"Error checking API key: {e}")
-            return None
-
-    @staticmethod
-    async def check_api_key(api_key: str) -> Optional[UserModel]:
+    async def check_user(user_id: str) -> Optional[UserModel]:
         """
         Validate an API key.
 
@@ -225,118 +150,27 @@ class UserManager:
             api_key (str): API key to validate
 
         Returns:
-            User's name if API key is valid, None otherwise
+            User's rate limits if user id is valid, None otherwise
         """
         try:
             async with get_db_session() as session:
-                query = sqlalchemy.select(UserModel).filter(UserModel.apikey == api_key)  # type: ignore
+                query = sqlalchemy.select(UserModel).filter(
+                    UserModel.user_id == user_id  # type: ignore
+                )
                 user = await session.execute(query)
                 user = user.scalar_one_or_none()
                 return user
         except SQLAlchemyError as e:
-            logger.error(f"Error checking API key: {e}")
+            logger.error(f"Rate limit checking user id: {e}")
             return None
 
     @staticmethod
-    async def update_token_usage(
-        userid: str, prompt_tokens: int, completion_tokens: int
-    ):
-        """
-        Update token usage for a specific user.
-
-        Args:
-            userid (str): User's unique ID
-            prompt_tokens (int): Number of input tokens
-            completion_tokens (int): Number of generated tokens
-        """
-        try:
-            async with get_db_session() as session:
-                user = await session.get(UserModel, userid)
-                if user:
-                    user.prompt_tokens += prompt_tokens
-                    user.completion_tokens += completion_tokens
-                    user.queries += 1
-                    await session.commit()
-                    logger.info(f"Updated token usage for user {userid}")
-                else:
-                    logger.warning(f"User {userid} not found")
-        except SQLAlchemyError as e:
-            logger.error(f"Error updating token usage: {e}")
-
-    @staticmethod
-    async def get_token_usage(userid: str) -> Optional[Dict[str, Any]]:
-        """
-        Get token usage for a specific user.
-
-        Args:
-            userid (str): User's unique ID
-        """
-        try:
-            async with get_db_session() as session:
-                user = await session.get(UserModel, userid)
-                if user:
-                    return {
-                        "prompt_tokens": user.prompt_tokens,
-                        "completion_tokens": user.completion_tokens,
-                        "total_tokens": user.prompt_tokens + user.completion_tokens,
-                        "queries": user.queries,
-                    }
-                else:
-                    logger.warning(f"User {userid} not found")
-                    return None
-        except SQLAlchemyError as e:
-            logger.error(f"Error updating token usage: {e}")
-            return None
-
-    @staticmethod
-    async def get_all_users() -> Optional[List[UserData]]:
-        """
-        Retrieve all users from the database.
-
-        Returns:
-            List of UserData or None if no users found
-        """
-        try:
-            async with get_db_session() as session:
-                users = await session.execute(sqlalchemy.select(UserModel))
-                users = users.scalars().all()
-                return [UserData.from_sqlalchemy(user) for user in users]
-        except SQLAlchemyError as e:
-            logger.error(f"Error retrieving all users: {e}")
-            return None
-
-    @staticmethod
-    async def get_user_token_usage(userid: str) -> Optional[Dict[str, int]]:
-        """
-        Retrieve total token usage for a user.
-
-        Args:
-            userid (str): User's unique ID
-
-        Returns:
-            Dict of token usage or None if user not found
-        """
-        try:
-            async with get_db_session() as session:
-                user = await session.get(UserModel, userid)
-                if user:
-                    return {
-                        "prompt_tokens": user.prompt_tokens,
-                        "completion_tokens": user.completion_tokens,
-                        "queries": user.queries,
-                    }
-                return None
-        except SQLAlchemyError as e:
-            logger.error(f"Error retrieving token usage: {e}")
-            return None
-
-    @staticmethod
-    async def update_rate_limits(userid: str, rate_limits: RateLimits) -> bool:
+    async def update_rate_limits(user_id: str, rate_limits: RateLimits) -> bool:
         """
         Update rate limits for a specific user.
 
         Args:
-            userid (str): User's unique ID
+            user_id (str): User's unique ID
             rate_limits (RateLimits): New rate limit configuration
 
         Returns:
@@ -344,14 +178,14 @@ class UserManager:
         """
         try:
             async with get_db_session() as session:
-                user = await session.get(UserModel, userid)
+                user = await session.get(UserModel, user_id)
                 if user:
                     user.rate_limits = rate_limits.model_dump()
                     await session.commit()
-                    logger.info(f"Updated rate limits for user {userid}")
+                    logger.info(f"Updated rate limits for user {user_id}")
                     return True
                 else:
-                    logger.warning(f"User {userid} not found")
+                    logger.warning(f"User {user_id} not found")
                     return False
         except SQLAlchemyError as e:
             logger.error(f"Error updating rate limits: {e}")

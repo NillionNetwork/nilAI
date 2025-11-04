@@ -43,61 +43,25 @@ def mock_user_manager(mock_user, mocker):
     from nilai_api.db.users import UserManager
     from nilai_api.db.logs import QueryLogManager
 
+    # Patch QueryLogManager for usage
     mocker.patch.object(
-        UserManager,
-        "get_token_usage",
-        return_value={
-            "prompt_tokens": 100,
-            "completion_tokens": 50,
-            "total_tokens": 150,
-            "queries": 10,
-        },
-    )
-    mocker.patch.object(UserManager, "update_token_usage")
-    mocker.patch.object(
-        UserManager,
+        QueryLogManager,
         "get_user_token_usage",
         return_value={
             "prompt_tokens": 100,
             "completion_tokens": 50,
-            "total_tokens": 150,
-            "completion_tokens_details": None,
-            "prompt_tokens_details": None,
             "queries": 10,
         },
     )
+    mocker.patch.object(QueryLogManager, "log_query")
+    
+    # Patch UserManager.check_user instead of check_api_key
     mocker.patch.object(
         UserManager,
-        "insert_user",
-        return_value={
-            "userid": "test-user-id",
-            "apikey": "test-api-key",
-            "rate_limits": RateLimits().get_effective_limits().model_dump_json(),
-        },
-    )
-    mocker.patch.object(
-        UserManager,
-        "check_api_key",
+        "check_user",
         return_value=mock_user,
     )
-    mocker.patch.object(
-        UserManager,
-        "get_all_users",
-        return_value=[
-            {
-                "userid": "test-user-id",
-                "apikey": "test-api-key",
-                "rate_limits": RateLimits().get_effective_limits().model_dump_json(),
-            },
-            {
-                "userid": "test-user-id-2",
-                "apikey": "test-api-key",
-                "rate_limits": RateLimits().get_effective_limits().model_dump_json(),
-            },
-        ],
-    )
-    mocker.patch.object(QueryLogManager, "log_query")
-    mocker.patch.object(UserManager, "update_last_activity")
+    
     return UserManager
 
 
@@ -107,6 +71,7 @@ def mock_state(mocker):
 
     mock_discovery_service = mocker.Mock()
     mock_discovery_service.discover_models = AsyncMock(return_value=expected_models)
+    mock_discovery_service.initialize = AsyncMock()
 
     mocker.patch.object(state, "discovery_service", mock_discovery_service)
 

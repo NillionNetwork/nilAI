@@ -20,6 +20,9 @@ logger = logging.getLogger(__name__)
 class NoOpMeteringContext:
     """A no-op metering context for requests that should skip metering (e.g., Docs Token)."""
 
+    def __init__(self):
+        self.lock_id: str = "noop-lock-id"
+
     def set_response(self, response_data: dict) -> None:
         """No-op method that does nothing."""
         pass
