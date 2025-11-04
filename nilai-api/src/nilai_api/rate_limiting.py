@@ -1,4 +1,3 @@
-import asyncio
 from asyncio import iscoroutine
 from typing import Callable, Tuple, Awaitable, Annotated
 
@@ -157,52 +156,34 @@ class RateLimit:
             )
 
             if web_search_enabled:
-                allowed_rps = min(
-                    CONFIG.web_search.rps,
-                    max(
-                        1,
-                        CONFIG.web_search.max_concurrent_requests
-                        // CONFIG.web_search.count,
-                    ),
-                )
-                await self.wait_for_bucket(
+                await self.check_bucket(
                     redis,
                     redis_rate_limit_command,
-                    "global:web_search:rps",
-                    allowed_rps,
-                    1000,
+                    f"web_search_minute:{user_limits.subscription_holder}",
+                    user_limits.rate_limits.web_search_rate_limit_minute,
+                    MINUTE_MS,
                 )
-
+                await self.check_bucket(
+                    redis,
+                    redis_rate_limit_command,
+                    f"web_search_hour:{user_limits.subscription_holder}",
+                    user_limits.rate_limits.web_search_rate_limit_hour,
+                    HOUR_MS,
+                )
+                await self.check_bucket(
+                    redis,
+                    redis_rate_limit_command,
+                    f"web_search_day:{user_limits.subscription_holder}",
+                    user_limits.rate_limits.web_search_rate_limit_day,
+                    DAY_MS,
+                )
                 await self.check_bucket(
                     redis,
                     redis_rate_limit_command,
                     f"web_search:{user_limits.subscription_holder}",
                     user_limits.rate_limits.web_search_rate_limit,
-                    0,  # No expiration for for-good rate limit
+                    0,
                 )
-
-                web_search_limits = [
-                    (
-                        user_limits.rate_limits.web_search_rate_limit_minute,
-                        MINUTE_MS,
-                        "minute",
-                    ),
-                    (
-                        user_limits.rate_limits.web_search_rate_limit_hour,
-                        HOUR_MS,
-                        "hour",
-                    ),
-                    (user_limits.rate_limits.web_search_rate_limit_day, DAY_MS, "day"),
-                ]
-
-                for limit, milliseconds, time_unit in web_search_limits:
-                    await self.check_bucket(
-                        redis,
-                        redis_rate_limit_command,
-                        f"web_search_{time_unit}:{user_limits.subscription_holder}",
-                        limit,
-                        milliseconds,
-                    )
 
         key = await self.check_concurrent_and_increment(redis, request)
         try:
@@ -230,24 +211,6 @@ class RateLimit:
                 detail="Too Many Requests",
                 headers={"Retry-After": str(expire)},
             )
-
-    @staticmethod
-    async def wait_for_bucket(
-        redis: Redis,
-        redis_rate_limit_command: str,
-        key: str,
-        times: int | None,
-        milliseconds: int,
-    ):
-        if times is None:
-            return
-        while True:
-            expire = await redis.evalsha(
-                redis_rate_limit_command, 1, key, str(times), str(milliseconds)
-            )  # type: ignore
-            if int(expire) == 0:
-                return
-            await asyncio.sleep((int(expire) + 50) / 1000)
 
     async def check_concurrent_and_increment(
         self, redis: Redis, request: Request

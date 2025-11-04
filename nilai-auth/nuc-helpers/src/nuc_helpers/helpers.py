@@ -250,7 +250,6 @@ def get_invocation_token(
     delegation_token: RootToken | DelegationToken,
     nilai_public_key: NilAuthPublicKey,
     delegated_key: NilAuthPrivateKey,
-    expires_at: datetime.datetime | None = None,
 ) -> InvocationToken:
     """
     Make an invocation token for the given delegated token and nilai public key
@@ -262,14 +261,12 @@ def get_invocation_token(
     """
     delegated_token_envelope = NucTokenEnvelope.parse(delegation_token.token)
 
-    builder = (
+    invocation = (
         NucTokenBuilder.extending(delegated_token_envelope)
         .body(InvocationBody(args={}))
         .audience(Did(nilai_public_key.serialize()))
+        .build(delegated_key)
     )
-    if expires_at is not None:
-        builder = builder.expires_at(expires_at)
-    invocation = builder.build(delegated_key)
     return InvocationToken(token=invocation)
 
 

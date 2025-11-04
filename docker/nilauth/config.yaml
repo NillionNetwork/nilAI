@@ -12,7 +12,7 @@ payments:
 
   subscriptions:
     renewal_threshold_seconds: 1000
-    length_seconds: 120
+    length_seconds: 900
     dollar_cost:
       nilai: 1
       nildb: 1
