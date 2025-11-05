@@ -94,7 +94,7 @@ services:
       retries: 5
 
   nilauth-credit-server:
-    image: ghcr.io/nillionnetwork/nilauth-credit:sha-cb9e36a
+    image: ghcr.io/nillionnetwork/nilauth-credit:sha-6754a1d
     platform: linux/amd64 # for macOS to force running on Rosetta 2
     environment:
       DATABASE_URL: postgresql://nilauth:nilauth_dev_password@nilauth-postgres:5432/nilauth_credit
