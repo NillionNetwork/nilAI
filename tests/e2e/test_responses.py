@@ -2,7 +2,9 @@ import json
 import os
 import httpx
 import pytest
+import pytest_asyncio
 from openai import OpenAI
+from openai import AsyncOpenAI
 
 from .config import BASE_URL, test_models, AUTH_STRATEGY, api_key_getter
 from .nuc import (
@@ -22,10 +24,31 @@ def _create_openai_client(api_key: str) -> OpenAI:
     )
 
 
+def _create_async_openai_client(api_key: str) -> AsyncOpenAI:
+    transport = httpx.AsyncHTTPTransport(verify=False)
+    return AsyncOpenAI(
+        base_url=BASE_URL,
+        api_key=api_key,
+        http_client=httpx.AsyncClient(transport=transport),
+    )
+
+
 @pytest.fixture
 def client():
     invocation_token: str = api_key_getter()
     return _create_openai_client(invocation_token)
+
+
+@pytest_asyncio.fixture
+async def async_client():
+    invocation_token: str = api_key_getter()
+    transport = httpx.AsyncHTTPTransport(verify=False)
+    httpx_client = httpx.AsyncClient(transport=transport)
+    client = AsyncOpenAI(
+        base_url=BASE_URL, api_key=invocation_token, http_client=httpx_client
+    )
+    yield client
+    await httpx_client.aclose()
 
 
 @pytest.fixture

@@ -46,3 +46,4 @@ if ENVIRONMENT not in models:
         f"Environment {ENVIRONMENT} not found in models, using {ENVIRONMENT} as default"
     )
 test_models = models[ENVIRONMENT]
+WEB_SEARCH_RPS = getattr(CONFIG.web_search, "rps", None)

@@ -13,7 +13,9 @@ import os
 import re
 import httpx
 import pytest
+import pytest_asyncio
 from openai import OpenAI
+from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletion
 from .config import BASE_URL, test_models, AUTH_STRATEGY, api_key_getter
 from .nuc import (
@@ -33,12 +35,33 @@ def _create_openai_client(api_key: str) -> OpenAI:
     )
 
 
+def _create_async_openai_client(api_key: str) -> AsyncOpenAI:
+    transport = httpx.AsyncHTTPTransport(verify=False)
+    return AsyncOpenAI(
+        base_url=BASE_URL,
+        api_key=api_key,
+        http_client=httpx.AsyncClient(transport=transport),
+    )
+
+
 @pytest.fixture
 def client():
     """Create an OpenAI client configured to use the Nilai API"""
     invocation_token: str = api_key_getter()
 
     return _create_openai_client(invocation_token)
+
+
+@pytest_asyncio.fixture
+async def async_client():
+    invocation_token: str = api_key_getter()
+    transport = httpx.AsyncHTTPTransport(verify=False)
+    httpx_client = httpx.AsyncClient(transport=transport)
+    client = AsyncOpenAI(
+        base_url=BASE_URL, api_key=invocation_token, http_client=httpx_client
+    )
+    yield client
+    await httpx_client.aclose()
 
 
 @pytest.fixture
@@ -60,6 +83,33 @@ def nildb_client():
     """Create an OpenAI client configured to use the Nilai API with rate limiting"""
     invocation_token = get_nildb_nuc_token()
     return _create_openai_client(invocation_token.token)
+
+
+@pytest.fixture
+def high_web_search_rate_limit(monkeypatch):
+    """Set high rate limits for web search for RPS tests"""
+    monkeypatch.setenv("WEB_SEARCH_RATE_LIMIT_MINUTE", "9999")
+    monkeypatch.setenv("WEB_SEARCH_RATE_LIMIT_HOUR", "9999")
+    monkeypatch.setenv("WEB_SEARCH_RATE_LIMIT_DAY", "9999")
+    monkeypatch.setenv("WEB_SEARCH_RATE_LIMIT", "9999")
+    monkeypatch.setenv("USER_RATE_LIMIT_MINUTE", "9999")
+    monkeypatch.setenv("USER_RATE_LIMIT_HOUR", "9999")
+    monkeypatch.setenv("USER_RATE_LIMIT_DAY", "9999")
+    monkeypatch.setenv("USER_RATE_LIMIT", "9999")
+    monkeypatch.setenv(
+        "MODEL_CONCURRENT_RATE_LIMIT",
+        (
+            '{"meta-llama/Llama-3.2-1B-Instruct": 500, '
+            '"meta-llama/Llama-3.2-3B-Instruct": 500, '
+            '"meta-llama/Llama-3.1-8B-Instruct": 300, '
+            '"cognitivecomputations/Dolphin3.0-Llama3.1-8B": 300, '
+            '"deepseek-ai/DeepSeek-R1-Distill-Qwen-14B": 50, '
+            '"hugging-quants/Meta-Llama-3.1-70B-Instruct-AWQ-INT4": 50, '
+            '"openai/gpt-oss-20b": 500, '
+            '"google/gemma-3-27b-it": 500, '
+            '"default": 500}'
+        ),
+    )
 
 
 @pytest.mark.parametrize(
@@ -248,7 +298,7 @@ def test_streaming_chat_completion(client, model):
         for chunk in stream:
             chunk_count += 1
             if chunk.choices and chunk.choices[0].delta.content:
-                content_piece = chunk.choices[0].delta.content
+                content_piece = chunk.choices[0].delta.content or ""
                 full_content += content_piece
 
                 print(f"Model {model} stream chunk {chunk_count}: {chunk}")
@@ -743,7 +793,7 @@ def test_model_streaming_request_high_token(client):
     "model",
     test_models,
 )
-def test_web_search(client, model):
+def test_web_search(client, model, high_web_search_rate_limit):
     """Test web_search functionality with proper source validation."""
 
     response = client.chat.completions.create(
