@@ -1,5 +1,7 @@
 # Import all configuration models
 import json
+import logging
+from pydantic import BaseModel
 from .environment import EnvironmentConfig
 from .database import DatabaseConfig, EtcdConfig, RedisConfig
 from .auth import AuthConfig, DocsConfig
@@ -7,8 +9,6 @@ from .nildb import NilDBConfig
 from .web_search import WebSearchSettings
 from .rate_limiting import RateLimitingConfig
 from .utils import create_config_model, CONFIG_DATA
-from pydantic import BaseModel
-import logging
 
 
 class NilAIConfig(BaseModel):
@@ -38,19 +38,25 @@ class NilAIConfig(BaseModel):
 
     def prettify(self):
         """Print the config in a pretty format removing passwords and other sensitive information"""
-        config_dict = self.model_dump()
-        keywords = ["pass", "token", "key"]
-        for key, value in config_dict.items():
-            if isinstance(value, str):
-                for keyword in keywords:
-                    print(key, keyword, keyword in key)
-                    if keyword in key and value is not None:
-                        config_dict[key] = "***************"
-            if isinstance(value, dict):
-                for k, v in value.items():
-                    for keyword in keywords:
-                        if keyword in k and v is not None:
-                            value[k] = "***************"
+        config_dict = self.model_dump(mode="json")
+
+        keywords = {"pass", "token", "key"}
+        for key, value in list(config_dict.items()):
+            if (
+                isinstance(value, str)
+                and any(k in key for k in keywords)
+                and value is not None
+            ):
+                config_dict[key] = "***************"
+            elif isinstance(value, dict):
+                for k, v in list(value.items()):
+                    if (
+                        isinstance(v, str)
+                        and any(kw in k for kw in keywords)
+                        and v is not None
+                    ):
+                        value[k] = "***************"
+
         return json.dumps(config_dict, indent=4)
 
 

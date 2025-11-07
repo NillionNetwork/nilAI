@@ -4,7 +4,7 @@
 # Verifier: Validate an attestation token against a remote policy
 # Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
-from nilai_common.api_model import AttestationReport
+from nilai_common.api_models import AttestationReport
 import json
 import base64
 from nilai_common.logger import setup_logger

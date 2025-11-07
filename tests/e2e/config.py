@@ -37,7 +37,7 @@ models = {
         "meta-llama/Llama-3.2-1B-Instruct",
         "meta-llama/Llama-3.1-8B-Instruct",
     ],
-    "ci": ["meta-llama/Llama-3.2-1B-Instruct"],
+    "ci": ["openai/gpt-oss-20b"],
 }
 
 if ENVIRONMENT not in models:
@@ -46,3 +46,4 @@ if ENVIRONMENT not in models:
         f"Environment {ENVIRONMENT} not found in models, using {ENVIRONMENT} as default"
     )
 test_models = models[ENVIRONMENT]
+WEB_SEARCH_RPS = getattr(CONFIG.web_search, "rps", None)

@@ -11,6 +11,7 @@ import pytest_asyncio
 from fastapi import HTTPException, Request
 
 from nilai_api.rate_limiting import RateLimit, UserRateLimits, setup_redis_conn
+from nilai_api.config import CONFIG
 
 
 @pytest_asyncio.fixture
@@ -70,6 +71,45 @@ async def test_concurrent_rate_limit(req):
 
     futures = [consume_generator(rate_limit(req, user_limits)) for _ in range(5)]
     await asyncio.gather(*futures)
+
+
+@pytest.mark.asyncio
+async def test_web_search_rps_limit(redis_client):
+    mock_request = MagicMock(spec=Request)
+    mock_request.state.redis = redis_client[0]
+    mock_request.state.redis_rate_limit_command = redis_client[1]
+    # Ensure a clean slate for the global RPS key used by the limiter
+    await redis_client[0].delete("web_search_rps")
+
+    async def web_search_extractor(_):
+        return True
+
+    rate_limit = RateLimit(web_search_extractor=web_search_extractor)
+    user_limits = UserRateLimits(
+        subscription_holder=random_id(),
+        token_rate_limit=None,
+        rate_limits=RateLimits(
+            user_rate_limit_day=None,
+            user_rate_limit_hour=None,
+            user_rate_limit_minute=None,
+            web_search_rate_limit_day=None,
+            web_search_rate_limit_hour=None,
+            web_search_rate_limit_minute=None,
+            user_rate_limit=None,
+            web_search_rate_limit=None,
+        ),
+    )
+
+    old_rps = CONFIG.web_search.rps
+    CONFIG.web_search.rps = 2
+    try:
+        await consume_generator(rate_limit(mock_request, user_limits))
+        await consume_generator(rate_limit(mock_request, user_limits))
+        with pytest.raises(HTTPException):
+            await consume_generator(rate_limit(mock_request, user_limits))
+    finally:
+        CONFIG.web_search.rps = old_rps
+        await redis_client[0].delete("web_search_rps")
 
 
 @pytest.mark.asyncio
@@ -199,86 +239,3 @@ async def test_web_search_rate_limits(redis_client):
     # Second request should be rejected due to minute limit (1 per minute)
     with pytest.raises(HTTPException):
         await consume_generator(rate_limit(mock_request, user_limits))
-
-
-@pytest.mark.asyncio
-async def test_global_web_search_rps_limit(req, redis_client, monkeypatch):
-    from nilai_api.config import CONFIG
-
-    await redis_client[0].delete("global:web_search:rps")
-    monkeypatch.setattr(CONFIG.web_search, "rps", 20)
-    monkeypatch.setattr(CONFIG.web_search, "max_concurrent_requests", 20)
-    monkeypatch.setattr(CONFIG.web_search, "count", 1)
-
-    rate_limit = RateLimit(web_search_extractor=lambda _: True)
-    user_limits = UserRateLimits(
-        subscription_holder=random_id(),
-        token_rate_limit=None,
-        rate_limits=RateLimits(
-            user_rate_limit_day=None,
-            user_rate_limit_hour=None,
-            user_rate_limit_minute=None,
-            web_search_rate_limit_day=None,
-            web_search_rate_limit_hour=None,
-            web_search_rate_limit_minute=None,
-            user_rate_limit=None,
-            web_search_rate_limit=None,
-        ),
-    )
-
-    async def run_guarded(i, times, t0):
-        async for _ in rate_limit(req, user_limits):
-            times[i] = asyncio.get_event_loop().time() - t0
-            await asyncio.sleep(0.01)
-
-    n = 40
-    times = [0.0] * n
-    t0 = asyncio.get_event_loop().time()
-    tasks = [asyncio.create_task(run_guarded(i, times, t0)) for i in range(n)]
-    await asyncio.gather(*tasks)
-
-    within_first_second = [t for t in times if t < 1.0]
-    assert len(within_first_second) <= 20
-    assert max(times) >= 1.0
-
-
-@pytest.mark.asyncio
-async def test_queueing_across_seconds(req, redis_client, monkeypatch):
-    from nilai_api.config import CONFIG
-
-    await redis_client[0].delete("global:web_search:rps")
-    monkeypatch.setattr(CONFIG.web_search, "rps", 20)
-    monkeypatch.setattr(CONFIG.web_search, "max_concurrent_requests", 20)
-    monkeypatch.setattr(CONFIG.web_search, "count", 1)
-
-    rate_limit = RateLimit(web_search_extractor=lambda _: True)
-    user_limits = UserRateLimits(
-        subscription_holder=random_id(),
-        token_rate_limit=None,
-        rate_limits=RateLimits(
-            user_rate_limit_day=None,
-            user_rate_limit_hour=None,
-            user_rate_limit_minute=None,
-            web_search_rate_limit_day=None,
-            web_search_rate_limit_hour=None,
-            web_search_rate_limit_minute=None,
-            user_rate_limit=None,
-            web_search_rate_limit=None,
-        ),
-    )
-
-    async def run_guarded(i, times, t0):
-        async for _ in rate_limit(req, user_limits):
-            times[i] = asyncio.get_event_loop().time() - t0
-            await asyncio.sleep(0.01)
-
-    n = 25
-    times = [0.0] * n
-    t0 = asyncio.get_event_loop().time()
-    tasks = [asyncio.create_task(run_guarded(i, times, t0)) for i in range(n)]
-    await asyncio.gather(*tasks)
-
-    first_window = [t for t in times if t < 1.0]
-    second_window = [t for t in times if 1.0 <= t < 2.0]
-    assert len(first_window) <= 20
-    assert len(second_window) >= 1

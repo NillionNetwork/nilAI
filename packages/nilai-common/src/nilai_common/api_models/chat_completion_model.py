@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import uuid
 from typing import (
-    Annotated,
     Iterable,
     List,
     Optional,
@@ -34,60 +32,18 @@ from openai.types.chat.chat_completion_content_part_image_param import (
 from openai.types.chat.chat_completion import Choice as OpenaAIChoice
 from pydantic import BaseModel, Field
 
-ChatToolFunction: TypeAlias = Function
+from nilai_common.api_models.common_model import Source
 
-# ---------- Aliases from the OpenAI SDK ----------
+ChatToolFunction: TypeAlias = Function
 ImageContent: TypeAlias = ChatCompletionContentPartImageParam
 TextContent: TypeAlias = ChatCompletionContentPartTextParam
-Message: TypeAlias = ChatCompletionMessageParam  # SDK union of message shapes
-
-
-# ---------- Domain-specific objects for web search ----------
-class ResultContent(BaseModel):
-    text: str
-    truncated: bool = False
+Message: TypeAlias = ChatCompletionMessageParam
 
 
 class Choice(OpenaAIChoice):
     pass
 
 
-class Source(BaseModel):
-    source: str
-    content: str
-
-
-class SearchResult(BaseModel):
-    title: str
-    body: str
-    url: str
-    content: ResultContent | None = None
-
-    def as_source(self) -> "Source":
-        text = self.content.text if self.content else self.body
-        return Source(source=self.url, content=text)
-
-    def model_post_init(self, __context) -> None:
-        # Auto-derive structured fields when not provided
-        if self.content is None and isinstance(self.body, str) and self.body:
-            self.content = ResultContent(text=self.body)
-
-
-class Topic(BaseModel):
-    topic: str
-    needs_search: bool = Field(..., alias="needs_search")
-
-
-class TopicResponse(BaseModel):
-    topics: List[Topic]
-
-
-class TopicQuery(BaseModel):
-    topic: str
-    query: str
-
-
-# ---------- Helpers ----------
 def _extract_text_from_content(content: Any) -> Optional[str]:
     """
     - If content is a str -> return it (stripped) if non-empty.
@@ -109,7 +65,6 @@ def _extract_text_from_content(content: Any) -> Optional[str]:
     return None
 
 
-# ---------- Adapter over the raw SDK message ----------
 class MessageAdapter(BaseModel):
     """Thin wrapper around an OpenAI ChatCompletionMessageParam with convenience methods."""
 
@@ -126,8 +81,6 @@ class MessageAdapter(BaseModel):
     ) -> None:
         if not isinstance(value, str):
             raise TypeError("role must be a string")
-        # Update the underlying SDK message dict
-        # Cast to Any to bypass TypedDict restrictions
         cast(Any, self.raw)["role"] = value
 
     @property
@@ -136,8 +89,6 @@ class MessageAdapter(BaseModel):
 
     @content.setter
     def content(self, value: Any) -> None:
-        # Update the underlying SDK message dict
-        # Cast to Any to bypass TypedDict restrictions
         cast(Any, self.raw)["content"] = value
 
     @staticmethod
@@ -234,7 +185,6 @@ def adapt_messages(msgs: List[Message]) -> List[MessageAdapter]:
     return [MessageAdapter(raw=m) for m in msgs]
 
 
-# ---------- Your additional containers ----------
 class WebSearchEnhancedMessages(BaseModel):
     messages: List[Message]
     sources: List[Source]
@@ -247,7 +197,6 @@ class WebSearchContext(BaseModel):
     sources: List[Source]
 
 
-# ---------- Request/response models ----------
 class ChatRequest(BaseModel):
     model: str
     messages: List[Message] = Field(..., min_length=1)
@@ -264,7 +213,6 @@ class ChatRequest(BaseModel):
     )
 
     def model_post_init(self, __context) -> None:
-        # Process messages after model initialization
         for i, msg in enumerate(self.messages):
             content = msg.get("content")
             if (
@@ -272,7 +220,6 @@ class ChatRequest(BaseModel):
                 and hasattr(content, "__iter__")
                 and hasattr(content, "__next__")
             ):
-                # Convert iterator to list in place
                 cast(Any, msg)["content"] = list(content)
 
     @property
@@ -338,52 +285,3 @@ class SignedChatCompletion(ChatCompletion):
     sources: Optional[List[Source]] = Field(
         default=None, description="Sources used for web search when enabled"
     )
-
-
-class ModelMetadata(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    name: str
-    version: str
-    description: str
-    author: str
-    license: str
-    source: str
-    supported_features: List[str]
-    tool_support: bool
-    multimodal_support: bool = False
-
-
-class ModelEndpoint(BaseModel):
-    url: str
-    metadata: ModelMetadata
-
-
-class HealthCheckResponse(BaseModel):
-    status: str
-    uptime: str
-
-
-# ---------- Attestation ----------
-Nonce = Annotated[
-    str,
-    Field(
-        max_length=64,
-        min_length=64,
-        description="The nonce to be used for the attestation",
-    ),
-]
-
-AMDAttestationToken = Annotated[
-    str, Field(description="The attestation token from AMD's attestation service")
-]
-
-NVAttestationToken = Annotated[
-    str, Field(description="The attestation token from NVIDIA's attestation service")
-]
-
-
-class AttestationReport(BaseModel):
-    nonce: Nonce
-    verifying_key: Annotated[str, Field(description="PEM encoded public key")]
-    cpu_attestation: AMDAttestationToken
-    gpu_attestation: NVAttestationToken

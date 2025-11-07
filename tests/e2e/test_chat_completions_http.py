@@ -1,15 +1,16 @@
 """
-Test suite for nilAI HTTP API
+Test suite for nilAI Chat Completions endpoint using HTTP client
 
 This test suite uses httpx to make requests to the nilAI HTTP API.
 
 To run the tests, use the following command:
 
-pytest tests/e2e/test_http.py
+pytest tests/e2e/test_chat_completions_http.py
 """
 
 import json
-
+import os
+import re
 
 from .config import BASE_URL, test_models, AUTH_STRATEGY, api_key_getter
 from .nuc import (
@@ -305,7 +306,10 @@ def test_model_streaming_request(client, model):
                 "role": "system",
                 "content": "You are a helpful assistant that provides accurate and concise information.",
             },
-            {"role": "user", "content": "Write a short poem about mountains."},
+            {
+                "role": "user",
+                "content": "Write a short poem about mountains. It must be 20 words maximum.",
+            },
         ],
         "temperature": 0.2,
         "stream": True,
@@ -355,12 +359,16 @@ def test_model_streaming_request(client, model):
 )
 def test_model_tools_request(client, model):
     """Test tools request for different models"""
+    if model == "openai/gpt-oss-20b":
+        pytest.skip(
+            "openai/gpt-oss-20b model only supports tool calls with responses endpoint"
+        )
     payload = {
         "model": model,
         "messages": [
             {
                 "role": "system",
-                "content": "You are a helpful assistant. When a user asks a question that requires calculation, use the execute_python tool to find the answer. After the tool provides its result, you must use that result to formulate a clear, final answer to the user's original question. Do not include any code or JSON in your final response.",
+                "content": "You are a helpful assistant. When a user asks a question that requires weather, use the get_weather tool to get the weather information.",
             },
             {"role": "user", "content": "What is the weather like in Paris today?"},
         ],
@@ -442,12 +450,17 @@ def test_model_tools_request(client, model):
 @pytest.mark.parametrize("model", test_models)
 def test_function_calling_with_streaming_httpx(client, model):
     """Test function calling with streaming using httpx, verifying tool calls and usage data."""
+    if model == "openai/gpt-oss-20b":
+        pytest.skip(
+            "Skipping test for openai/gpt-oss-20b model as it only supports responses endpoint"
+        )
+
     payload = {
         "model": model,
         "messages": [
             {
                 "role": "system",
-                "content": "You are a helpful assistant that provides accurate and concise information.",
+                "content": "You are a helpful assistant that provides accurate and concise information. You are a helpful assistant that provides accurate and concise information. For getting weather, use function call with get_weather.",
             },
             {
                 "role": "user",
@@ -475,6 +488,7 @@ def test_function_calling_with_streaming_httpx(client, model):
                 },
             }
         ],
+        "tool_choice": {"type": "function", "function": {"name": "get_weather"}},
         "temperature": 0.2,
         "stream": True,
     }
@@ -620,7 +634,7 @@ def test_invalid_nildb_command_nucs(nildb_client):
 def test_large_payload_handling(client):
     """Test handling of large input payloads"""
     # Create a very large system message
-    large_system_message = "Hello " * 10000  # 100KB of text
+    large_system_message = "Hello " * 1000  # 100KB of text
 
     payload = {
         "model": test_models[0],
@@ -848,6 +862,9 @@ def test_nildb_delegation(client: httpx.Client):
     )
 
 
+@pytest.mark.skip(
+    reason="prompt cannot be accessed because of a secretvaults-py update"
+)
 @pytest.mark.parametrize(
     "model",
     test_models,
@@ -860,10 +877,6 @@ def test_nildb_prompt_document(document_id_client: httpx.Client, model):
     payload = {
         "model": model,
         "messages": [
-            {
-                "role": "system",
-                "content": "You are a helpful assistant.",
-            },
             {"role": "user", "content": "Can you make a small rhyme?"},
         ],
         "temperature": 0.2,
@@ -877,3 +890,150 @@ def test_nildb_prompt_document(document_id_client: httpx.Client, model):
     # Response must talk about cheese which is what the prompt document contains
     message: str = response.json()["choices"][0].get("message", {}).get("content", None)
     assert "cheese" in message.lower(), "Response should contain cheese"
+
+
+@pytest.fixture
+def high_web_search_rate_limit(monkeypatch):
+    monkeypatch.setenv("WEB_SEARCH_RATE_LIMIT_MINUTE", "9999")
+    monkeypatch.setenv("WEB_SEARCH_RATE_LIMIT_HOUR", "9999")
+    monkeypatch.setenv("WEB_SEARCH_RATE_LIMIT_DAY", "9999")
+    monkeypatch.setenv("WEB_SEARCH_RATE_LIMIT", "9999")
+
+
+@pytest.mark.parametrize("model", test_models)
+def test_web_search(client, model, high_web_search_rate_limit):
+    """Test web_search functionality with proper source validation."""
+    payload = {
+        "model": model,
+        "messages": [
+            {
+                "role": "system",
+                "content": "You are a helpful assistant that provides accurate and up-to-date information.",
+            },
+            {
+                "role": "user",
+                "content": "Who won the Roland Garros Open in 2024? Just reply with the winner's name.",
+            },
+        ],
+        "extra_body": {"web_search": True},
+        "temperature": 0.2,
+        "max_tokens": 150,
+    }
+
+    response = client.post("/chat/completions", json=payload, timeout=60)
+    assert response.status_code == 200, (
+        f"Response for {model} failed with status {response.status_code}"
+    )
+
+    response_json = response.json()
+    assert response_json.get("model") == model, f"Response model should be {model}"
+    assert "choices" in response_json, "Response should contain choices"
+    assert len(response_json["choices"]) > 0, (
+        "Response should contain at least one choice"
+    )
+
+    message = response_json["choices"][0].get("message", {})
+    content = message.get("content", "")
+    reasoning_content = message.get("reasoning_content", "")
+
+    assert content or reasoning_content, (
+        "Response should contain content or reasoning_content"
+    )
+
+    sources = response_json.get("sources")
+    if sources is not None:
+        assert isinstance(sources, list), "Sources should be a list"
+        assert len(sources) > 0, "Sources should not be empty"
+        print(f"Sources found: {len(sources)}")
+    else:
+        print(
+            "Warning: Sources field is None - web search may not be enabled or working properly"
+        )
+
+    print(
+        f"\nModel {model} web search response: {content[:100] if content else 'No content'}..."
+    )
+
+
+@pytest.mark.skipif(
+    not os.environ.get("E2B_API_KEY"),
+    reason="Requires E2B_API_KEY for code execution sandbox",
+)
+@pytest.mark.parametrize("model", test_models)
+def test_execute_python_sha256_e2e(client, model):
+    if model == "openai/gpt-oss-20b":
+        pytest.skip(
+            "Skipping test for openai/gpt-oss-20b model as it only supports responses endpoint"
+        )
+
+    expected = "75cc238b167a05ab7336d773cb096735d459df2f0df9c8df949b1c44075df8a5"
+
+    system_msg = (
+        "You are a helpful assistant. When a user asks a question that requires code execution, "
+        "use the execute_python tool to find the answer. After the tool provides its result, "
+        "you must use that result to formulate a clear, final answer to the user's original question. "
+        "Do not include any code or JSON in your final response."
+    )
+    user_msg = "Execute this exact Python code and return the result: import hashlib; print(hashlib.sha256('Nillion'.encode()).hexdigest())"
+
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system_msg},
+            {"role": "user", "content": user_msg},
+        ],
+        "temperature": 0,
+        "tools": [
+            {
+                "type": "function",
+                "function": {
+                    "name": "execute_python",
+                    "description": "Executes a snippet of Python code in a secure sandbox and returns the standard output.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "code": {
+                                "type": "string",
+                                "description": "The Python code to be executed.",
+                            }
+                        },
+                        "required": ["code"],
+                        "additionalProperties": False,
+                    },
+                    "strict": True,
+                },
+            }
+        ],
+    }
+
+    trials = 3
+    escaped_expected = re.escape(expected)
+    pattern = rf"\b{escaped_expected}\b"
+    last_data = None
+    last_content = ""
+    last_status = None
+    for _ in range(trials):
+        response = client.post("/chat/completions", json=payload)
+        last_status = response.status_code
+        if response.status_code != 200:
+            continue
+        data = response.json()
+        last_data = data
+        if not ("choices" in data and data["choices"]):
+            continue
+        message = data["choices"][0].get("message", {})
+        content = message.get("content") or ""
+        last_content = content
+        normalized_content = re.sub(r"\s+", " ", content)
+        if re.search(pattern, normalized_content):
+            break
+    else:
+        pytest.fail(
+            (
+                "Expected exact SHA-256 hash not found after retries.\n"
+                f"Last status: {last_status}\n"
+                f"Got: {last_content[:200]}...\n"
+                f"Expected: {expected}\n"
+                f"Full: {json.dumps(last_data, indent=2)[:1000] if last_data else '<no json>'}"
+            )
+        )

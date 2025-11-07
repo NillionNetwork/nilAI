@@ -1,7 +1,13 @@
 from openai.types.chat.chat_completion import ChoiceLogprobs
+from openai.types.responses import Response as OpenAIResponse, ResponseUsage
+from openai.types.responses.response_usage import (
+    InputTokensDetails,
+    OutputTokensDetails,
+)
 
 from nilai_common import (
     SignedChatCompletion,
+    SignedResponse,
     ModelEndpoint,
     ModelMetadata,
     Usage,
@@ -39,5 +45,31 @@ response: SignedChatCompletion = SignedChatCompletion(
         )
     ],  # type: ignore
     usage=Usage(prompt_tokens=100, completion_tokens=50, total_tokens=150),
+    signature="test-signature",
+)
+
+responses_usage: ResponseUsage = ResponseUsage(
+    input_tokens=100,
+    input_tokens_details=InputTokensDetails(cached_tokens=0),
+    output_tokens=50,
+    output_tokens_details=OutputTokensDetails(reasoning_tokens=0),
+    total_tokens=150,
+)
+
+RESPONSES_RESPONSE: OpenAIResponse = OpenAIResponse(
+    id="test-response-id",
+    object="response",
+    model="test-model",
+    created_at=123456.0,
+    status="completed",
+    output=[],
+    parallel_tool_calls=False,
+    tool_choice="auto",
+    tools=[],
+    usage=responses_usage,
+)
+
+SIGNED_RESPONSES_RESPONSE: SignedResponse = SignedResponse(
+    **RESPONSES_RESPONSE.model_dump(),
     signature="test-signature",
 )

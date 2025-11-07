@@ -13,6 +13,7 @@ auth:
 docs:
   token: null
 
+
 # Web Search Configuration
 web_search:
   api_key: null
@@ -30,8 +31,8 @@ rate_limiting:
   user_rate_limit_minute: 100
   user_rate_limit_hour: 1000
   user_rate_limit_day: 10000
-  web_search_rate_limit_minute: 1
-  web_search_rate_limit_hour: 3
+  web_search_rate_limit_minute: 6
+  web_search_rate_limit_hour: 18
   web_search_rate_limit_day: 72
   web_search_rate_limit: null # For-good rate limit
   model_concurrent_rate_limit:

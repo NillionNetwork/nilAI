@@ -1,5 +1,5 @@
 import pytest
-from nilai_common.api_model import ModelMetadata
+from nilai_common.api_models import ModelMetadata
 from pydantic import ValidationError
 
 

@@ -9,7 +9,7 @@ import trafilatura
 from fastapi import HTTPException, status
 
 from nilai_api.config import CONFIG
-from nilai_common.api_model import (
+from nilai_common.api_models import (
     ChatRequest,
     MessageAdapter,
     SearchResult,
@@ -20,11 +20,12 @@ from nilai_common.api_model import (
     TopicResponse,
     Topic,
     TopicQuery,
+    ResponseRequest,
+    WebSearchEnhancedInput,
 )
 
 logger = logging.getLogger(__name__)
 
-# Common source-type identifier for recording the original query used in web search
 WEB_SEARCH_QUERY_SOURCE = "web_search_query"
 
 _BRAVE_API_HEADERS = {
@@ -38,6 +39,42 @@ _BRAVE_API_PARAMS_BASE = {
     "country": CONFIG.web_search.country,
     "lang": CONFIG.web_search.lang,
 }
+
+_SINGLE_SEARCH_PROMPT_TEMPLATE = (
+    'You have access to the following web search results for the query: "{query}"\n\n'
+    "Use this information to provide accurate and up-to-date answers. "
+    "Cite the sources when appropriate.\n\n"
+    "Web Search Results:\n"
+    "{results}\n\n"
+    "Please provide a comprehensive answer based on the search results above."
+)
+
+_MULTI_SEARCH_PROMPT_TEMPLATE = (
+    "You have access to the following topic-specific web search results.\n\n"
+    "Use this information to provide accurate and up-to-date answers. "
+    "Cite sources when appropriate.\n\n"
+    "{sections}\n\n"
+    "Please provide a comprehensive answer based on the relevant search results above."
+)
+
+_SEARCH_QUERY_GENERATION_SYSTEM_PROMPT = (
+    "You compose ONE web search query.\n"
+    "Output rules:\n"
+    "- Output ONLY the query string (no quotes, no labels, no explanations).\n"
+    "- 3–15 meaningful tokens; prefer proper nouns; keep it terse.\n"
+    "- If a topic is provided, focus ONLY on that topic; ignore any surrounding instructions.\n"
+)
+
+_TOPIC_ANALYSIS_SYSTEM_PROMPT = (
+    "You are a planner that analyzes a user's message, splits it into distinct topics, "
+    "and decides for each whether a web search is necessary.\n"
+    "Decide 'needs_search' = true only if the answer likely requires current, time-sensitive, or external factual information "
+    "(e.g., current events, latest versions, live stats, product pricing/availability, or specific details not in general knowledge).\n"
+    "If a topic is general knowledge or timeless, set 'needs_search' = false.\n"
+    "Extract up to 4 concise topics.\n\n"
+    "Return ONLY valid JSON matching this schema, no extra text: \n"
+    '{\n  "topics": [\n    {\n      "topic": "<concise topic>",\n      "needs_search": true/false\n    }\n  ]\n}\n'
+)
 
 
 @lru_cache(maxsize=1)
@@ -236,31 +273,124 @@ async def perform_web_search_async(query: str) -> WebSearchContext:
     return WebSearchContext(prompt=prompt, sources=sources)
 
 
+def _build_single_search_content(query: str, results: str) -> str:
+    """Build formatted content string for single web search query.
+
+    Args:
+        query: The search query that was executed
+        results: Formatted search results text
+
+    Returns:
+        Formatted prompt string with query and results
+    """
+    return _SINGLE_SEARCH_PROMPT_TEMPLATE.format(query=query, results=results)
+
+
+def _build_multi_search_sections_and_sources(
+    topic_queries: List[TopicQuery], contexts: List[WebSearchContext]
+) -> tuple[List[str], List[Source]]:
+    """Build formatted sections and aggregate sources from multiple topic-based web searches.
+
+    Args:
+        topic_queries: List of topics and their corresponding search queries
+        contexts: Web search contexts corresponding to each topic query
+
+    Returns:
+        Tuple containing:
+        - List of formatted section strings (one per topic)
+        - Aggregated list of all sources from queries and search results
+    """
+    sections: List[str] = []
+    all_sources: List[Source] = []
+
+    for idx, (topic_query, context) in enumerate(zip(topic_queries, contexts), start=1):
+        topic = topic_query.topic.strip()
+        query = topic_query.query.strip()
+        if not query:
+            continue
+
+        all_sources.append(Source(source=WEB_SEARCH_QUERY_SOURCE, content=query))
+
+        header = f'Topic {idx}: {topic}\nQuery: "{query}"\n\nWeb Search Results:\n'
+        block = context.prompt.strip() if context.prompt else "(no results)"
+        sections.append(header + block)
+        all_sources.extend(context.sources)
+
+    return sections, all_sources
+
+
+def _build_multi_search_content(sections: List[str]) -> str:
+    """Build formatted content string for multiple topic-based web searches.
+
+    Args:
+        sections: List of formatted section strings (one per topic)
+
+    Returns:
+        Formatted prompt string with all topic sections
+    """
+    return _MULTI_SEARCH_PROMPT_TEMPLATE.format(sections="\n\n".join(sections))
+
+
+async def _generate_topic_query(
+    topic_obj: Topic, user_query: str, model_name: str, client: Any
+) -> TopicQuery | None:
+    """Generate a search query for a specific topic using the LLM.
+
+    Args:
+        topic_obj: Topic object containing the topic string
+        user_query: Original user query for context
+        model_name: Name of the LLM model to use
+        client: LLM client instance for API calls
+
+    Returns:
+        TopicQuery object with topic and generated query, or None if generation fails
+    """
+    topic_str = topic_obj.topic.strip()
+    if not topic_str:
+        return None
+    try:
+        query = await generate_search_query_from_llm(
+            user_query, model_name, client, topic=topic_str
+        )
+        return TopicQuery(topic=topic_str, query=query)
+    except Exception:
+        logger.exception("Failed generating query for topic '%s'", topic_str)
+        return None
+
+
+async def _perform_search(query: str) -> WebSearchContext:
+    """Execute a web search with error handling.
+
+    Args:
+        query: Search query string
+
+    Returns:
+        WebSearchContext with results, or empty context if search fails
+    """
+    try:
+        return await perform_web_search_async(query)
+    except Exception:
+        logger.exception("Search failed for query '%s'", query)
+        return WebSearchContext(prompt="", sources=[])
+
+
 async def enhance_messages_with_web_search(
     req: ChatRequest, query: str
 ) -> WebSearchEnhancedMessages:
-    """Enhance a list of messages with web search context.
+    """Enhance chat messages with web search context for a single query.
 
     Args:
-        messages: List of conversation messages to enhance
+        req: ChatRequest containing conversation messages
         query: Search query to retrieve web search results for
 
     Returns:
-        WebSearchEnhancedMessages containing the original messages with web search
-        context prepended as a system message, along with source information
+        WebSearchEnhancedMessages with web search context added to system messages
+        and source information
     """
     ctx = await perform_web_search_async(query)
     query_source = Source(source=WEB_SEARCH_QUERY_SOURCE, content=query)
 
-    web_search_content = (
-        f'You have access to the following web search results for the query: "{query}"\n\n'
-        "Use this information to provide accurate and up-to-date answers. "
-        "Cite the sources when appropriate.\n\n"
-        "Web Search Results:\n"
-        f"{ctx.prompt}\n\n"
-        "Please provide a comprehensive answer based on the search results above."
-    )
-
+    web_search_content = _build_single_search_content(query, ctx.prompt)
     req.ensure_system_content(web_search_content)
 
     return WebSearchEnhancedMessages(
@@ -272,17 +402,20 @@ async def enhance_messages_with_web_search(
 async def generate_search_query_from_llm(
     user_message: str, model_name: str, client: Any, *, topic: str | None = None
 ) -> str:
-    """
-    Use the LLM to produce a concise, high-recall search query.
-    """
-    system_prompt = (
-        "You compose ONE web search query.\n"
-        "Output rules:\n"
-        "- Output ONLY the query string (no quotes, no labels, no explanations).\n"
-        "- 3–15 meaningful tokens; prefer proper nouns; keep it terse.\n"
-        "- If a topic is provided, focus ONLY on that topic; ignore any surrounding instructions.\n"
-    )
+    """Use the LLM to generate a concise, high-recall web search query.
 
+    Args:
+        user_message: User's message or question
+        model_name: Name of the LLM model to use
+        client: LLM client instance for API calls
+        topic: Optional specific topic to focus the query on
+
+    Returns:
+        Generated search query string, or user_message as fallback if generation fails
+
+    Raises:
+        RuntimeError: If LLM call fails or returns invalid response
+    """
     user_content = (
         user_message
         if not topic
@@ -290,14 +423,16 @@ async def generate_search_query_from_llm(
     )
 
     messages = [
-        MessageAdapter.new_message(role="system", content=system_prompt),
+        MessageAdapter.new_message(
+            role="system", content=_SEARCH_QUERY_GENERATION_SYSTEM_PROMPT
+        ),
         MessageAdapter.new_message(role="user", content=user_content),
     ]
 
     req = {
         "model": model_name,
         "messages": messages,
-        "max_tokens": 600,
+        "max_tokens": 1000,
     }
 
     logger.info("Generate search query start model=%s", model_name)
@@ -333,25 +468,59 @@ async def generate_search_query_from_llm(
     return content
 
 
+async def _execute_web_search_workflow(
+    user_query: str, model_name: str, client: Any
+) -> tuple[List[TopicQuery], List[WebSearchContext]] | tuple[None, None]:
+    """Execute the complete multi-topic web search workflow.
+
+    Analyzes user query to identify topics, generates search queries for each topic,
+    and executes all searches in parallel.
+
+    Args:
+        user_query: User's query to analyze and search for
+        model_name: Name of the LLM model to use for topic analysis and query generation
+        client: LLM client instance for API calls
+
+    Returns:
+        Tuple of (topic_queries, contexts) if successful, or (None, None) if no topics
+        require search or workflow fails
+    """
+    try:
+        topics = await analyze_web_search_topics(user_query, model_name, client)
+        topics_to_search = [t for t in topics if t.needs_search][:3]
+
+        if not topics_to_search:
+            logger.info(
+                "No topics require web search; falling back to single-query enrichment"
+            )
+            return None, None
+
+        query_generation_tasks = [
+            _generate_topic_query(t, user_query, model_name, client)
+            for t in topics_to_search
+        ]
+        generated_results = await asyncio.gather(*query_generation_tasks)
+        topic_queries: List[TopicQuery] = [res for res in generated_results if res]
+
+        if not topic_queries:
+            logger.info(
+                "No valid topic queries generated; falling back to single query"
+            )
+            return None, None
+
+        search_tasks = [_perform_search(tq.query) for tq in topic_queries]
+        contexts = await asyncio.gather(*search_tasks)
+
+        return topic_queries, contexts
+
+    except Exception:
+        logger.exception("Error during web search workflow")
+        return None, None
+
+
 async def handle_web_search(
     req_messages: ChatRequest, model_name: str, client: Any
 ) -> WebSearchEnhancedMessages:
-    """Handle web search enhancement for a conversation.
-
-    Analyzes the user's message to identify topics that require web search,
-    generates optimized search queries for each topic using an LLM, and
-    enhances the conversation with relevant web search results. Falls back
-    to single-query search if topic analysis fails or no topics need search.
-
-    Args:
-        req_messages: ChatRequest containing conversation messages to process
-        model_name: Name of the LLM model to use for query generation
-        client: LLM client instance for making API calls
-
-    Returns:
-        WebSearchEnhancedMessages with web search context added, or original
-        messages if no user query is found or search fails
-    """
     logger.info("Handle web search start")
     logger.debug(
         "Handle web search messages_in=%d model=%s",
@@ -364,53 +533,15 @@ async def handle_web_search(
         return WebSearchEnhancedMessages(messages=req_messages.messages, sources=[])
 
     try:
-        topics = await analyze_web_search_topics(user_query, model_name, client)
-        topics_to_search = [t for t in topics if t.needs_search][:3]
+        topic_queries, contexts = await _execute_web_search_workflow(
+            user_query, model_name, client
+        )
 
-        if not topics_to_search:
-            logger.info(
-                "No topics require web search; falling back to single-query enrichment"
-            )
+        if topic_queries is None or contexts is None:
             concise_query = await generate_search_query_from_llm(
                 user_query, model_name, client
             )
             return await enhance_messages_with_web_search(req_messages, concise_query)
-
-        async def _generate_query(topic_obj: Topic) -> TopicQuery | None:
-            topic_str = topic_obj.topic.strip()
-            if not topic_str:
-                return None
-            try:
-                query = await generate_search_query_from_llm(
-                    user_query, model_name, client, topic=topic_str
-                )
-                return TopicQuery(topic=topic_str, query=query)
-            except Exception:
-                logger.exception("Failed generating query for topic '%s'", topic_str)
-                return None
-
-        query_generation_tasks = [_generate_query(t) for t in topics_to_search]
-        generated_results = await asyncio.gather(*query_generation_tasks)
-        topic_queries: List[TopicQuery] = [res for res in generated_results if res]
-
-        if not topic_queries:
-            logger.info(
-                "No valid topic queries generated; falling back to single query"
-            )
-            concise_query = await generate_search_query_from_llm(
-                user_query, model_name, client
-            )
-            return await enhance_messages_with_web_search(req_messages, concise_query)
-
-        async def _search(q: str) -> WebSearchContext:
-            try:
-                return await perform_web_search_async(q)
-            except Exception:
-                logger.exception("Search failed for query '%s'", q)
-                return WebSearchContext(prompt="", sources=[])
-
-        search_tasks = [_search(tq.query) for tq in topic_queries]
-        contexts = await asyncio.gather(*search_tasks)
 
         return await enhance_messages_with_multi_web_search(
             req_messages, topic_queries, contexts
@@ -428,23 +559,21 @@ async def handle_web_search(
 async def analyze_web_search_topics(
     user_message: str, model_name: str, client: Any
 ) -> List[Topic]:
-    """Use the LLM to identify topics and whether each needs web search.
+    """Use the LLM to identify topics in user message and determine which need web search.
 
-    Returns a list of Pydantic Topic objects.
+    Args:
+        user_message: User's message to analyze
+        model_name: Name of the LLM model to use
+        client: LLM client instance for API calls
+
+    Returns:
+        List of Topic objects, each indicating whether it needs web search. Empty list if
+        analysis fails.
     """
-    system_prompt = (
-        "You are a planner that analyzes a user's message, splits it into distinct topics, "
-        "and decides for each whether a web search is necessary.\n"
-        "Decide 'needs_search' = true only if the answer likely requires current, time-sensitive, or external factual information "
-        "(e.g., current events, latest versions, live stats, product pricing/availability, or specific details not in general knowledge).\n"
-        "If a topic is general knowledge or timeless, set 'needs_search' = false.\n"
-        "Extract up to 4 concise topics.\n\n"
-        "Return ONLY valid JSON matching this schema, no extra text: \n"
-        '{\n  "topics": [\n    {\n      "topic": "<concise topic>",\n      "needs_search": true/false\n    }\n  ]\n}\n'
-    )
-
     messages = [
-        MessageAdapter.new_message(role="system", content=system_prompt),
+        MessageAdapter.new_message(
+            role="system", content=_TOPIC_ANALYSIS_SYSTEM_PROMPT
+        ),
         MessageAdapter.new_message(role="user", content=user_message),
     ]
 
@@ -471,38 +600,149 @@ async def enhance_messages_with_multi_web_search(
     topic_queries: List[TopicQuery],
     contexts: List[WebSearchContext],
 ) -> WebSearchEnhancedMessages:
-    """Enhance messages with multiple topic-specific web search contexts."""
+    """Enhance chat messages with multiple topic-specific web search contexts.
+
+    Args:
+        req: ChatRequest containing conversation messages
+        topic_queries: List of topics and their corresponding search queries
+        contexts: Web search contexts corresponding to each topic query
+
+    Returns:
+        WebSearchEnhancedMessages with all topic-specific web search contexts added
+        to system messages and aggregated source information
+    """
     if not topic_queries or not contexts:
         return WebSearchEnhancedMessages(messages=req.messages, sources=[])
 
-    # Build a merged content block
-    sections: List[str] = []
-    all_sources: List[Source] = []
-
-    for idx, (topic_query, context) in enumerate(zip(topic_queries, contexts), start=1):
-        topic = topic_query.topic.strip()
-        query = topic_query.query.strip()
-        if not query:
-            continue
-
-        all_sources.append(Source(source=WEB_SEARCH_QUERY_SOURCE, content=query))
-
-        header = f'Topic {idx}: {topic}\nQuery: "{query}"\n\nWeb Search Results:\n'
-        block = context.prompt.strip() if context.prompt else "(no results)"
-        sections.append(header + block)
-        all_sources.extend(context.sources)
+    sections, all_sources = _build_multi_search_sections_and_sources(
+        topic_queries, contexts
+    )
 
     if not sections:
         return WebSearchEnhancedMessages(messages=req.messages, sources=[])
 
-    web_search_content = (
-        "You have access to the following topic-specific web search results.\n\n"
-        "Use this information to provide accurate and up-to-date answers. "
-        "Cite sources when appropriate.\n\n"
-        + "\n\n".join(sections)
-        + "\n\nPlease provide a comprehensive answer based on the relevant search results above."
-    )
-
+    web_search_content = _build_multi_search_content(sections)
     req.ensure_system_content(web_search_content)
 
     return WebSearchEnhancedMessages(messages=req.messages, sources=all_sources)
+
+
+async def enhance_input_with_web_search(
+    req: ResponseRequest, query: str
+) -> WebSearchEnhancedInput:
+    """Enhance response input with web search context for a single query.
+
+    Args:
+        req: ResponseRequest containing input and instructions
+        query: Search query to retrieve web search results for
+
+    Returns:
+        WebSearchEnhancedInput with web search context added to instructions
+        and source information
+    """
+    ctx = await perform_web_search_async(query)
+    query_source = Source(source=WEB_SEARCH_QUERY_SOURCE, content=query)
+
+    web_search_instructions = _build_single_search_content(query, ctx.prompt)
+    req.ensure_instructions(web_search_instructions)
+
+    return WebSearchEnhancedInput(
+        input=req.input,
+        instructions=req.instructions,
+        sources=[query_source] + ctx.sources,
+    )
+
+
+async def enhance_input_with_multi_web_search(
+    req: ResponseRequest,
+    topic_queries: List[TopicQuery],
+    contexts: List[WebSearchContext],
+) -> WebSearchEnhancedInput:
+    """Enhance response input with multiple topic-specific web search contexts.
+
+    Args:
+        req: ResponseRequest containing input and instructions
+        topic_queries: List of topics and their corresponding search queries
+        contexts: Web search contexts corresponding to each topic query
+
+    Returns:
+        WebSearchEnhancedInput with all topic-specific web search contexts added
+        to instructions and aggregated source information
+    """
+    if not topic_queries or not contexts:
+        return WebSearchEnhancedInput(
+            input=req.input, instructions=req.instructions, sources=[]
+        )
+
+    sections, all_sources = _build_multi_search_sections_and_sources(
+        topic_queries, contexts
+    )
+
+    if not sections:
+        return WebSearchEnhancedInput(
+            input=req.input, instructions=req.instructions, sources=[]
+        )
+
+    web_search_instructions = _build_multi_search_content(sections)
+    req.ensure_instructions(web_search_instructions)
+
+    return WebSearchEnhancedInput(
+        input=req.input, instructions=req.instructions, sources=all_sources
+    )
+
+
+async def handle_web_search_for_responses(
+    req: ResponseRequest, model_name: str, client: Any
+) -> WebSearchEnhancedInput:
+    """Handle web search enhancement for response requests.
+
+    Analyzes the user's input to identify topics that require web search,
+    generates optimized search queries for each topic using an LLM, and
+    enhances the request with relevant web search results. Falls back to
+    single-query search if topic analysis fails or no topics need search.
+
+    Args:
+        req: ResponseRequest containing input to process
+        model_name: Name of the LLM model to use for query generation
+        client: LLM client instance for making API calls
+
+    Returns:
+        WebSearchEnhancedInput with web search context added, or original
+        input if no user query is found or search fails
+    """
+    logger.info("Handle web search for responses start")
+    logger.debug(
+        "Handle web search for responses model=%s",
+        model_name,
+    )
+    user_query = req.get_last_user_query()
+    if not user_query:
+        logger.info("No user query found")
+        return WebSearchEnhancedInput(
+            input=req.input, instructions=req.instructions, sources=[]
+        )
+
+    try:
+        topic_queries, contexts = await _execute_web_search_workflow(
+            user_query, model_name, client
+        )
+
+        if topic_queries is None or contexts is None:
+            concise_query = await generate_search_query_from_llm(
+                user_query, model_name, client
+            )
+            return await enhance_input_with_web_search(req, concise_query)
+
+        return await enhance_input_with_multi_web_search(req, topic_queries, contexts)
+
+    except HTTPException:
+        logger.exception("Web search provider error")
+        return WebSearchEnhancedInput(
+            input=req.input, instructions=req.instructions, sources=[]
+        )
+
+    except Exception:
+        logger.exception("Unexpected error during web search handling")
+        return WebSearchEnhancedInput(
+            input=req.input, instructions=req.instructions, sources=[]
+        )
