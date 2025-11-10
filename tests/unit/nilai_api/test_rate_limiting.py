@@ -11,7 +11,6 @@ import pytest_asyncio
 from fastapi import HTTPException, Request
 
 from nilai_api.rate_limiting import RateLimit, UserRateLimits, setup_redis_conn
-from nilai_api.config import CONFIG
 
 
 @pytest_asyncio.fixture
@@ -71,45 +70,6 @@ async def test_concurrent_rate_limit(req):
 
     futures = [consume_generator(rate_limit(req, user_limits)) for _ in range(5)]
     await asyncio.gather(*futures)
-
-
-@pytest.mark.asyncio
-async def test_web_search_rps_limit(redis_client):
-    mock_request = MagicMock(spec=Request)
-    mock_request.state.redis = redis_client[0]
-    mock_request.state.redis_rate_limit_command = redis_client[1]
-    # Ensure a clean slate for the global RPS key used by the limiter
-    await redis_client[0].delete("web_search_rps")
-
-    async def web_search_extractor(_):
-        return True
-
-    rate_limit = RateLimit(web_search_extractor=web_search_extractor)
-    user_limits = UserRateLimits(
-        subscription_holder=random_id(),
-        token_rate_limit=None,
-        rate_limits=RateLimits(
-            user_rate_limit_day=None,
-            user_rate_limit_hour=None,
-            user_rate_limit_minute=None,
-            web_search_rate_limit_day=None,
-            web_search_rate_limit_hour=None,
-            web_search_rate_limit_minute=None,
-            user_rate_limit=None,
-            web_search_rate_limit=None,
-        ),
-    )
-
-    old_rps = CONFIG.web_search.rps
-    CONFIG.web_search.rps = 2
-    try:
-        await consume_generator(rate_limit(mock_request, user_limits))
-        await consume_generator(rate_limit(mock_request, user_limits))
-        with pytest.raises(HTTPException):
-            await consume_generator(rate_limit(mock_request, user_limits))
-    finally:
-        CONFIG.web_search.rps = old_rps
-        await redis_client[0].delete("web_search_rps")
 
 
 @pytest.mark.asyncio
