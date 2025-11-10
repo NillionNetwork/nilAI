@@ -7,6 +7,7 @@ from typing import List, Dict, Any
 import httpx
 import trafilatura
 from fastapi import HTTPException, status
+from aiolimiter import AsyncLimiter
 
 from nilai_api.config import CONFIG
 from nilai_common.api_models import (
@@ -90,8 +91,16 @@ def _get_http_client() -> httpx.AsyncClient:
     )
 
 
+@lru_cache(maxsize=1)
+def _get_brave_rate_limiter() -> AsyncLimiter | None:
+    rps = CONFIG.web_search.rps
+    if rps is None or rps <= 0:
+        return None
+    return AsyncLimiter(max_rate=rps, time_period=1.0)
+
+
 async def _make_brave_api_request(query: str) -> Dict[str, Any]:
-    """Make an API request to the Brave Search API.
+    """Make an API request to the Brave Search API with strict rate limiting.
 
     Args:
         query: The search query string to execute
@@ -100,7 +109,7 @@ async def _make_brave_api_request(query: str) -> Dict[str, Any]:
         Dict containing the raw API response data
 
     Raises:
-        HTTPException: If API key is missing or API request fails
+        HTTPException: If rate limit exceeded, API key is missing, or API request fails
     """
     if not CONFIG.web_search.api_key:
         raise HTTPException(
@@ -108,6 +117,21 @@ async def _make_brave_api_request(query: str) -> Dict[str, Any]:
             detail="Missing BRAVE_SEARCH_API key in environment",
         )
 
+    limiter = _get_brave_rate_limiter()
+    if limiter and not limiter.has_capacity():
+        logger.warning("Brave API rate limit exceeded - rejecting request immediately")
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Brave API rate limit exceeded ({CONFIG.web_search.rps} requests/second)",
+        )
+
+    if limiter:
+        async with limiter:
+            return await _send_brave_api_request(query)
+    return await _send_brave_api_request(query)
+
+
+async def _send_brave_api_request(query: str) -> Dict[str, Any]:
     q = " ".join(query.split())
 
     params = {**_BRAVE_API_PARAMS_BASE, "q": q}
@@ -125,7 +149,19 @@ async def _make_brave_api_request(query: str) -> Dict[str, Any]:
         params.get("lang"),
         params.get("count"),
     )
-    resp = await client.get(CONFIG.web_search.api_path, headers=headers, params=params)
+
+    resp = await client.get(
+        CONFIG.web_search.api_path,
+        headers=headers,
+        params=params,
+    )
+
+    if resp.status_code == status.HTTP_429_TOO_MANY_REQUESTS:
+        logger.warning("Brave API rate limited by provider")
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Web search rate limit exceeded by provider",
+        )
 
     if resp.status_code >= 400:
         logger.error("Brave API error: %s - %s", resp.status_code, resp.text)

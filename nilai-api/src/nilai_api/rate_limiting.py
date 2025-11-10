@@ -9,7 +9,6 @@ from fastapi import status, HTTPException, Request
 from redis.asyncio import from_url, Redis
 
 from nilai_api.auth import get_auth_info, AuthenticationInfo, TokenRateLimits
-from nilai_api.config import CONFIG
 
 LUA_RATE_LIMIT_SCRIPT = """
 local key = KEYS[1]
@@ -176,13 +175,6 @@ class RateLimit:
                     f"web_search_day:{user_limits.subscription_holder}",
                     user_limits.rate_limits.web_search_rate_limit_day,
                     DAY_MS,
-                )
-                await self.check_bucket(
-                    redis,
-                    redis_rate_limit_command,
-                    "web_search_rps",
-                    CONFIG.web_search.rps,
-                    1000,
                 )
                 await self.check_bucket(
                     redis,
