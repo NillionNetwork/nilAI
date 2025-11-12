@@ -93,6 +93,13 @@ def _get_http_client() -> httpx.AsyncClient:
 
 @lru_cache(maxsize=1)
 def _get_brave_rate_limiter() -> AsyncLimiter | None:
+    """
+    Get or create a Brave API rate limiter.
+
+    Returns:
+        An AsyncLimiter instance limited by the configured requests per second,
+        or None if rate limiting is disabled by configuration.
+    """
     rps = CONFIG.web_search.rps
     if rps is None or rps <= 0:
         return None
@@ -118,13 +125,6 @@ async def _make_brave_api_request(query: str) -> Dict[str, Any]:
         )
 
     limiter = _get_brave_rate_limiter()
-    if limiter and not limiter.has_capacity():
-        logger.warning("Brave API rate limit exceeded - rejecting request immediately")
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"Brave API rate limit exceeded ({CONFIG.web_search.rps} requests/second)",
-        )
-
     if limiter:
         async with limiter:
             return await _send_brave_api_request(query)
@@ -132,6 +132,14 @@ async def _make_brave_api_request(query: str) -> Dict[str, Any]:
 
 
 async def _send_brave_api_request(query: str) -> Dict[str, Any]:
+    """Send a request to the Brave Search API.
+
+    Args:
+        query: The search query string to execute
+
+    Returns:
+        Dict containing the raw API response data
+    """
     q = " ".join(query.split())
 
     params = {**_BRAVE_API_PARAMS_BASE, "q": q}

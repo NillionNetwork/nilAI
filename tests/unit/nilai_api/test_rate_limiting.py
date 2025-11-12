@@ -1,15 +1,21 @@
 import asyncio
 import string
 import random
+import time
 from unittest.mock import MagicMock
 from datetime import datetime, timedelta, timezone
 
 from nilai_api.auth import TokenRateLimit, TokenRateLimits
+from nilai_api.config import CONFIG
 from nilai_api.db.users import RateLimits
 import pytest
 import pytest_asyncio
 from fastapi import HTTPException, Request
 
+from nilai_api.handlers.web_search import (
+    _get_brave_rate_limiter,
+    _make_brave_api_request,
+)
 from nilai_api.rate_limiting import RateLimit, UserRateLimits, setup_redis_conn
 
 
@@ -199,3 +205,71 @@ async def test_web_search_rate_limits(redis_client):
     # Second request should be rejected due to minute limit (1 per minute)
     with pytest.raises(HTTPException):
         await consume_generator(rate_limit(mock_request, user_limits))
+
+
+@pytest.mark.asyncio
+async def test_web_search_rps_queues_when_exceeded(monkeypatch):
+    """Ensure AsyncLimiter queues requests that exceed the configured RPS."""
+    _get_brave_rate_limiter.cache_clear()
+    call_times: list[float] = []
+
+    async def fake_send_brave(query: str):
+        timestamp = time.perf_counter()
+        call_times.append(timestamp)
+        await asyncio.sleep(0)  # yield control to mimic network scheduling
+        return {"query": query}
+
+    monkeypatch.setattr(CONFIG.web_search, "api_key", "test-key", raising=False)
+    monkeypatch.setattr(CONFIG.web_search, "rps", 2, raising=False)
+    monkeypatch.setattr(
+        "nilai_api.handlers.web_search._send_brave_api_request",
+        fake_send_brave,
+    )
+
+    try:
+        await asyncio.gather(
+            *[_make_brave_api_request(f"query-{idx}") for idx in range(4)]
+        )
+    finally:
+        _get_brave_rate_limiter.cache_clear()
+
+    assert len(call_times) == 4
+    sorted_times = sorted(call_times)
+    # First two calls run immediately; later calls must wait ~0.5s before firing.
+    assert sorted_times[2] - sorted_times[0] >= 0.4
+    assert sorted_times[3] - sorted_times[1] >= 0.4
+
+
+@pytest.mark.asyncio
+async def test_web_search_rps_shared_globally_across_users(monkeypatch):
+    """Validate that the Brave limiter is shared globally across concurrent users."""
+    _get_brave_rate_limiter.cache_clear()
+    call_log: dict[str, float] = {}
+
+    async def fake_send_brave(query: str):
+        timestamp = time.perf_counter()
+        call_log[query] = timestamp
+        await asyncio.sleep(0)
+        return {"query": query}
+
+    monkeypatch.setattr(CONFIG.web_search, "api_key", "test-key", raising=False)
+    monkeypatch.setattr(CONFIG.web_search, "rps", 2, raising=False)
+    monkeypatch.setattr(
+        "nilai_api.handlers.web_search._send_brave_api_request",
+        fake_send_brave,
+    )
+
+    user_a_queries = [f"user-a-{i}" for i in range(2)]
+    user_b_queries = [f"user-b-{i}" for i in range(2)]
+
+    try:
+        await asyncio.gather(*[_make_brave_api_request(q) for q in user_a_queries])
+        await asyncio.gather(*[_make_brave_api_request(q) for q in user_b_queries])
+    finally:
+        _get_brave_rate_limiter.cache_clear()
+
+    assert set(call_log) == set(user_a_queries + user_b_queries)
+    latest_a = max(call_log[q] for q in user_a_queries)
+    earliest_b = min(call_log[q] for q in user_b_queries)
+    # Even though user B starts after A finished, they still wait for the global limiter slot.
+    assert earliest_b - latest_a >= 0.4
