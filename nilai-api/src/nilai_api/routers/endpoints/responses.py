@@ -60,6 +60,7 @@ async def responses_web_search_rate_limit(request: Request) -> bool:
     "/v1/responses", tags=["Responses"], response_model=SignedResponse
 )
 async def create_response(
+    request: Request,
     req: ResponseRequest = Body(
         {
             "model": "openai/gpt-oss-20b",
@@ -171,7 +172,7 @@ async def create_response(
         logger.info(f"[responses] web_search start request_id={request_id}")
         t_ws = time.monotonic()
         web_search_result = await handle_web_search_for_responses(
-            req, model_name, client
+            req, model_name, client, request
         )
         input_items = web_search_result.input
         instructions = web_search_result.instructions

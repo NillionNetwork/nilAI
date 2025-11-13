@@ -15,4 +15,4 @@ class WebSearchSettings(BaseModel):
     max_concurrent_requests: int = Field(
         default=20, description="Maximum concurrent requests"
     )
-    rps: int = Field(default=20, description="Requests per second limit")
+    rps: Optional[int] = Field(default=20, description="Requests per second limit")

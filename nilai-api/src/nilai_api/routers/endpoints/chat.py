@@ -59,6 +59,7 @@ async def chat_completion_web_search_rate_limit(request: Request) -> bool:
 
 @chat_completion_router.post("/v1/chat/completions", tags=["Chat"], response_model=None)
 async def chat_completion(
+    request: Request,
     req: ChatRequest = Body(
         ChatRequest(
             model="meta-llama/Llama-3.2-1B-Instruct",
@@ -188,7 +189,7 @@ async def chat_completion(
     if req.web_search:
         logger.info(f"[chat] web_search start request_id={request_id}")
         t_ws = time.monotonic()
-        web_search_result = await handle_web_search(req, model_name, client)
+        web_search_result = await handle_web_search(req, model_name, client, request)
         messages = web_search_result.messages
         sources = web_search_result.sources
         logger.info(

@@ -74,45 +74,6 @@ async def test_concurrent_rate_limit(req):
 
 
 @pytest.mark.asyncio
-async def test_web_search_rps_limit(redis_client):
-    mock_request = MagicMock(spec=Request)
-    mock_request.state.redis = redis_client[0]
-    mock_request.state.redis_rate_limit_command = redis_client[1]
-    # Ensure a clean slate for the global RPS key used by the limiter
-    await redis_client[0].delete("web_search_rps")
-
-    async def web_search_extractor(_):
-        return True
-
-    rate_limit = RateLimit(web_search_extractor=web_search_extractor)
-    user_limits = UserRateLimits(
-        subscription_holder=random_id(),
-        token_rate_limit=None,
-        rate_limits=RateLimits(
-            user_rate_limit_day=None,
-            user_rate_limit_hour=None,
-            user_rate_limit_minute=None,
-            web_search_rate_limit_day=None,
-            web_search_rate_limit_hour=None,
-            web_search_rate_limit_minute=None,
-            user_rate_limit=None,
-            web_search_rate_limit=None,
-        ),
-    )
-
-    old_rps = CONFIG.web_search.rps
-    CONFIG.web_search.rps = 2
-    try:
-        await consume_generator(rate_limit(mock_request, user_limits))
-        await consume_generator(rate_limit(mock_request, user_limits))
-        with pytest.raises(HTTPException):
-            await consume_generator(rate_limit(mock_request, user_limits))
-    finally:
-        CONFIG.web_search.rps = old_rps
-        await redis_client[0].delete("web_search_rps")
-
-
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "user_limits",
     [
@@ -239,3 +200,125 @@ async def test_web_search_rate_limits(redis_client):
     # Second request should be rejected due to minute limit (1 per minute)
     with pytest.raises(HTTPException):
         await consume_generator(rate_limit(mock_request, user_limits))
+
+
+@pytest.mark.asyncio
+async def test_check_brave_rps_limit(redis_client):
+    """Test that check_brave_rps enforces global RPS limit across all users."""
+    mock_request = MagicMock(spec=Request)
+    mock_request.state.redis = redis_client[0]
+    mock_request.state.redis_rate_limit_command = redis_client[1]
+
+    await redis_client[0].delete("brave_rps_global")
+
+    old_rps = CONFIG.web_search.rps
+    CONFIG.web_search.rps = 3
+    try:
+        rate_limit = RateLimit()
+
+        await rate_limit.check_brave_rps(mock_request)
+        await rate_limit.check_brave_rps(mock_request)
+        await rate_limit.check_brave_rps(mock_request)
+
+        with pytest.raises(HTTPException) as exc_info:
+            await rate_limit.check_brave_rps(mock_request)
+
+        assert exc_info.value.status_code == 429
+        assert "Too Many Requests" in str(exc_info.value.detail)
+    finally:
+        CONFIG.web_search.rps = old_rps
+        await redis_client[0].delete("brave_rps_global")
+
+
+@pytest.mark.asyncio
+async def test_check_brave_rps_disabled(redis_client):
+    """Test that check_brave_rps does nothing when limit is disabled."""
+    mock_request = MagicMock(spec=Request)
+    mock_request.state.redis = redis_client[0]
+    mock_request.state.redis_rate_limit_command = redis_client[1]
+
+    old_rps = CONFIG.web_search.rps
+    CONFIG.web_search.rps = None
+    try:
+        rate_limit = RateLimit()
+
+        await rate_limit.check_brave_rps(mock_request)
+        await rate_limit.check_brave_rps(mock_request)
+        await rate_limit.check_brave_rps(mock_request)
+    finally:
+        CONFIG.web_search.rps = old_rps
+
+
+@pytest.mark.asyncio
+async def test_check_brave_rps_zero_limit(redis_client):
+    """Test that check_brave_rps does nothing when limit is 0 or negative."""
+    mock_request = MagicMock(spec=Request)
+    mock_request.state.redis = redis_client[0]
+    mock_request.state.redis_rate_limit_command = redis_client[1]
+
+    old_rps = CONFIG.web_search.rps
+    CONFIG.web_search.rps = 0
+    try:
+        rate_limit = RateLimit()
+
+        await rate_limit.check_brave_rps(mock_request)
+        await rate_limit.check_brave_rps(mock_request)
+    finally:
+        CONFIG.web_search.rps = old_rps
+
+
+@pytest.mark.asyncio
+async def test_check_brave_rps_global_key(redis_client):
+    """Test that check_brave_rps uses the correct global key across different requests."""
+    mock_request_1 = MagicMock(spec=Request)
+    mock_request_1.state.redis = redis_client[0]
+    mock_request_1.state.redis_rate_limit_command = redis_client[1]
+
+    mock_request_2 = MagicMock(spec=Request)
+    mock_request_2.state.redis = redis_client[0]
+    mock_request_2.state.redis_rate_limit_command = redis_client[1]
+
+    await redis_client[0].delete("brave_rps_global")
+
+    old_rps = CONFIG.web_search.rps
+    CONFIG.web_search.rps = 2
+    try:
+        rate_limit = RateLimit()
+
+        await rate_limit.check_brave_rps(mock_request_1)
+        await rate_limit.check_brave_rps(mock_request_2)
+
+        with pytest.raises(HTTPException):
+            await rate_limit.check_brave_rps(mock_request_1)
+    finally:
+        CONFIG.web_search.rps = old_rps
+        await redis_client[0].delete("brave_rps_global")
+
+
+@pytest.mark.asyncio
+async def test_check_brave_rps_reset_after_window(redis_client):
+    """Test that check_brave_rps resets after the 1 second window expires."""
+    mock_request = MagicMock(spec=Request)
+    mock_request.state.redis = redis_client[0]
+    mock_request.state.redis_rate_limit_command = redis_client[1]
+
+    await redis_client[0].delete("brave_rps_global")
+
+    old_rps = CONFIG.web_search.rps
+    CONFIG.web_search.rps = 2
+    try:
+        rate_limit = RateLimit()
+
+        await rate_limit.check_brave_rps(mock_request)
+        await rate_limit.check_brave_rps(mock_request)
+
+        with pytest.raises(HTTPException):
+            await rate_limit.check_brave_rps(mock_request)
+
+        await asyncio.sleep(1.1)
+
+        await rate_limit.check_brave_rps(mock_request)
+        await rate_limit.check_brave_rps(mock_request)
+    finally:
+        CONFIG.web_search.rps = old_rps
+        await redis_client[0].delete("brave_rps_global")

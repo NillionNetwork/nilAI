@@ -180,13 +180,6 @@ class RateLimit:
                 await self.check_bucket(
                     redis,
                     redis_rate_limit_command,
-                    "web_search_rps",
-                    CONFIG.web_search.rps,
-                    1000,
-                )
-                await self.check_bucket(
-                    redis,
-                    redis_rate_limit_command,
                     f"web_search:{user_limits.subscription_holder}",
                     user_limits.rate_limits.web_search_rate_limit,
                     0,
@@ -240,6 +233,26 @@ class RateLimit:
                 detail="Too Many Requests",
             )
         return key
+
+    @staticmethod
+    async def check_brave_rps(request: Request) -> None:
+        """
+        Global RPS limit for Brave API calls, across all users.
+        """
+        redis = request.state.redis
+        redis_rate_limit_command = request.state.redis_rate_limit_command
+
+        limit = CONFIG.web_search.rps
+        if not limit or limit <= 0:
+            return
+
+        await RateLimit.check_bucket(
+            redis,
+            redis_rate_limit_command,
+            "brave_rps_global",
+            limit,
+            1000,
+        )
 
     @staticmethod
     async def concurrent_decrement(redis: Redis, key: str | None):
