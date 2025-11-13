@@ -97,6 +97,7 @@ async def _make_brave_api_request(query: str, request: Request) -> Dict[str, Any
 
     Args:
         query: The search query string to execute
+        request: FastAPI request object for rate limiting
 
     Returns:
         Dict containing the raw API response data
@@ -242,6 +243,16 @@ async def perform_web_search_async(query: str, request: Request) -> WebSearchCon
     Fetches only the exact page for each Brave URL and extracts its
     main content with trafilatura. If extraction fails, falls back to
     the Brave snippet.
+
+    Args:
+        query: The search query string to execute
+        request: FastAPI request object for rate limiting
+
+    Returns:
+        WebSearchContext with formatted search results and source information
+
+    Raises:
+        HTTPException: If no results are found (404) or if the API request fails
     """
     if not (query and query.strip()):
         logger.warning("Empty or invalid query provided for web search")
@@ -721,6 +732,7 @@ async def handle_web_search_for_responses(
         req: ResponseRequest containing input to process
         model_name: Name of the LLM model to use for query generation
         client: LLM client instance for making API calls
+        request: FastAPI request object for rate limiting
 
     Returns:
         WebSearchEnhancedInput with web search context added, or original

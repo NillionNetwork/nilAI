@@ -207,7 +207,7 @@ async def test_make_brave_api_request_calls_rps_limit():
         mock_http_client = AsyncMock()
         mock_response = AsyncMock()
         mock_response.status_code = 200
-        mock_response.json = AsyncMock(return_value=mock_data)
+        mock_response.json = MagicMock(return_value=mock_data)
         mock_http_client.get = AsyncMock(return_value=mock_response)
         mock_client.return_value = mock_http_client
 
