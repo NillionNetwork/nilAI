@@ -18,6 +18,29 @@ import subprocess
 import sys
 import shutil
 import yaml
+from dotenv import load_dotenv
+
+
+def load_environment_variables(is_dev):
+    """
+    Load environment variables from .env.mainnet file.
+
+    Returns:
+        dict: Environment variables dictionary with .env.mainnet loaded
+    """
+    env = os.environ.copy()
+
+    # Load .env.mainnet file if it exists
+    env_file = ".env.mainnet" if not is_dev else ".env.dev"
+    if os.path.isfile(env_file):
+        print(f"Loading environment variables from {env_file}")
+        load_dotenv(env_file, override=True)
+        # Update the env dict with the loaded variables
+        env.update(os.environ)
+    else:
+        print(f"Warning: {env_file} not found, using system environment variables only")
+
+    return env
 
 
 def find_docker_compose_command():
@@ -369,8 +392,8 @@ def main():
     if use_no_path_resolution:
         config_cmd.append("--no-path-resolution")
 
-    # Set FILES environment variable to a valid placeholder path that we'll replace later
-    env = os.environ.copy()
+    # Load environment variables from .env.mainnet and set FILES environment variable
+    env = load_environment_variables(args.dev)
     files_placeholder = "/tmp/files_placeholder"
     env["FILES"] = files_placeholder
 

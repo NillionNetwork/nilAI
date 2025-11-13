@@ -8,7 +8,6 @@ services:
       - .env.testnet
     environment:
       - AUTH_STRATEGY=nuc
-      - POSTGRES_DB=${POSTGRES_DB_TESTNET}
     volumes:
       - ${FILES}/testnet/nilai-api/config.yaml:/app/nilai-api/src/nilai_api/config/config.yaml
   grafana:
