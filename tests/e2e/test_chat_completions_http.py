@@ -139,7 +139,6 @@ def test_usage_endpoint(client):
         "total_tokens",
         "completion_tokens",
         "prompt_tokens",
-        "queries",
     ]
 
     for key in expected_keys:

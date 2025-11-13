@@ -21,14 +21,6 @@ async def test_runs_in_a_loop():
 def mock_user():
     mock = MagicMock(spec=UserModel)
     mock.user_id = "test-user-id"
-    mock.name = "Test User"
-    mock.apikey = "test-api-key"
-    mock.prompt_tokens = 100
-    mock.completion_tokens = 50
-    mock.total_tokens = 150
-    mock.completion_tokens_details = None
-    mock.prompt_tokens_details = None
-    mock.queries = 10
     mock.rate_limits = RateLimits().get_effective_limits().model_dump_json()
     mock.rate_limits_obj = RateLimits().get_effective_limits()
     return mock

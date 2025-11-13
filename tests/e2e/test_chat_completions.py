@@ -480,12 +480,7 @@ def test_usage_endpoint(client):
         assert isinstance(usage_data, dict), "Usage data should be a dictionary"
 
         # Check for expected keys
-        expected_keys = [
-            "total_tokens",
-            "completion_tokens",
-            "prompt_tokens",
-            "queries",
-        ]
+        expected_keys = ["total_tokens", "completion_tokens", "prompt_tokens"]
         for key in expected_keys:
             assert key in usage_data, f"Expected key {key} not found in usage data"
 

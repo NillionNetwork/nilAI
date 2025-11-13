@@ -1,4 +1,3 @@
-from datetime import datetime, timezone
 import logging
 from unittest.mock import MagicMock
 
@@ -23,14 +22,7 @@ def mock_user_model():
     from nilai_api.db.users import UserModel
 
     mock = MagicMock(spec=UserModel)
-    mock.name = "Test User"
     mock.user_id = "test-user-id"
-    mock.apikey = "test-api-key"
-    mock.prompt_tokens = 0
-    mock.completion_tokens = 0
-    mock.queries = 0
-    mock.signup_date = datetime.now(timezone.utc)
-    mock.last_activity = datetime.now(timezone.utc)
     mock.rate_limits = RateLimits().get_effective_limits().model_dump_json()
     mock.rate_limits_obj = RateLimits().get_effective_limits()
     return mock
