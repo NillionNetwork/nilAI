@@ -817,7 +817,7 @@ def test_web_search(client, model, high_web_search_rate_limit):
         "temperature": 0.01,
     }
 
-    response = client.post("/responses", json=payload, timeout=60)
+    response = client.post("/responses", json=payload, timeout=180)
     assert response.status_code == 200, (
         f"Response for {model} failed with status {response.status_code}"
     )
