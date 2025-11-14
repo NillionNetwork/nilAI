@@ -813,12 +813,11 @@ def test_web_search(client, model, high_web_search_rate_limit):
         "model": model,
         "input": "Who won the Roland Garros Open in 2024? Just reply with the winner's name.",
         "instructions": "You are a helpful assistant that provides accurate and up-to-date information. Answer in 10 words maximum and do not reason.",
-        "temperature": 0.2,
-        "max_output_tokens": 15000,
         "extra_body": {"web_search": True},
+        "temperature": 0.01,
     }
 
-    response = client.post("/responses", json=payload, timeout=180)
+    response = client.post("/responses", json=payload, timeout=60)
     assert response.status_code == 200, (
         f"Response for {model} failed with status {response.status_code}"
     )

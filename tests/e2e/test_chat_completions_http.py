@@ -908,7 +908,7 @@ def test_web_search(client, model, high_web_search_rate_limit):
         "messages": [
             {
                 "role": "system",
-                "content": "You are a helpful assistant that provides accurate and up-to-date information.",
+                "content": "You are a helpful assistant that provides accurate and up-to-date information. Answer in 10 words maximum and do not reason.",
             },
             {
                 "role": "user",
@@ -916,7 +916,7 @@ def test_web_search(client, model, high_web_search_rate_limit):
             },
         ],
         "extra_body": {"web_search": True},
-        "temperature": 0.2,
+        "temperature": 0.01,
         "max_tokens": 150,
     }
 

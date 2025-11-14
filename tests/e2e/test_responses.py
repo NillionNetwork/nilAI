@@ -709,9 +709,9 @@ def test_web_search(client, model, high_web_search_rate_limit):
     response = client.responses.create(
         model=model,
         input="Who won the Roland Garros Open in 2024? Just reply with the winner's name.",
-        instructions="You are a helpful assistant that provides accurate and up-to-date information.",
+        instructions="You are a helpful assistant that provides accurate and up-to-date information. Answer in 10 words maximum and do not reason.",
         extra_body={"web_search": True},
-        temperature=0.2,
+        temperature=0.01,
     )
 
     assert response is not None, "Response should not be None"
