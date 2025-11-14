@@ -52,13 +52,10 @@ services:
       VLLM_ALLOW_LONG_MAX_MODEL_LEN: "1"
       PYTORCH_CUDA_ALLOC_CONF: "expandable_segments:True"
     volumes:
-      - hugging_face_models:/root/.cache/huggingface
+      - /home/ec2-user/.cache/huggingface:/root/.cache/huggingface  # Mount runner's HF cache
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       retries: 3
       start_period: 60s
       timeout: 10s
-
-volumes:
-  hugging_face_models:

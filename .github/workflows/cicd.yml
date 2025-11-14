@@ -130,9 +130,40 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build ${{ matrix.component }} image
+      - name: Pre-pull Docker base image (for vllm)
+        if: matrix.component == 'vllm'
+        run: |
+          echo "Pre-pulling vllm base image to avoid rate limiting during build..."
+          docker pull vllm/vllm-openai:v0.10.1
+
+      - name: Setup HuggingFace cache directory
+        if: matrix.component == 'vllm' && matrix.model_to_cache != ''
+        run: |
+          mkdir -p /home/ec2-user/.cache/huggingface
+          echo "Cache directory created at /home/ec2-user/.cache/huggingface"
+
+      - name: Cache HuggingFace models
+        if: matrix.component == 'vllm' && matrix.model_to_cache != ''
+        uses: actions/cache@v4
+        id: cache-hf-models
+        with:
+          path: /home/ec2-user/.cache/huggingface
+          key: huggingface-models-${{ matrix.model_to_cache }}-v1
+          restore-keys: |
+            huggingface-models-${{ matrix.model_to_cache }}-
+            huggingface-models-
+
+      - name: Download HuggingFace model
+        if: matrix.component == 'vllm' && matrix.model_to_cache != '' && steps.cache-hf-models.outputs.cache-hit != 'true'
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          echo "Downloading model ${{ matrix.model_to_cache }} to cache..."
+          python3 -c "from huggingface_hub import snapshot_download; import os; os.environ['HF_TOKEN'] = '${{ secrets.HF_TOKEN }}'; snapshot_download('${{ matrix.model_to_cache }}', cache_dir='/home/ec2-user/.cache/huggingface'); print('Model cached successfully')" \
+            || { echo "Failed to download model"; exit 1; }
+          echo "Model download completed successfully"
+
+      - name: Build ${{ matrix.component }} image
         run: |
           echo "Building ${{ matrix.component }} image..."
 
@@ -143,14 +174,6 @@ jobs:
           CACHE_FROM="type=registry,ref=ghcr.io/${REPO_LOWER}/nilai-${{ matrix.component }}:buildcache"
           CACHE_TO="type=registry,ref=ghcr.io/${REPO_LOWER}/nilai-${{ matrix.component }}:buildcache,mode=max"
 
-          # Add model caching for vllm component
-          EXTRA_BUILD_ARGS=""
-          SECRET_ARGS=""
-          if [ "${{ matrix.component }}" = "vllm" ] && [ -n "${{ matrix.model_to_cache || '' }}" ]; then
-            EXTRA_BUILD_ARGS="--build-arg MODEL_TO_CACHE=${{ matrix.model_to_cache }}"
-            SECRET_ARGS="--secret id=hf_token,env=HF_TOKEN"
-          fi
-
           docker buildx build \
             -t nillion/nilai-${{ matrix.component }}:latest \
             -f docker/${{ matrix.component }}.Dockerfile \
@@ -158,8 +181,6 @@ jobs:
             --cache-to=${CACHE_TO} \
             --load \
             ${{ matrix.build_args || '' }} \
-            ${EXTRA_BUILD_ARGS} \
-            ${SECRET_ARGS} \
             .
 
           echo "✅ ${{ matrix.component }} build completed successfully"
