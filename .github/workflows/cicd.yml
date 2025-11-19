@@ -117,6 +117,32 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Disable unattended upgrades
+        run: |
+          echo "Disabling unattended upgrades to prevent interference with CI builds..."
+
+          # Stop unattended-upgrades service
+          sudo systemctl stop unattended-upgrades || true
+          sudo systemctl disable unattended-upgrades || true
+
+          # Kill any running unattended-upgrades processes
+          sudo pkill -f unattended-upgrade || true
+
+          # Remove or disable the unattended-upgrades configuration
+          sudo systemctl mask unattended-upgrades || true
+
+          # Wait for any ongoing package operations to complete
+          while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+            echo "Waiting for package manager lock to be released..."
+            sleep 5
+          done
+
+          # Disable automatic updates in APT configuration
+          echo 'APT::Periodic::Update-Package-Lists "0";' | sudo tee /etc/apt/apt.conf.d/20auto-upgrades
+          echo 'APT::Periodic::Unattended-Upgrade "0";' | sudo tee -a /etc/apt/apt.conf.d/20auto-upgrades
+
+          echo "✅ Unattended upgrades disabled successfully"
+
       - name: Install Docker Buildx plugin
         run: |
           set -euo pipefail
@@ -278,6 +304,32 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Disable unattended upgrades
+        run: |
+          echo "Disabling unattended upgrades to prevent interference with CI builds..."
+
+          # Stop unattended-upgrades service
+          sudo systemctl stop unattended-upgrades || true
+          sudo systemctl disable unattended-upgrades || true
+
+          # Kill any running unattended-upgrades processes
+          sudo pkill -f unattended-upgrade || true
+
+          # Remove or disable the unattended-upgrades configuration
+          sudo systemctl mask unattended-upgrades || true
+
+          # Wait for any ongoing package operations to complete
+          while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+            echo "Waiting for package manager lock to be released..."
+            sleep 5
+          done
+
+          # Disable automatic updates in APT configuration
+          echo 'APT::Periodic::Update-Package-Lists "0";' | sudo tee /etc/apt/apt.conf.d/20auto-upgrades
+          echo 'APT::Periodic::Unattended-Upgrade "0";' | sudo tee -a /etc/apt/apt.conf.d/20auto-upgrades
+
+          echo "✅ Unattended upgrades disabled successfully"
 
       - uses: astral-sh/setup-uv@v7
         with:
