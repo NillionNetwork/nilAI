@@ -163,13 +163,27 @@ jobs:
             huggingface-models-${{ matrix.model_to_cache }}-
             huggingface-models-
 
+      - name: Setup uv for model download
+        if: matrix.component == 'vllm' && matrix.model_to_cache != '' && steps.cache-hf-models.outputs.cache-hit != 'true'
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "**/pyproject.toml"
+
+      - name: Install dependencies for model download
+        if: matrix.component == 'vllm' && matrix.model_to_cache != '' && steps.cache-hf-models.outputs.cache-hit != 'true'
+        run: |
+          export ACLOCAL=aclocal
+          export AUTOMAKE=automake
+          uv sync
+
       - name: Download HuggingFace model
         if: matrix.component == 'vllm' && matrix.model_to_cache != '' && steps.cache-hf-models.outputs.cache-hit != 'true'
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           echo "Downloading model ${{ matrix.model_to_cache }} to cache..."
-          python3 -c "from huggingface_hub import snapshot_download; import os; os.environ['HF_TOKEN'] = '${{ secrets.HF_TOKEN }}'; snapshot_download('${{ matrix.model_to_cache }}', cache_dir='/home/ec2-user/.cache/huggingface'); print('Model cached successfully')" \
+          uv run python -c "from huggingface_hub import snapshot_download; import os; os.environ['HF_TOKEN'] = '${{ secrets.HF_TOKEN }}'; snapshot_download('${{ matrix.model_to_cache }}', cache_dir='/home/ec2-user/.cache/huggingface'); print('Model cached successfully')" \
             || { echo "Failed to download model"; exit 1; }
           echo "Model download completed successfully"
 
