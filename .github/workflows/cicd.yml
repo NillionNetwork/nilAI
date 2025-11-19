@@ -140,6 +140,16 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Check system resources
+        run: |
+          echo "=== System Resources ==="
+          df -h
+          free -h
+          echo "=== Docker Info ==="
+          docker info
+          echo "=== Docker System Usage ==="
+          docker system df
+
       - name: Pre-pull Docker base image (for vllm)
         if: matrix.component == 'vllm'
         run: |
@@ -209,14 +219,55 @@ jobs:
             CACHE_ARGS="--cache-to=type=registry,ref=${CACHE_REF},mode=max"
           fi
 
-          # Build with appropriate cache configuration
-          docker buildx build \
-            -t nillion/nilai-${{ matrix.component }}:latest \
-            -f docker/${{ matrix.component }}.Dockerfile \
-            ${CACHE_ARGS} \
-            --load \
-            ${{ matrix.build_args || '' }} \
-            .
+          # Function to build with retry logic
+          build_with_retry() {
+            local attempt=1
+            local max_attempts=3
+
+            while [ $attempt -le $max_attempts ]; do
+              echo "🔄 Build attempt $attempt of $max_attempts..."
+
+              if docker buildx build \
+                -t nillion/nilai-${{ matrix.component }}:latest \
+                -f docker/${{ matrix.component }}.Dockerfile \
+                ${CACHE_ARGS} \
+                --load \
+                ${{ matrix.build_args || '' }} \
+                .; then
+                echo "✅ Build succeeded on attempt $attempt"
+                return 0
+              else
+                echo "❌ Build failed on attempt $attempt"
+                if [ $attempt -lt $max_attempts ]; then
+                  echo "⏳ Waiting 30 seconds before retry..."
+                  sleep 30
+
+                  # Clean up any partial builds
+                  echo "🧹 Cleaning up Docker system..."
+                  docker system prune -f || true
+
+                  # On retry, disable cache export to reduce complexity
+                  if [ $attempt -eq 2 ]; then
+                    echo "⚠️  Disabling cache export for retry..."
+                    CACHE_ARGS="--cache-from=type=registry,ref=${CACHE_REF}"
+                  fi
+
+                  # On final retry, disable all cache
+                  if [ $attempt -eq 3 ]; then
+                    echo "⚠️  Disabling all cache for final retry..."
+                    CACHE_ARGS=""
+                  fi
+                fi
+                attempt=$((attempt + 1))
+              fi
+            done
+
+            echo "💥 All build attempts failed"
+            return 1
+          }
+
+          # Execute build with retry logic
+          build_with_retry
 
           echo "✅ ${{ matrix.component }} build completed successfully"
 
