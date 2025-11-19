@@ -173,6 +173,7 @@ jobs:
       - name: Install dependencies for model download
         if: matrix.component == 'vllm' && matrix.model_to_cache != '' && steps.cache-hf-models.outputs.cache-hit != 'true'
         run: |
+          apt-get update && apt-get install curl git pkg-config automake file python3.12-dev -y
           export ACLOCAL=aclocal
           export AUTOMAKE=automake
           uv sync
