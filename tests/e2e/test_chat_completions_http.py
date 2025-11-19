@@ -196,7 +196,6 @@ def test_model_standard_request(client, model):
             },
             {"role": "user", "content": "What is the capital of France?"},
         ],
-        "temperature": 0.2,
     }
 
     response = client.post("/chat/completions", json=payload, timeout=30)
@@ -252,7 +251,6 @@ def test_model_standard_request_nillion_2025(nillion_2025_client, model):
             },
             {"role": "user", "content": "What is the capital of France?"},
         ],
-        "temperature": 0.2,
     }
 
     response = nillion_2025_client.post("/chat/completions", json=payload, timeout=30)
@@ -311,7 +309,6 @@ def test_model_streaming_request(client, model):
                 "content": "Write a short poem about mountains. It must be 20 words maximum.",
             },
         ],
-        "temperature": 0.2,
         "stream": True,
     }
 
@@ -372,7 +369,6 @@ def test_model_tools_request(client, model):
             },
             {"role": "user", "content": "What is the weather like in Paris today?"},
         ],
-        "temperature": 0.2,
         "tools": [
             {
                 "type": "function",
@@ -489,7 +485,6 @@ def test_function_calling_with_streaming_httpx(client, model):
             }
         ],
         "tool_choice": {"type": "function", "function": {"name": "get_weather"}},
-        "temperature": 0.2,
         "stream": True,
     }
 
@@ -752,7 +747,6 @@ def test_chat_completion_missing_model(client):
     """Test chat completion with missing model field to trigger a validation error"""
     payload = {
         "messages": [{"role": "user", "content": "What is your name?"}],
-        "temperature": 0.2,
     }
     response = client.post("/chat/completions", json=payload)
     assert response.status_code == 400, (
@@ -765,7 +759,6 @@ def test_chat_completion_negative_max_tokens(client):
     payload = {
         "model": test_models[0],
         "messages": [{"role": "user", "content": "Tell me a joke."}],
-        "temperature": 0.2,
         "max_tokens": -10,
     }
     response = client.post("/chat/completions", json=payload)
@@ -879,7 +872,6 @@ def test_nildb_prompt_document(document_id_client: httpx.Client, model):
         "messages": [
             {"role": "user", "content": "Can you make a small rhyme?"},
         ],
-        "temperature": 0.2,
     }
 
     response = document_id_client.post("/chat/completions", json=payload, timeout=30)
@@ -916,7 +908,6 @@ def test_web_search(client, model, high_web_search_rate_limit):
             },
         ],
         "extra_body": {"web_search": True},
-        "temperature": 0.2,
         "max_tokens": 150,
     }
 

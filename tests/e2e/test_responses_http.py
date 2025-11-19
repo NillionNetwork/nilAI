@@ -108,7 +108,6 @@ def test_model_standard_request(client, model):
         "model": model,
         "input": "What is the capital of France?",
         "instructions": "You are a helpful assistant that provides accurate and concise information.",
-        "temperature": 0.2,
         "max_output_tokens": 100,
     }
 
@@ -189,7 +188,6 @@ def test_model_standard_request_nillion_2025(nillion_2025_client, model):
         "model": model,
         "input": "What is the capital of France?",
         "instructions": "You are a helpful assistant that provides accurate and concise information.",
-        "temperature": 0.2,
     }
 
     response = nillion_2025_client.post("/responses", json=payload, timeout=30)
@@ -244,7 +242,6 @@ def test_model_streaming_request(client, model):
         "model": model,
         "input": "Write a short poem about mountains.",
         "instructions": "You are a helpful assistant that provides accurate and concise information.",
-        "temperature": 0.2,
         "stream": True,
     }
 
@@ -306,7 +303,6 @@ def test_model_tools_request(client, model):
         "model": model,
         "instructions": "You are a helpful assistant. When a user asks a question that requires weather, use the get_weather tool to get the weather information.",
         "input": "What is the weather like in Paris today?",
-        "temperature": 0.2,
         "tool_choice": "auto",
         "tools": [
             {
@@ -405,7 +401,6 @@ def test_function_calling_with_streaming_httpx(client, model):
                 },
             }
         ],
-        "temperature": 0.2,
         "stream": True,
     }
 
@@ -643,7 +638,6 @@ def test_response_invalid_temperature(client):
 def test_response_missing_model(client):
     payload = {
         "input": "What is your name?",
-        "temperature": 0.2,
     }
     response = client.post("/responses", json=payload)
     assert response.status_code == 400, (
@@ -655,7 +649,6 @@ def test_response_negative_max_tokens(client):
     payload = {
         "model": test_models[0],
         "input": "Tell me a joke.",
-        "temperature": 0.2,
         "max_output_tokens": -10,
     }
     response = client.post("/responses", json=payload)
@@ -813,7 +806,7 @@ def test_web_search(client, model, high_web_search_rate_limit):
         "model": model,
         "input": "Who won the Roland Garros Open in 2024? Just reply with the winner's name.",
         "instructions": "You are a helpful assistant that provides accurate and up-to-date information. Answer in 10 words maximum and do not reason.",
-        "temperature": 0.2,
+        "temperature": 0.95,
         "max_output_tokens": 15000,
         "extra_body": {"web_search": True},
     }
@@ -924,7 +917,6 @@ def test_nildb_prompt_document(document_id_client: httpx.Client, model):
         "model": model,
         "input": "Can you make a small rhyme?",
         "instructions": "You are a helpful assistant.",
-        "temperature": 0.2,
     }
 
     response = document_id_client.post("/responses", json=payload, timeout=30)
