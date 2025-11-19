@@ -159,6 +159,10 @@ class TestNilDBEndpoints:
             user=mock_user, token_rate_limit=None, prompt_document=mock_prompt_document
         )
 
+        # Mock metering context
+        mock_meter = MagicMock()
+        mock_meter.set_response = MagicMock()
+
         request = ChatRequest(
             model="test-model", messages=[{"role": "user", "content": "Hello"}]
         )
@@ -240,8 +244,14 @@ class TestNilDBEndpoints:
             # Mock handle_tool_workflow to return the response and token counts
             mock_handle_tool_workflow.return_value = (mock_response, 0, 0)
 
+            # Mock metering context
+            mock_meter = MagicMock()
+            mock_meter.set_response = MagicMock()
+
             # Call the function (this will test the prompt injection logic)
-            await chat_completion(req=request, auth_info=mock_auth_info)
+            await chat_completion(
+                req=request, auth_info=mock_auth_info, meter=mock_meter
+            )
 
             mock_get_prompt.assert_called_once_with(mock_prompt_document)
 
@@ -264,6 +274,10 @@ class TestNilDBEndpoints:
         mock_auth_info = AuthenticationInfo(
             user=mock_user, token_rate_limit=None, prompt_document=mock_prompt_document
         )
+
+        # Mock metering context
+        mock_meter = MagicMock()
+        mock_meter.set_response = MagicMock()
 
         request = ChatRequest(
             model="test-model", messages=[{"role": "user", "content": "Hello"}]
@@ -310,6 +324,10 @@ class TestNilDBEndpoints:
             token_rate_limit=None,
             prompt_document=None,
         )
+
+        # Mock metering context
+        mock_meter = MagicMock()
+        mock_meter.set_response = MagicMock()
 
         request = ChatRequest(
             model="test-model", messages=[{"role": "user", "content": "Hello"}]
@@ -391,7 +409,9 @@ class TestNilDBEndpoints:
             mock_handle_tool_workflow.return_value = (mock_response, 0, 0)
 
             # Call the function
-            await chat_completion(req=request, auth_info=mock_auth_info)
+            await chat_completion(
+                req=request, auth_info=mock_auth_info, meter=mock_meter
+            )
 
             # Should not call get_prompt_from_nildb when no prompt document
             mock_get_prompt.assert_not_called()
@@ -477,7 +497,12 @@ class TestNilDBEndpoints:
 
             mock_handle_tool_workflow.return_value = (mock_response, 0, 0)
 
-            await create_response(req=request, auth_info=mock_auth_info)
+            mock_meter = MagicMock()
+            mock_meter.set_response = MagicMock()
+
+            await create_response(
+                req=request, auth_info=mock_auth_info, meter=mock_meter
+            )
 
             mock_get_prompt.assert_called_once_with(mock_prompt_document)
 
@@ -604,7 +629,12 @@ class TestNilDBEndpoints:
 
             mock_handle_tool_workflow.return_value = (mock_response, 0, 0)
 
-            await create_response(req=request, auth_info=mock_auth_info)
+            mock_meter = MagicMock()
+            mock_meter.set_response = MagicMock()
+
+            await create_response(
+                req=request, auth_info=mock_auth_info, meter=mock_meter
+            )
 
             mock_get_prompt.assert_not_called()
 

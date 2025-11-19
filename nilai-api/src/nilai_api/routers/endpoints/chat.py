@@ -12,6 +12,7 @@ from openai import AsyncOpenAI
 from nilai_api.auth import get_auth_info, AuthenticationInfo
 from nilai_api.config import CONFIG
 from nilai_api.crypto import sign_message
+from nilai_api.credit import LLMMeter, LLMUsage
 from nilai_api.db.logs import QueryLogManager
 from nilai_api.db.users import UserManager
 from nilai_api.handlers.nildb.handler import get_prompt_from_nildb
@@ -27,6 +28,7 @@ from nilai_common import (
     SignedChatCompletion,
     Source,
 )
+from nilauth_credit_middleware import MeteringContext
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +79,7 @@ async def chat_completion(
         )
     ),
     auth_info: AuthenticationInfo = Depends(get_auth_info),
+    meter: MeteringContext = Depends(LLMMeter),
 ) -> Union[SignedChatCompletion, StreamingResponse]:
     """
     Generate a chat completion response from the AI model.
@@ -257,6 +260,15 @@ async def chat_completion(
                     prompt_tokens=prompt_token_usage,
                     completion_tokens=completion_token_usage,
                 )
+                meter.set_response(
+                    {
+                        "usage": LLMUsage(
+                            prompt_tokens=prompt_token_usage,
+                            completion_tokens=completion_token_usage,
+                            web_searches=len(sources) if sources else 0,
+                        )
+                    }
+                )
                 await QueryLogManager.log_query(
                     auth_info.user.userid,
                     model=req.model,
@@ -286,7 +298,6 @@ async def chat_completion(
         )
 
     logger.info(f"[chat] call start request_id={request_id}")
-    logger.info(f"[chat] call message: {request_kwargs['messages']}")
     t_call = time.monotonic()
     response = await client.chat.completions.create(**request_kwargs)
     logger.info(
@@ -294,6 +305,7 @@ async def chat_completion(
     )
     logger.info(f"[chat] call response: {response}")
 
+    # Handle tool workflow fully inside tools.router
     (
         final_completion,
         agg_prompt_tokens,
@@ -335,7 +347,15 @@ async def chat_completion(
         prompt_tokens=model_response.usage.prompt_tokens,
         completion_tokens=model_response.usage.completion_tokens,
     )
-
+    meter.set_response(
+        {
+            "usage": LLMUsage(
+                prompt_tokens=model_response.usage.prompt_tokens,
+                completion_tokens=model_response.usage.completion_tokens,
+                web_searches=len(sources) if sources else 0,
+            )
+        }
+    )
     await QueryLogManager.log_query(
         auth_info.user.userid,
         model=req.model,

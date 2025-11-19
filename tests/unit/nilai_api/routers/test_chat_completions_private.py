@@ -137,11 +137,26 @@ def mock_state(mocker):
 
 
 @pytest.fixture
-def client(mock_user_manager):
+def mock_metering_context(mocker):
+    """Mock the metering context to avoid credit service calls during tests."""
+    mock_context = MagicMock()
+    mock_context.set_response = MagicMock()
+    return mock_context
+
+
+@pytest.fixture
+def client(mock_user_manager, mock_metering_context):
     from nilai_api.app import app
+    from nilai_api.credit import LLMMeter
+
+    # Override the LLMMeter dependency to avoid actual credit service calls
+    app.dependency_overrides[LLMMeter] = lambda: mock_metering_context
 
     with TestClient(app) as client:
         yield client
+
+    # Clean up the override after tests
+    app.dependency_overrides.clear()
 
 
 # Example test
