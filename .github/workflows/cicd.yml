@@ -195,15 +195,25 @@ jobs:
           # Convert repository name to lowercase for Docker registry compatibility
           REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
 
-          # Set cache and build args based on component
-          CACHE_FROM="type=registry,ref=ghcr.io/${REPO_LOWER}/nilai-${{ matrix.component }}:buildcache"
-          CACHE_TO="type=registry,ref=ghcr.io/${REPO_LOWER}/nilai-${{ matrix.component }}:buildcache,mode=max"
+          # Set cache references
+          CACHE_REF="ghcr.io/${REPO_LOWER}/nilai-${{ matrix.component }}:buildcache"
 
+          # Check if cache exists and is accessible
+          echo "Checking cache availability..."
+          CACHE_ARGS=""
+          if docker manifest inspect ${CACHE_REF} >/dev/null 2>&1; then
+            echo "✅ Cache found, using registry cache"
+            CACHE_ARGS="--cache-from=type=registry,ref=${CACHE_REF} --cache-to=type=registry,ref=${CACHE_REF},mode=max"
+          else
+            echo "⚠️  No cache found or cache inaccessible, building without import cache"
+            CACHE_ARGS="--cache-to=type=registry,ref=${CACHE_REF},mode=max"
+          fi
+
+          # Build with appropriate cache configuration
           docker buildx build \
             -t nillion/nilai-${{ matrix.component }}:latest \
             -f docker/${{ matrix.component }}.Dockerfile \
-            --cache-from=${CACHE_FROM} \
-            --cache-to=${CACHE_TO} \
+            ${CACHE_ARGS} \
             --load \
             ${{ matrix.build_args || '' }} \
             .
