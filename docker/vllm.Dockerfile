@@ -9,6 +9,7 @@ FROM vllm/vllm-openai:v0.11.2
 # ENV MODEL_PATH=${MODEL_PATH}
 # ENV EXEC_PATH=nilai_models.models.${MODEL_NAME}:app
 
+ENV PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 COPY --link . /daemon/
 COPY --link vllm_templates /opt/vllm/templates
 
