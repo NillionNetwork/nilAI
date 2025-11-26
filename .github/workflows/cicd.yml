@@ -222,6 +222,18 @@ jobs:
             echo "cache-hit=false" >> $GITHUB_OUTPUT
           fi
 
+      - name: DEBUG - Verify Cache Structure
+        if: matrix.component == 'vllm'
+        run: |
+          echo "Listing /home/ec2-user/.cache/huggingface contents:"
+          ls -F /home/ec2-user/.cache/huggingface/ || echo "Directory not found"
+          
+          echo "Checking for specific model folder:"
+          ls -F /home/ec2-user/.cache/huggingface/models--openai--gpt-oss-20b/ || echo "Model folder not found"
+          
+          echo "Checking snapshot content (first few files):"
+          find /home/ec2-user/.cache/huggingface -maxdepth 4 | head -n 10    
+          
       - name: Setup uv for model download
         if: matrix.component == 'vllm' && matrix.model_to_cache != '' && steps.restore-model.outputs.cache-hit != 'true'
         uses: astral-sh/setup-uv@v7
