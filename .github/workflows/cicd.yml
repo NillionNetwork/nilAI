@@ -188,26 +188,61 @@ jobs:
           mkdir -p /home/ec2-user/.cache/huggingface
           echo "Cache directory created at /home/ec2-user/.cache/huggingface"
 
-      - name: Cache HuggingFace models
+      - name: Restore model from GHCR
         if: matrix.component == 'vllm' && matrix.model_to_cache != ''
-        uses: actions/cache@v4
-        id: cache-hf-models
-        with:
-          path: /home/ec2-user/.cache/huggingface
-          key: huggingface-models-${{ matrix.model_to_cache }}-v1
-          restore-keys: |
-            huggingface-models-${{ matrix.model_to_cache }}-
-            huggingface-models-
+        id: restore-model
+        run: |
+          MODEL_CACHE_DIR="/home/ec2-user/.cache/huggingface"
+          HF_DIR_NAME="models--$(echo ${{ matrix.model_to_cache }} | sed 's/\//--/g')"
+          FULL_PATH="$MODEL_CACHE_DIR/$HF_DIR_NAME"
 
+          if [ -d "$FULL_PATH" ]; then
+            echo "Model found on host filesystem at $FULL_PATH"
+            echo "Skipping GHCR pull to save I/O."
+            echo "cache-hit=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          MODEL_IMAGE="ghcr.io/${{ github.repository_owner }}/nilai-model-cache:${{ matrix.model_to_cache }}-v1"
+          MODEL_IMAGE=$(echo "$MODEL_IMAGE" | tr '[:upper:]' '[:lower:]')
+
+          echo "Attempting to pull model cache image: $MODEL_IMAGE"
+
+          if docker pull "$MODEL_IMAGE"; then
+            echo "Image found. Copying model files to host..."
+            mkdir -p "$MODEL_CACHE_DIR"
+
+            CONTAINER_ID=$(docker create "$MODEL_IMAGE")
+            docker cp "$CONTAINER_ID":/model/. "$MODEL_CACHE_DIR/"
+            docker rm "$CONTAINER_ID"
+            echo "Model restored from GHCR."
+            echo "cache-hit=true" >> $GITHUB_OUTPUT
+          else
+            echo "Model cache not found in GHCR."
+            echo "cache-hit=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: DEBUG - Verify Cache Structure
+        if: matrix.component == 'vllm'
+        run: |
+          echo "Listing /home/ec2-user/.cache/huggingface contents:"
+          ls -F /home/ec2-user/.cache/huggingface/ || echo "Directory not found"
+          
+          echo "Checking for specific model folder:"
+          ls -F /home/ec2-user/.cache/huggingface/models--openai--gpt-oss-20b/ || echo "Model folder not found"
+          
+          echo "Checking snapshot content (first few files):"
+          find /home/ec2-user/.cache/huggingface -maxdepth 4 | head -n 10    
+          
       - name: Setup uv for model download
-        if: matrix.component == 'vllm' && matrix.model_to_cache != '' && steps.cache-hf-models.outputs.cache-hit != 'true'
+        if: matrix.component == 'vllm' && matrix.model_to_cache != '' && steps.restore-model.outputs.cache-hit != 'true'
         uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
           cache-dependency-glob: "**/pyproject.toml"
 
       - name: Install dependencies for model download
-        if: matrix.component == 'vllm' && matrix.model_to_cache != '' && steps.cache-hf-models.outputs.cache-hit != 'true'
+        if: matrix.component == 'vllm' && matrix.model_to_cache != '' && steps.restore-model.outputs.cache-hit != 'true'
         run: |
           apt-get update && apt-get install curl git pkg-config automake file python3.12-dev -y
           export ACLOCAL=aclocal
@@ -215,7 +250,7 @@ jobs:
           uv sync
 
       - name: Download HuggingFace model
-        if: matrix.component == 'vllm' && matrix.model_to_cache != '' && steps.cache-hf-models.outputs.cache-hit != 'true'
+        if: matrix.component == 'vllm' && matrix.model_to_cache != '' && steps.restore-model.outputs.cache-hit != 'true'
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
@@ -223,6 +258,26 @@ jobs:
           uv run python -c "from huggingface_hub import snapshot_download; import os; os.environ['HF_TOKEN'] = '${{ secrets.HF_TOKEN }}'; snapshot_download('${{ matrix.model_to_cache }}', cache_dir='/home/ec2-user/.cache/huggingface'); print('Model cached successfully')" \
             || { echo "Failed to download model"; exit 1; }
           echo "Model download completed successfully"
+
+      - name: Save model to GHCR
+        if: matrix.component == 'vllm' && matrix.model_to_cache != '' && steps.restore-model.outputs.cache-hit != 'true'
+        run: |
+          echo "Saving model to GHCR..."
+
+          MODEL_IMAGE="ghcr.io/${{ github.repository_owner }}/nilai-model-cache:${{ matrix.model_to_cache }}-v1"
+          MODEL_IMAGE=$(echo "$MODEL_IMAGE" | tr '[:upper:]' '[:lower:]')
+
+          echo "FROM scratch" > Dockerfile.model
+          echo "COPY . /model" >> Dockerfile.model
+
+          cd /home/ec2-user/.cache/huggingface
+
+          echo "Building cache image..."
+          docker build -t "$MODEL_IMAGE" -f $GITHUB_WORKSPACE/Dockerfile.model .
+
+          echo "Pushing cache image to GHCR..."
+          docker push "$MODEL_IMAGE"
+          echo "Model cached to GHCR."
 
       - name: Build ${{ matrix.component }} image
         run: |
