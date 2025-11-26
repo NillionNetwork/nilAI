@@ -1,10 +1,12 @@
 import pytest
-from unittest.mock import patch
-from fastapi import HTTPException
+from unittest.mock import patch, MagicMock, AsyncMock
+from fastapi import HTTPException, Request
 from nilai_api.handlers.web_search import (
     perform_web_search_async,
     enhance_messages_with_web_search,
+    _make_brave_api_request,
 )
+from nilai_api.rate_limiting import RateLimit
 from nilai_common import MessageAdapter, ChatRequest
 from nilai_common.api_models import (
     WebSearchContext,
@@ -32,6 +34,8 @@ async def test_perform_web_search_async_success():
         }
     }
 
+    mock_request = MagicMock(spec=Request)
+
     with (
         patch("nilai_api.config.CONFIG.web_search.api_key", "test-key"),
         patch(
@@ -39,7 +43,7 @@ async def test_perform_web_search_async_success():
             return_value=mock_data,
         ),
     ):
-        ctx = await perform_web_search_async("AI developments")
+        ctx = await perform_web_search_async("AI developments", mock_request)
 
         assert ctx.sources is not None
         assert len(ctx.sources) == 2
@@ -59,6 +63,7 @@ async def test_perform_web_search_async_success():
 async def test_perform_web_search_async_no_results():
     """Test web search with no results returns 404"""
     mock_data = {"web": {"results": []}}
+    mock_request = MagicMock(spec=Request)
 
     with (
         patch("nilai_api.handlers.web_search.CONFIG.web_search.api_key", "test-key"),
@@ -68,7 +73,7 @@ async def test_perform_web_search_async_no_results():
         ),
         pytest.raises(HTTPException) as exc_info,
     ):
-        await perform_web_search_async("nonexistent query")
+        await perform_web_search_async("nonexistent query", mock_request)
 
     assert exc_info.value.status_code == 404
 
@@ -100,6 +105,9 @@ async def test_perform_web_search_async_concurrent_queries():
         }
     }
 
+    mock_request_1 = MagicMock(spec=Request)
+    mock_request_2 = MagicMock(spec=Request)
+
     with (
         patch("nilai_api.config.CONFIG.web_search.api_key", "test-key"),
         patch(
@@ -111,8 +119,8 @@ async def test_perform_web_search_async_concurrent_queries():
 
         # Run two concurrent web searches
         results = await asyncio.gather(
-            perform_web_search_async("AI news"),
-            perform_web_search_async("Machine learning"),
+            perform_web_search_async("AI news", mock_request_1),
+            perform_web_search_async("Machine learning", mock_request_2),
         )
 
         # Verify both searches completed successfully
@@ -146,6 +154,7 @@ async def test_enhance_messages_with_web_search():
         MessageAdapter.new_message(role="user", content="What is the latest AI news?"),
     ]
     req = ChatRequest(model="dummy", messages=original_messages)
+    mock_request = MagicMock(spec=Request)
 
     with patch("nilai_api.handlers.web_search.perform_web_search_async") as mock_search:
         mock_search.return_value = WebSearchContext(
@@ -155,7 +164,7 @@ async def test_enhance_messages_with_web_search():
             ],
         )
 
-        enhanced = await enhance_messages_with_web_search(req, "AI news")
+        enhanced = await enhance_messages_with_web_search(req, "AI news", mock_request)
 
         assert len(enhanced.messages) == 2
         assert enhanced.messages[0]["role"] == "system"
@@ -166,3 +175,65 @@ async def test_enhance_messages_with_web_search():
         assert enhanced.sources[0].content == "AI news"
         assert enhanced.sources[1].source == "https://example.com"
         assert enhanced.sources[1].content == "OpenAI announces GPT-5"
+
+
+@pytest.mark.asyncio
+async def test_make_brave_api_request_calls_rps_limit():
+    """Test that _make_brave_api_request calls check_brave_rps for rate limiting."""
+    mock_request = MagicMock(spec=Request)
+    mock_data = {
+        "web": {
+            "results": [
+                {
+                    "title": "Test Result",
+                    "description": "Test description",
+                    "url": "https://example.com/test",
+                }
+            ]
+        }
+    }
+
+    with (
+        patch("nilai_api.config.CONFIG.web_search.api_key", "test-key"),
+        patch(
+            "nilai_api.handlers.web_search.CONFIG.web_search.api_path",
+            "https://api.brave.com/v1/web/search",
+        ),
+        patch("nilai_api.handlers.web_search._get_http_client") as mock_client,
+        patch.object(
+            RateLimit, "check_brave_rps", new_callable=AsyncMock
+        ) as mock_check_rps,
+    ):
+        mock_http_client = AsyncMock()
+        mock_response = AsyncMock()
+        mock_response.status_code = 200
+        mock_response.json = MagicMock(return_value=mock_data)
+        mock_http_client.get = AsyncMock(return_value=mock_response)
+        mock_client.return_value = mock_http_client
+
+        result = await _make_brave_api_request("test query", mock_request)
+
+        mock_check_rps.assert_called_once_with(mock_request)
+        assert result == mock_data
+
+
+@pytest.mark.asyncio
+async def test_make_brave_api_request_rps_limit_exceeded():
+    """Test that _make_brave_api_request raises 429 when RPS limit is exceeded."""
+    mock_request = MagicMock(spec=Request)
+
+    with (
+        patch("nilai_api.config.CONFIG.web_search.api_key", "test-key"),
+        patch.object(
+            RateLimit, "check_brave_rps", new_callable=AsyncMock
+        ) as mock_check_rps,
+    ):
+        mock_check_rps.side_effect = HTTPException(
+            status_code=429, detail="Too Many Requests"
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            await _make_brave_api_request("test query", mock_request)
+
+        assert exc_info.value.status_code == 429
+        mock_check_rps.assert_called_once_with(mock_request)

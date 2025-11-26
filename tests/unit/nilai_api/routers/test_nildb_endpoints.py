@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import patch, MagicMock, AsyncMock
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status, Request
 
 from nilai_api.auth.common import AuthenticationInfo, PromptDocument
 from nilai_api.db.users import RateLimits, UserData, UserModel
@@ -240,8 +240,11 @@ class TestNilDBEndpoints:
             # Mock handle_tool_workflow to return the response and token counts
             mock_handle_tool_workflow.return_value = (mock_response, 0, 0)
 
+            # Create a mock Request object
+            mock_request = MagicMock(spec=Request)
+
             # Call the function (this will test the prompt injection logic)
-            await chat_completion(req=request, auth_info=mock_auth_info)
+            await chat_completion(mock_request, req=request, auth_info=mock_auth_info)
 
             mock_get_prompt.assert_called_once_with(mock_prompt_document)
 
@@ -284,8 +287,13 @@ class TestNilDBEndpoints:
 
             mock_get_prompt.side_effect = Exception("Unable to extract prompt")
 
+            # Create a mock Request object
+            mock_request = MagicMock(spec=Request)
+
             with pytest.raises(HTTPException) as exc_info:
-                await chat_completion(req=request, auth_info=mock_auth_info)
+                await chat_completion(
+                    mock_request, req=request, auth_info=mock_auth_info
+                )
 
             assert exc_info.value.status_code == status.HTTP_403_FORBIDDEN
             assert (
@@ -390,8 +398,11 @@ class TestNilDBEndpoints:
             # Mock handle_tool_workflow to return the response and token counts
             mock_handle_tool_workflow.return_value = (mock_response, 0, 0)
 
+            # Create a mock Request object
+            mock_request = MagicMock(spec=Request)
+
             # Call the function
-            await chat_completion(req=request, auth_info=mock_auth_info)
+            await chat_completion(mock_request, req=request, auth_info=mock_auth_info)
 
             # Should not call get_prompt_from_nildb when no prompt document
             mock_get_prompt.assert_not_called()
@@ -477,7 +488,10 @@ class TestNilDBEndpoints:
 
             mock_handle_tool_workflow.return_value = (mock_response, 0, 0)
 
-            await create_response(req=request, auth_info=mock_auth_info)
+            # Create a mock Request object
+            mock_request = MagicMock(spec=Request)
+
+            await create_response(mock_request, req=request, auth_info=mock_auth_info)
 
             mock_get_prompt.assert_called_once_with(mock_prompt_document)
 
@@ -518,8 +532,13 @@ class TestNilDBEndpoints:
 
             mock_get_prompt.side_effect = Exception("Unable to extract prompt")
 
+            # Create a mock Request object
+            mock_request = MagicMock(spec=Request)
+
             with pytest.raises(HTTPException) as exc_info:
-                await create_response(req=request, auth_info=mock_auth_info)
+                await create_response(
+                    mock_request, req=request, auth_info=mock_auth_info
+                )
 
             assert exc_info.value.status_code == status.HTTP_403_FORBIDDEN
             assert (
@@ -604,7 +623,10 @@ class TestNilDBEndpoints:
 
             mock_handle_tool_workflow.return_value = (mock_response, 0, 0)
 
-            await create_response(req=request, auth_info=mock_auth_info)
+            # Create a mock Request object
+            mock_request = MagicMock(spec=Request)
+
+            await create_response(mock_request, req=request, auth_info=mock_auth_info)
 
             mock_get_prompt.assert_not_called()
 

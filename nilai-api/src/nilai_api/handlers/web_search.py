@@ -4,9 +4,11 @@ import asyncio
 from functools import lru_cache
 from typing import List, Dict, Any
 
+from fastapi import HTTPException, status, Request
+from nilai_api.rate_limiting import RateLimit
+
 import httpx
 import trafilatura
-from fastapi import HTTPException, status
 
 from nilai_api.config import CONFIG
 from nilai_common.api_models import (
@@ -90,11 +92,12 @@ def _get_http_client() -> httpx.AsyncClient:
     )
 
 
-async def _make_brave_api_request(query: str) -> Dict[str, Any]:
+async def _make_brave_api_request(query: str, request: Request) -> Dict[str, Any]:
     """Make an API request to the Brave Search API.
 
     Args:
         query: The search query string to execute
+        request: FastAPI request object for rate limiting
 
     Returns:
         Dict containing the raw API response data
@@ -107,6 +110,8 @@ async def _make_brave_api_request(query: str) -> Dict[str, Any]:
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Missing BRAVE_SEARCH_API key in environment",
         )
+
+    await RateLimit.check_brave_rps(request)
 
     q = " ".join(query.split())
 
@@ -125,7 +130,14 @@ async def _make_brave_api_request(query: str) -> Dict[str, Any]:
         params.get("lang"),
         params.get("count"),
     )
+
     resp = await client.get(CONFIG.web_search.api_path, headers=headers, params=params)
+
+    if resp.status_code == 429:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Web search rate limit exceeded",
+        )
 
     if resp.status_code >= 400:
         logger.error("Brave API error: %s - %s", resp.status_code, resp.text)
@@ -225,12 +237,22 @@ async def _fetch_and_extract_page_content(
         return None
 
 
-async def perform_web_search_async(query: str) -> WebSearchContext:
+async def perform_web_search_async(query: str, request: Request) -> WebSearchContext:
     """Perform an asynchronous web search using the Brave Search API.
 
     Fetches only the exact page for each Brave URL and extracts its
     main content with trafilatura. If extraction fails, falls back to
     the Brave snippet.
+
+    Args:
+        query: The search query string to execute
+        request: FastAPI request object for rate limiting
+
+    Returns:
+        WebSearchContext with formatted search results and source information
+
+    Raises:
+        HTTPException: If no results are found (404) or if the API request fails
     """
     if not (query and query.strip()):
         logger.warning("Empty or invalid query provided for web search")
@@ -240,7 +262,7 @@ async def perform_web_search_async(query: str) -> WebSearchContext:
     logger.debug("Web search query: %s", query)
 
     try:
-        data = await _make_brave_api_request(query)
+        data = await _make_brave_api_request(query, request)
         initial_results = _parse_brave_results(data)
     except HTTPException:
         logger.exception("Brave API request failed")
@@ -358,36 +380,38 @@ async def _generate_topic_query(
         return None
 
 
-async def _perform_search(query: str) -> WebSearchContext:
+async def _perform_search(query: str, request: Request) -> WebSearchContext:
     """Execute a web search with error handling.
 
     Args:
         query: Search query string
+        request: FastAPI request object for rate limiting
 
     Returns:
         WebSearchContext with results, or empty context if search fails
     """
     try:
-        return await perform_web_search_async(query)
+        return await perform_web_search_async(query, request)
     except Exception:
         logger.exception("Search failed for query '%s'", query)
         return WebSearchContext(prompt="", sources=[])
 
 
 async def enhance_messages_with_web_search(
-    req: ChatRequest, query: str
+    req: ChatRequest, query: str, request: Request
 ) -> WebSearchEnhancedMessages:
     """Enhance chat messages with web search context for a single query.
 
     Args:
         req: ChatRequest containing conversation messages
         query: Search query to retrieve web search results for
+        request: FastAPI request object for rate limiting
 
     Returns:
         WebSearchEnhancedMessages with web search context added to system messages
         and source information
     """
-    ctx = await perform_web_search_async(query)
+    ctx = await perform_web_search_async(query, request)
     query_source = Source(source=WEB_SEARCH_QUERY_SOURCE, content=query)
 
     web_search_content = _build_single_search_content(query, ctx.prompt)
@@ -469,7 +493,7 @@ async def generate_search_query_from_llm(
 
 
 async def _execute_web_search_workflow(
-    user_query: str, model_name: str, client: Any
+    user_query: str, model_name: str, client: Any, request: Request
 ) -> tuple[List[TopicQuery], List[WebSearchContext]] | tuple[None, None]:
     """Execute the complete multi-topic web search workflow.
 
@@ -480,6 +504,7 @@ async def _execute_web_search_workflow(
         user_query: User's query to analyze and search for
         model_name: Name of the LLM model to use for topic analysis and query generation
         client: LLM client instance for API calls
+        request: FastAPI request object for rate limiting
 
     Returns:
         Tuple of (topic_queries, contexts) if successful, or (None, None) if no topics
@@ -508,7 +533,7 @@ async def _execute_web_search_workflow(
             )
             return None, None
 
-        search_tasks = [_perform_search(tq.query) for tq in topic_queries]
+        search_tasks = [_perform_search(tq.query, request) for tq in topic_queries]
         contexts = await asyncio.gather(*search_tasks)
 
         return topic_queries, contexts
@@ -519,7 +544,7 @@ async def _execute_web_search_workflow(
 
 
 async def handle_web_search(
-    req_messages: ChatRequest, model_name: str, client: Any
+    req_messages: ChatRequest, model_name: str, client: Any, request: Request
 ) -> WebSearchEnhancedMessages:
     logger.info("Handle web search start")
     logger.debug(
@@ -534,14 +559,16 @@ async def handle_web_search(
 
     try:
         topic_queries, contexts = await _execute_web_search_workflow(
-            user_query, model_name, client
+            user_query, model_name, client, request
         )
 
         if topic_queries is None or contexts is None:
             concise_query = await generate_search_query_from_llm(
                 user_query, model_name, client
             )
-            return await enhance_messages_with_web_search(req_messages, concise_query)
+            return await enhance_messages_with_web_search(
+                req_messages, concise_query, request
+            )
 
         return await enhance_messages_with_multi_web_search(
             req_messages, topic_queries, contexts
@@ -628,7 +655,7 @@ async def enhance_messages_with_multi_web_search(
 
 
 async def enhance_input_with_web_search(
-    req: ResponseRequest, query: str
+    req: ResponseRequest, query: str, request: Request
 ) -> WebSearchEnhancedInput:
     """Enhance response input with web search context for a single query.
 
@@ -640,7 +667,7 @@ async def enhance_input_with_web_search(
         WebSearchEnhancedInput with web search context added to instructions
         and source information
     """
-    ctx = await perform_web_search_async(query)
+    ctx = await perform_web_search_async(query, request)
     query_source = Source(source=WEB_SEARCH_QUERY_SOURCE, content=query)
 
     web_search_instructions = _build_single_search_content(query, ctx.prompt)
@@ -692,7 +719,7 @@ async def enhance_input_with_multi_web_search(
 
 
 async def handle_web_search_for_responses(
-    req: ResponseRequest, model_name: str, client: Any
+    req: ResponseRequest, model_name: str, client: Any, request: Request
 ) -> WebSearchEnhancedInput:
     """Handle web search enhancement for response requests.
 
@@ -705,6 +732,7 @@ async def handle_web_search_for_responses(
         req: ResponseRequest containing input to process
         model_name: Name of the LLM model to use for query generation
         client: LLM client instance for making API calls
+        request: FastAPI request object for rate limiting
 
     Returns:
         WebSearchEnhancedInput with web search context added, or original
@@ -724,14 +752,14 @@ async def handle_web_search_for_responses(
 
     try:
         topic_queries, contexts = await _execute_web_search_workflow(
-            user_query, model_name, client
+            user_query, model_name, client, request
         )
 
         if topic_queries is None or contexts is None:
             concise_query = await generate_search_query_from_llm(
                 user_query, model_name, client
             )
-            return await enhance_input_with_web_search(req, concise_query)
+            return await enhance_input_with_web_search(req, concise_query, request)
 
         return await enhance_input_with_multi_web_search(req, topic_queries, contexts)
 
