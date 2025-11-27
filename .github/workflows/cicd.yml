@@ -11,6 +11,7 @@ on:
 permissions:
   id-token: write # Required for OIDC
   contents: read  # Required for checkout
+  packages: write # Required for pushing cache layers to GHCR
 
 jobs:
   test:
@@ -19,13 +20,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: astral-sh/setup-uv@v4
+      - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
           cache-dependency-glob: "**/pyproject.toml"
 
       - name: Cache dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ${{ env.UV_CACHE_DIR }}
           key: ${{ runner.os }}-uv-${{ hashFiles('**/pyproject.toml') }}
@@ -110,14 +111,251 @@ jobs:
         include:
           - component: api
             build_args: "--target nilai --platform linux/amd64"
+          - component: vllm
+            model_to_cache: "openai/gpt-oss-20b"
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
+
+      - name: Disable unattended upgrades
+        run: |
+          echo "Disabling unattended upgrades to prevent interference with CI builds..."
+
+          # Stop unattended-upgrades service
+          sudo systemctl stop unattended-upgrades || true
+          sudo systemctl disable unattended-upgrades || true
+
+          # Kill any running unattended-upgrades processes
+          sudo pkill -f unattended-upgrade || true
+
+          # Remove or disable the unattended-upgrades configuration
+          sudo systemctl mask unattended-upgrades || true
+
+          # Wait for any ongoing package operations to complete
+          while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+            echo "Waiting for package manager lock to be released..."
+            sleep 5
+          done
+
+          # Disable automatic updates in APT configuration
+          echo 'APT::Periodic::Update-Package-Lists "0";' | sudo tee /etc/apt/apt.conf.d/20auto-upgrades
+          echo 'APT::Periodic::Unattended-Upgrade "0";' | sudo tee -a /etc/apt/apt.conf.d/20auto-upgrades
+
+          echo "✅ Unattended upgrades disabled successfully"
+
+      - name: Install Docker Buildx plugin
+        run: |
+          set -euo pipefail
+          BUILDX_VERSION="v0.14.1"
+          mkdir -p ~/.docker/cli-plugins
+          curl -sSL "https://github.com/docker/buildx/releases/download/${BUILDX_VERSION}/buildx-${BUILDX_VERSION}.linux-amd64" \
+            -o ~/.docker/cli-plugins/docker-buildx
+          chmod +x ~/.docker/cli-plugins/docker-buildx
+          docker buildx version
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: image=moby/buildkit:latest
+          buildkitd-flags: --allow-insecure-entitlement security.insecure --allow-insecure-entitlement network.host
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Check system resources
+        run: |
+          echo "=== System Resources ==="
+          df -h
+          free -h
+          echo "=== Docker Info ==="
+          docker info
+          echo "=== Docker System Usage ==="
+          docker system df
+
+      - name: Pre-pull Docker base image (for vllm)
+        if: matrix.component == 'vllm'
+        run: |
+          echo "Pre-pulling vllm base image to avoid rate limiting during build..."
+          docker pull vllm/vllm-openai:v0.11.2
+
+      - name: Setup HuggingFace cache directory
+        if: matrix.component == 'vllm' && matrix.model_to_cache != ''
+        run: |
+          mkdir -p /home/ec2-user/.cache/huggingface
+          echo "Cache directory created at /home/ec2-user/.cache/huggingface"
+
+      - name: Restore model from GHCR
+        if: matrix.component == 'vllm' && matrix.model_to_cache != ''
+        id: restore-model
+        run: |
+          MODEL_CACHE_DIR="/home/ec2-user/.cache/huggingface"
+          HF_DIR_NAME="models--$(echo ${{ matrix.model_to_cache }} | sed 's/\//--/g')"
+          FULL_PATH="$MODEL_CACHE_DIR/$HF_DIR_NAME"
+
+          if [ -d "$FULL_PATH" ]; then
+            echo "Model found on host filesystem at $FULL_PATH"
+            echo "Skipping GHCR pull to save I/O."
+            echo "cache-hit=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          RAW_TAG="${{ matrix.model_to_cache }}-v1"
+          SAFE_TAG=$(echo "$RAW_TAG" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_.-]/-/g')
+          MODEL_IMAGE="ghcr.io/${REPO_LOWER}/nilai-model-cache:${SAFE_TAG}"
+
+          echo "Attempting to pull model cache image: $MODEL_IMAGE"
+
+          if docker pull "$MODEL_IMAGE"; then
+            echo "Image found. Copying model files to host..."
+            mkdir -p "$MODEL_CACHE_DIR"
+
+            CONTAINER_ID=$(docker create "$MODEL_IMAGE")
+            docker cp "$CONTAINER_ID":/model/. "$MODEL_CACHE_DIR/"
+            docker rm "$CONTAINER_ID"
+            echo "Model restored from GHCR."
+            echo "cache-hit=true" >> $GITHUB_OUTPUT
+          else
+            echo "Model cache not found in GHCR."
+            echo "cache-hit=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: DEBUG - Verify Cache Structure
+        if: matrix.component == 'vllm'
+        run: |
+          echo "Listing /home/ec2-user/.cache/huggingface contents:"
+          ls -F /home/ec2-user/.cache/huggingface/ || echo "Directory not found"
+          
+          echo "Checking for specific model folder:"
+          ls -F /home/ec2-user/.cache/huggingface/models--openai--gpt-oss-20b/ || echo "Model folder not found"
+          
+          echo "Checking snapshot content (first few files):"
+          find /home/ec2-user/.cache/huggingface -maxdepth 4 | head -n 10    
+          
+      - name: Setup uv for model download
+        if: matrix.component == 'vllm' && matrix.model_to_cache != '' && steps.restore-model.outputs.cache-hit != 'true'
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "**/pyproject.toml"
+
+      - name: Install dependencies for model download
+        if: matrix.component == 'vllm' && matrix.model_to_cache != '' && steps.restore-model.outputs.cache-hit != 'true'
+        run: |
+          apt-get update && apt-get install curl git pkg-config automake file python3.12-dev -y
+          export ACLOCAL=aclocal
+          export AUTOMAKE=automake
+          uv sync
+
+      - name: Download HuggingFace model
+        if: matrix.component == 'vllm' && matrix.model_to_cache != '' && steps.restore-model.outputs.cache-hit != 'true'
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          echo "Downloading model ${{ matrix.model_to_cache }} to cache..."
+          uv run python -c "from huggingface_hub import snapshot_download; import os; os.environ['HF_TOKEN'] = '${{ secrets.HF_TOKEN }}'; snapshot_download('${{ matrix.model_to_cache }}', cache_dir='/home/ec2-user/.cache/huggingface'); print('Model cached successfully')" \
+            || { echo "Failed to download model"; exit 1; }
+          echo "Model download completed successfully"
+
+      - name: Save model to GHCR
+        if: matrix.component == 'vllm' && matrix.model_to_cache != '' && steps.restore-model.outputs.cache-hit != 'true'
+        run: |
+          echo "Saving model to GHCR..."
+
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          RAW_TAG="${{ matrix.model_to_cache }}-v1"
+          SAFE_TAG=$(echo "$RAW_TAG" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_.-]/-/g')
+          MODEL_IMAGE="ghcr.io/${REPO_LOWER}/nilai-model-cache:${SAFE_TAG}"
+
+          echo "Using cache image: $MODEL_IMAGE"
+
+          echo "FROM scratch" > Dockerfile.model
+          echo "COPY . /model" >> Dockerfile.model
+
+          cd /home/ec2-user/.cache/huggingface
+
+          echo "Building cache image..."
+          docker build -t "$MODEL_IMAGE" -f $GITHUB_WORKSPACE/Dockerfile.model .
+
+          echo "Pushing cache image to GHCR..."
+          docker push "$MODEL_IMAGE"
+          echo "Model cached to GHCR."
 
       - name: Build ${{ matrix.component }} image
         run: |
           echo "Building ${{ matrix.component }} image..."
-          docker build -t nillion/nilai-${{ matrix.component }}:latest -f docker/${{ matrix.component }}.Dockerfile ${{ matrix.build_args || '' }} .
+
+          # Convert repository name to lowercase for Docker registry compatibility
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+
+          # Set cache references
+          CACHE_REF="ghcr.io/${REPO_LOWER}/nilai-${{ matrix.component }}:buildcache"
+
+          # Check if cache exists and is accessible
+          echo "Checking cache availability..."
+          CACHE_ARGS=""
+          if docker manifest inspect ${CACHE_REF} >/dev/null 2>&1; then
+            echo "✅ Cache found, using registry cache"
+            CACHE_ARGS="--cache-from=type=registry,ref=${CACHE_REF} --cache-to=type=registry,ref=${CACHE_REF},mode=max"
+          else
+            echo "⚠️  No cache found or cache inaccessible, building without import cache"
+            CACHE_ARGS="--cache-to=type=registry,ref=${CACHE_REF},mode=max"
+          fi
+
+          # Function to build with retry logic
+          build_with_retry() {
+            local attempt=1
+            local max_attempts=3
+
+            while [ $attempt -le $max_attempts ]; do
+              echo "🔄 Build attempt $attempt of $max_attempts..."
+
+              if docker buildx build \
+                -t nillion/nilai-${{ matrix.component }}:latest \
+                -f docker/${{ matrix.component }}.Dockerfile \
+                ${CACHE_ARGS} \
+                --load \
+                ${{ matrix.build_args || '' }} \
+                .; then
+                echo "✅ Build succeeded on attempt $attempt"
+                return 0
+              else
+                echo "❌ Build failed on attempt $attempt"
+                if [ $attempt -lt $max_attempts ]; then
+                  echo "⏳ Waiting 30 seconds before retry..."
+                  sleep 30
+
+                  # Clean up any partial builds
+                  echo "🧹 Cleaning up Docker system..."
+                  docker system prune -f || true
+
+                  # On retry, disable cache export to reduce complexity
+                  if [ $attempt -eq 2 ]; then
+                    echo "⚠️  Disabling cache export for retry..."
+                    CACHE_ARGS="--cache-from=type=registry,ref=${CACHE_REF}"
+                  fi
+
+                  # On final retry, disable all cache
+                  if [ $attempt -eq 3 ]; then
+                    echo "⚠️  Disabling all cache for final retry..."
+                    CACHE_ARGS=""
+                  fi
+                fi
+                attempt=$((attempt + 1))
+              fi
+            done
+
+            echo "💥 All build attempts failed"
+            return 1
+          }
+
+          # Execute build with retry logic
+          build_with_retry
+
           echo "✅ ${{ matrix.component }} build completed successfully"
 
   e2e-tests:
@@ -126,9 +364,35 @@ jobs:
     runs-on: ${{ needs.start-runner.outputs.label }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
-      - uses: astral-sh/setup-uv@v4
+      - name: Disable unattended upgrades
+        run: |
+          echo "Disabling unattended upgrades to prevent interference with CI builds..."
+
+          # Stop unattended-upgrades service
+          sudo systemctl stop unattended-upgrades || true
+          sudo systemctl disable unattended-upgrades || true
+
+          # Kill any running unattended-upgrades processes
+          sudo pkill -f unattended-upgrade || true
+
+          # Remove or disable the unattended-upgrades configuration
+          sudo systemctl mask unattended-upgrades || true
+
+          # Wait for any ongoing package operations to complete
+          while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+            echo "Waiting for package manager lock to be released..."
+            sleep 5
+          done
+
+          # Disable automatic updates in APT configuration
+          echo 'APT::Periodic::Update-Package-Lists "0";' | sudo tee /etc/apt/apt.conf.d/20auto-upgrades
+          echo 'APT::Periodic::Unattended-Upgrade "0";' | sudo tee -a /etc/apt/apt.conf.d/20auto-upgrades
+
+          echo "✅ Unattended upgrades disabled successfully"
+
+      - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
           cache-dependency-glob: "**/pyproject.toml"

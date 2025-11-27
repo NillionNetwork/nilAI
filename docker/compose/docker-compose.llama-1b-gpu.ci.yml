@@ -37,12 +37,10 @@ services:
       - TOOL_SUPPORT=true
       - CUDA_LAUNCH_BLOCKING=1
     volumes:
-      - hugging_face_models:/root/.cache/huggingface  # cache models
+      - /home/ec2-user/.cache/huggingface:/root/.cache/huggingface  # Mount runner's HF cache
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       retries: 3
       start_period: 60s
       timeout: 10s
-volumes:
-  hugging_face_models:
