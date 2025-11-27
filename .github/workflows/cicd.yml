@@ -164,7 +164,7 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ github.token }}
 
       - name: Check system resources
         run: |
@@ -203,10 +203,10 @@ jobs:
             exit 0
           fi
 
-          OWNER_LOWER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
           RAW_TAG="${{ matrix.model_to_cache }}-v1"
           SAFE_TAG=$(echo "$RAW_TAG" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_.-]/-/g')
-          MODEL_IMAGE="ghcr.io/${OWNER_LOWER}/nilai-model-cache:${SAFE_TAG}"
+          MODEL_IMAGE="ghcr.io/${REPO_LOWER}/nilai-model-cache:${SAFE_TAG}"
 
           echo "Attempting to pull model cache image: $MODEL_IMAGE"
 
@@ -266,10 +266,10 @@ jobs:
         run: |
           echo "Saving model to GHCR..."
 
-          OWNER_LOWER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
           RAW_TAG="${{ matrix.model_to_cache }}-v1"
           SAFE_TAG=$(echo "$RAW_TAG" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_.-]/-/g')
-          MODEL_IMAGE="ghcr.io/${OWNER_LOWER}/nilai-model-cache:${SAFE_TAG}"
+          MODEL_IMAGE="ghcr.io/${REPO_LOWER}/nilai-model-cache:${SAFE_TAG}"
 
           echo "Using cache image: $MODEL_IMAGE"
 
