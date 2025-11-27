@@ -180,7 +180,7 @@ jobs:
         if: matrix.component == 'vllm'
         run: |
           echo "Pre-pulling vllm base image to avoid rate limiting during build..."
-          docker pull vllm/vllm-openai:v0.10.1
+          docker pull vllm/vllm-openai:v0.11.2
 
       - name: Setup HuggingFace cache directory
         if: matrix.component == 'vllm' && matrix.model_to_cache != ''
@@ -203,8 +203,10 @@ jobs:
             exit 0
           fi
 
-          MODEL_IMAGE="ghcr.io/${{ github.repository_owner }}/nilai-model-cache:${{ matrix.model_to_cache }}-v1"
-          MODEL_IMAGE=$(echo "$MODEL_IMAGE" | tr '[:upper:]' '[:lower:]')
+          OWNER_LOWER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          RAW_TAG="${{ matrix.model_to_cache }}-v1"
+          SAFE_TAG=$(echo "$RAW_TAG" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_.-]/-/g')
+          MODEL_IMAGE="ghcr.io/${OWNER_LOWER}/nilai-model-cache:${SAFE_TAG}"
 
           echo "Attempting to pull model cache image: $MODEL_IMAGE"
 
@@ -264,8 +266,12 @@ jobs:
         run: |
           echo "Saving model to GHCR..."
 
-          MODEL_IMAGE="ghcr.io/${{ github.repository_owner }}/nilai-model-cache:${{ matrix.model_to_cache }}-v1"
-          MODEL_IMAGE=$(echo "$MODEL_IMAGE" | tr '[:upper:]' '[:lower:]')
+          OWNER_LOWER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          RAW_TAG="${{ matrix.model_to_cache }}-v1"
+          SAFE_TAG=$(echo "$RAW_TAG" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_.-]/-/g')
+          MODEL_IMAGE="ghcr.io/${OWNER_LOWER}/nilai-model-cache:${SAFE_TAG}"
+
+          echo "Using cache image: $MODEL_IMAGE"
 
           echo "FROM scratch" > Dockerfile.model
           echo "COPY . /model" >> Dockerfile.model
