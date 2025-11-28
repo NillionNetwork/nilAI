@@ -161,21 +161,21 @@ class RateLimit:
                 await self.check_bucket(
                     redis,
                     redis_rate_limit_command,
-                    f"web_search_minute:{user_limits.subscription_holder}",
+                    f"web_search_minute:{user_limits.user_id}",
                     user_limits.rate_limits.web_search_rate_limit_minute,
                     MINUTE_MS,
                 )
                 await self.check_bucket(
                     redis,
                     redis_rate_limit_command,
-                    f"web_search_hour:{user_limits.subscription_holder}",
+                    f"web_search_hour:{user_limits.user_id}",
                     user_limits.rate_limits.web_search_rate_limit_hour,
                     HOUR_MS,
                 )
                 await self.check_bucket(
                     redis,
                     redis_rate_limit_command,
-                    f"web_search_day:{user_limits.subscription_holder}",
+                    f"web_search_day:{user_limits.user_id}",
                     user_limits.rate_limits.web_search_rate_limit_day,
                     DAY_MS,
                 )

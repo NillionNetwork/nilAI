@@ -86,7 +86,7 @@ async def test_web_search_rps_limit(redis_client):
 
     rate_limit = RateLimit(web_search_extractor=web_search_extractor)
     user_limits = UserRateLimits(
-        subscription_holder=random_id(),
+        user_id=random_id(),
         token_rate_limit=None,
         rate_limits=RateLimits(
             user_rate_limit_day=None,

@@ -12,94 +12,9 @@ import json
 import os
 import re
 
-from .config import BASE_URL, ENVIRONMENT, test_models, AUTH_STRATEGY, api_key_getter
-from .nuc import (
-    get_rate_limited_nuc_token,
-    get_invalid_rate_limited_nuc_token,
-    get_document_id_nuc_token,
-)
+from .config import BASE_URL, ENVIRONMENT, test_models, AUTH_STRATEGY
 import httpx
 import pytest
-
-
-@pytest.fixture
-def client():
-    """Create an HTTPX client with default headers"""
-    invocation_token: str = api_key_getter()
-    print("invocation_token", invocation_token)
-    return httpx.Client(
-        base_url=BASE_URL,
-        headers={
-            "accept": "application/json",
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {invocation_token}",
-        },
-        verify=False,
-        timeout=None,
-    )
-
-
-@pytest.fixture
-def rate_limited_client():
-    """Create an HTTPX client with default headers"""
-    invocation_token = get_rate_limited_nuc_token(rate_limit=1)
-    return httpx.Client(
-        base_url=BASE_URL,
-        headers={
-            "accept": "application/json",
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {invocation_token}",
-        },
-        timeout=None,
-        verify=False,
-    )
-
-
-@pytest.fixture
-def invalid_rate_limited_client():
-    """Create an HTTPX client with default headers"""
-    invocation_token = get_invalid_rate_limited_nuc_token()
-    return httpx.Client(
-        base_url=BASE_URL,
-        headers={
-            "accept": "application/json",
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {invocation_token}",
-        },
-        timeout=None,
-        verify=False,
-    )
-
-
-@pytest.fixture
-def nillion_2025_client():
-    """Create an HTTPX client with default headers"""
-    return httpx.Client(
-        base_url=BASE_URL,
-        headers={
-            "accept": "application/json",
-            "Content-Type": "application/json",
-            "Authorization": "Bearer Nillion2025",
-        },
-        verify=False,
-        timeout=None,
-    )
-
-
-@pytest.fixture
-def document_id_client():
-    """Create an HTTPX client with default headers"""
-    invocation_token = get_document_id_nuc_token()
-    return httpx.Client(
-        base_url=BASE_URL,
-        headers={
-            "accept": "application/json",
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {invocation_token}",
-        },
-        verify=False,
-        timeout=None,
-    )
 
 
 def test_health_endpoint(client):

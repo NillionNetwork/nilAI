@@ -5,7 +5,15 @@ import uuid
 from base64 import b64encode
 from typing import AsyncGenerator, Optional, Union, List, Tuple
 
-from fastapi import APIRouter, Body, Depends, HTTPException, status, Request, BackgroundTasks
+from fastapi import (
+    APIRouter,
+    Body,
+    Depends,
+    HTTPException,
+    status,
+    Request,
+    BackgroundTasks,
+)
 from fastapi.responses import StreamingResponse
 from openai import AsyncOpenAI
 
@@ -13,8 +21,7 @@ from nilai_api.auth import get_auth_info, AuthenticationInfo
 from nilai_api.config import CONFIG
 from nilai_api.crypto import sign_message
 from nilai_api.credit import LLMMeter, LLMUsage
-from nilai_api.db.logs import QueryLogManager, QueryLogContext
-from nilai_api.db.users import UserManager
+from nilai_api.db.logs import QueryLogContext
 from nilai_api.handlers.nildb.handler import get_prompt_from_nildb
 
 # from nilai_api.handlers.nilrag import handle_nilrag_for_responses
@@ -157,7 +164,9 @@ async def create_response(
             )
 
         has_multimodal = req.has_multimodal_content()
-        if has_multimodal and (not endpoint.metadata.multimodal_support or req.web_search):
+        if has_multimodal and (
+            not endpoint.metadata.multimodal_support or req.web_search
+        ):
             raise HTTPException(
                 status_code=400,
                 detail="Model does not support multimodal content, remove image inputs from request",
@@ -180,7 +189,9 @@ async def create_response(
         client = AsyncOpenAI(base_url=model_url, api_key="<not-needed>")
         if auth_info.prompt_document:
             try:
-                nildb_prompt: str = await get_prompt_from_nildb(auth_info.prompt_document)
+                nildb_prompt: str = await get_prompt_from_nildb(
+                    auth_info.prompt_document
+                )
                 req.ensure_instructions(nildb_prompt)
             except Exception as e:
                 raise HTTPException(
@@ -244,7 +255,9 @@ async def create_response(
                                 usage = event.response.usage
                                 prompt_token_usage = usage.input_tokens
                                 completion_token_usage = usage.output_tokens
-                                payload["response"]["usage"] = usage.model_dump(mode="json")
+                                payload["response"]["usage"] = usage.model_dump(
+                                    mode="json"
+                                )
 
                             if sources:
                                 if "data" not in payload:
@@ -389,7 +402,7 @@ async def create_response(
                 log_ctx.set_model(model_name)
             log_ctx.set_error(error_code=error_code, error_message=error_message)
             await log_ctx.commit()
-        
+
         raise
     except Exception as e:
         error_message = str(e)

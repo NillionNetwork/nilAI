@@ -5,7 +5,7 @@ from nilai_common import AttestationReport
 ATTESTATION_URL = "http://nilcc-attester/v2/report"
 
 
-async def get_attestation_report() -> AttestationReport:
+async def get_attestation_report(nonce: str) -> AttestationReport:
     """Get the attestation report"""
 
     try:
@@ -13,6 +13,7 @@ async def get_attestation_report() -> AttestationReport:
             response: httpx.Response = await client.get(ATTESTATION_URL)
             response_json = response.json()
             return AttestationReport(
+                nonce=nonce,
                 gpu_attestation=response_json["report"],
                 cpu_attestation=response_json["gpu_token"],
                 verifying_key="",  # Added later by the API

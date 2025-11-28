@@ -5,7 +5,15 @@ import uuid
 from base64 import b64encode
 from typing import AsyncGenerator, Optional, Union, List, Tuple
 
-from fastapi import APIRouter, Body, Depends, HTTPException, status, Request, BackgroundTasks
+from fastapi import (
+    APIRouter,
+    Body,
+    Depends,
+    HTTPException,
+    status,
+    Request,
+    BackgroundTasks,
+)
 from fastapi.responses import StreamingResponse
 from openai import AsyncOpenAI
 
@@ -13,8 +21,7 @@ from nilai_api.auth import get_auth_info, AuthenticationInfo
 from nilai_api.config import CONFIG
 from nilai_api.crypto import sign_message
 from nilai_api.credit import LLMMeter, LLMUsage
-from nilai_api.db.logs import QueryLogManager, QueryLogContext
-from nilai_api.db.users import UserManager
+from nilai_api.db.logs import QueryLogContext
 from nilai_api.handlers.nildb.handler import get_prompt_from_nildb
 from nilai_api.handlers.nilrag import handle_nilrag
 from nilai_api.handlers.tools.tool_router import handle_tool_workflow

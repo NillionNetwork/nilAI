@@ -1,80 +1,46 @@
 import json
 import os
-import httpx
 import pytest
 import pytest_asyncio
-from openai import OpenAI
-from openai import AsyncOpenAI
 
 from .config import BASE_URL, test_models, AUTH_STRATEGY, api_key_getter
-from .nuc import (
-    get_rate_limited_nuc_token,
-    get_invalid_rate_limited_nuc_token,
-    get_nildb_nuc_token,
-)
 
 
-def _create_openai_client(api_key: str) -> OpenAI:
-    """Helper function to create an OpenAI client with SSL verification disabled"""
-    transport = httpx.HTTPTransport(verify=False)
-    return OpenAI(
-        base_url=BASE_URL,
-        api_key=api_key,
-        http_client=httpx.Client(transport=transport),
-    )
-
-
-def _create_async_openai_client(api_key: str) -> AsyncOpenAI:
-    transport = httpx.AsyncHTTPTransport(verify=False)
-    return AsyncOpenAI(
-        base_url=BASE_URL,
-        api_key=api_key,
-        http_client=httpx.AsyncClient(transport=transport),
-    )
+# ============================================================================
+# Fixture Aliases for OpenAI SDK Tests
+# These create local aliases that reference the centralized fixtures in conftest.py
+# This allows tests to use 'client' instead of 'openai_client', maintaining backward compatibility
+# ============================================================================
 
 
 @pytest.fixture
-def client():
-    invocation_token: str = api_key_getter()
-    return _create_openai_client(invocation_token)
+def client(openai_client):
+    """Alias for openai_client fixture from conftest.py"""
+    return openai_client
 
 
 @pytest_asyncio.fixture
-async def async_client():
-    invocation_token: str = api_key_getter()
-    transport = httpx.AsyncHTTPTransport(verify=False)
-    httpx_client = httpx.AsyncClient(transport=transport)
-    client = AsyncOpenAI(
-        base_url=BASE_URL, api_key=invocation_token, http_client=httpx_client
-    )
-    yield client
-    await httpx_client.aclose()
+async def async_client(async_openai_client):
+    """Alias for async_openai_client fixture from conftest.py"""
+    return async_openai_client
 
 
 @pytest.fixture
-def rate_limited_client():
-    invocation_token = get_rate_limited_nuc_token(rate_limit=1)
-    return _create_openai_client(invocation_token.token)
+def rate_limited_client(rate_limited_openai_client):
+    """Alias for rate_limited_openai_client fixture from conftest.py"""
+    return rate_limited_openai_client
 
 
 @pytest.fixture
-def invalid_rate_limited_client():
-    invocation_token = get_invalid_rate_limited_nuc_token()
-    return _create_openai_client(invocation_token.token)
+def invalid_rate_limited_client(invalid_rate_limited_openai_client):
+    """Alias for invalid_rate_limited_openai_client fixture from conftest.py"""
+    return invalid_rate_limited_openai_client
 
 
 @pytest.fixture
-def nildb_client():
-    invocation_token = get_nildb_nuc_token()
-    return _create_openai_client(invocation_token.token)
-
-
-@pytest.fixture
-def high_web_search_rate_limit(monkeypatch):
-    monkeypatch.setenv("WEB_SEARCH_RATE_LIMIT_MINUTE", "9999")
-    monkeypatch.setenv("WEB_SEARCH_RATE_LIMIT_HOUR", "9999")
-    monkeypatch.setenv("WEB_SEARCH_RATE_LIMIT_DAY", "9999")
-    monkeypatch.setenv("WEB_SEARCH_RATE_LIMIT", "9999")
+def nildb_client(document_id_openai_client):
+    """Alias for document_id_openai_client fixture from conftest.py"""
+    return document_id_openai_client
 
 
 @pytest.mark.parametrize("model", test_models)

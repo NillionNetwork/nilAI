@@ -72,12 +72,13 @@ async def get_usage(auth_info: AuthenticationInfo = Depends(get_auth_info)) -> U
 
 @router.get("/v1/attestation/report", tags=["Attestation"])
 async def get_attestation(
+    nonce: str,
     auth_info: AuthenticationInfo = Depends(get_auth_info),
 ) -> AttestationReport:
     """
     Generate a cryptographic attestation report.
 
-    - **attestation_request**: Attestation request containing a nonce
+    - **nonce**: Nonce for the attestation request (64 character hex string)
     - **user**: Authenticated user information (through HTTP Bearer header)
     - **Returns**: Attestation details for service verification
 
@@ -90,7 +91,7 @@ async def get_attestation(
     Provides cryptographic proof of the service's integrity and environment.
     """
 
-    attestation_report = await get_attestation_report()
+    attestation_report = await get_attestation_report(nonce)
     attestation_report.verifying_key = state.b64_public_key
     return attestation_report
 

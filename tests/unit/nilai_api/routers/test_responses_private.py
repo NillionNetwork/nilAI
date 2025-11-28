@@ -24,7 +24,7 @@ async def test_runs_in_a_loop():
 @pytest.fixture
 def mock_user():
     mock = MagicMock(spec=UserModel)
-    mock.userid = "test-user-id"
+    mock.user_id = "test-user-id"
     mock.name = "Test User"
     mock.apikey = "test-api-key"
     mock.prompt_tokens = 100
@@ -50,18 +50,19 @@ def mock_user_manager(mock_user, mocker):
         return_value={
             "prompt_tokens": 100,
             "completion_tokens": 50,
+            "total_tokens": 150,
             "queries": 10,
         },
     )
     mocker.patch.object(QueryLogManager, "log_query")
-    
-    # Patch UserManager.check_user instead of check_api_key
-    mocker.patch.object(
-        UserManager,
-        "check_user",
+
+    # Mock validate_credential for authentication
+    mocker.patch(
+        "nilai_api.auth.strategies.validate_credential",
+        new_callable=AsyncMock,
         return_value=mock_user,
     )
-    
+
     return UserManager
 
 
@@ -103,7 +104,7 @@ def mock_metering_context(mocker):
 
 
 @pytest.fixture
-def client(mock_user_manager, mock_metering_context):
+def client(mock_user_manager, mock_state, mock_metering_context):
     from nilai_api.app import app
     from nilai_api.credit import LLMMeter
 
@@ -175,6 +176,11 @@ def test_create_response(mock_user, mock_state, mock_user_manager, mocker, clien
         "nilai_api.routers.endpoints.responses.handle_responses_tool_workflow",
         return_value=(response_data, 0, 0),
     )
+    mocker.patch(
+        "nilai_api.routers.endpoints.responses.state.get_model",
+        return_value=model_endpoint,
+    )
+    mocker.patch("nilai_api.db.logs.QueryLogContext.commit", new_callable=AsyncMock)
 
     payload = {
         "model": "meta-llama/Llama-3.2-1B-Instruct",
@@ -273,6 +279,11 @@ def test_create_response_stream_includes_sources(
         "nilai_api.routers.endpoints.responses.AsyncOpenAI",
         return_value=mock_async_openai_instance,
     )
+    mocker.patch(
+        "nilai_api.routers.endpoints.responses.state.get_model",
+        return_value=model_endpoint,
+    )
+    mocker.patch("nilai_api.db.logs.QueryLogContext.commit", new_callable=AsyncMock)
 
     payload = {
         "model": "meta-llama/Llama-3.2-1B-Instruct",

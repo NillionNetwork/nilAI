@@ -77,6 +77,7 @@ def mock_state(mocker):
 
     # Patch get_attestation method
     attestation_response = AttestationReport(
+        nonce="0" * 64,
         verifying_key="test-verifying-key",
         cpu_attestation="test-cpu-attestation",
         gpu_attestation="test-gpu-attestation",
@@ -179,9 +180,7 @@ def test_chat_completion(mock_user, mock_state, mock_user_manager, mocker, clien
         "nilai_api.routers.endpoints.chat.handle_tool_workflow",
         return_value=(response_data, 0, 0),
     )
-    mocker.patch(
-        "nilai_api.routers.private.QueryLogContext.commit", new_callable=AsyncMock
-    )
+    mocker.patch("nilai_api.db.logs.QueryLogContext.commit", new_callable=AsyncMock)
     response = client.post(
         "/v1/chat/completions",
         json={
@@ -222,9 +221,7 @@ def test_chat_completion_stream_includes_sources(
         "nilai_api.routers.endpoints.chat.handle_web_search",
         new=AsyncMock(return_value=mock_web_search_result),
     )
-    mocker.patch(
-        "nilai_api.routers.private.QueryLogContext.commit", new_callable=AsyncMock
-    )
+    mocker.patch("nilai_api.db.logs.QueryLogContext.commit", new_callable=AsyncMock)
 
     class MockChunk:
         def __init__(self, data, usage=None):

@@ -7,7 +7,6 @@ from nilai_api.db.users import RateLimits, UserData, UserModel
 from nilai_api.handlers.nildb.api_model import (
     PromptDelegationToken,
 )
-from datetime import datetime, timezone
 from nilai_common import ResponseRequest
 
 
@@ -178,12 +177,6 @@ class TestNilDBEndpoints:
                 "nilai_api.routers.endpoints.chat.handle_web_search"
             ) as mock_handle_web_search,
             patch(
-                "nilai_api.routers.endpoints.chat.UserManager.update_token_usage"
-            ) as mock_update_usage,
-            patch(
-                "nilai_api.routers.endpoints.chat.QueryLogManager.log_query"
-            ) as mock_log_query,
-            patch(
                 "nilai_api.routers.endpoints.chat.handle_tool_workflow"
             ) as mock_handle_tool_workflow,
         ):
@@ -244,7 +237,10 @@ class TestNilDBEndpoints:
 
             # Call the function (this will test the prompt injection logic)
             await chat_completion(
-                req=request, auth_info=mock_auth_info, meter=mock_meter
+                req=request,
+                auth_info=mock_auth_info,
+                meter=mock_meter,
+                log_ctx=mock_log_ctx,
             )
 
             mock_get_prompt.assert_called_once_with(mock_prompt_document)
@@ -355,12 +351,6 @@ class TestNilDBEndpoints:
                 "nilai_api.routers.endpoints.chat.handle_web_search"
             ) as mock_handle_web_search,
             patch(
-                "nilai_api.routers.endpoints.chat.UserManager.update_token_usage"
-            ) as mock_update_usage,
-            patch(
-                "nilai_api.routers.endpoints.chat.QueryLogManager.log_query"
-            ) as mock_log_query,
-            patch(
                 "nilai_api.routers.endpoints.chat.handle_tool_workflow"
             ) as mock_handle_tool_workflow,
         ):
@@ -415,7 +405,10 @@ class TestNilDBEndpoints:
 
             # Call the function
             await chat_completion(
-                req=request, auth_info=mock_auth_info, meter=mock_meter
+                req=request,
+                auth_info=mock_auth_info,
+                meter=mock_meter,
+                log_ctx=mock_log_ctx,
             )
 
             # Should not call get_prompt_from_nildb when no prompt document
@@ -431,7 +424,7 @@ class TestNilDBEndpoints:
         )
 
         mock_user = MagicMock()
-        mock_user.userid = "test-user-id"
+        mock_user.user_id = "test-user-id"
         mock_user.name = "Test User"
         mock_user.apikey = "test-api-key"
         mock_user.rate_limits = RateLimits().get_effective_limits()
@@ -472,12 +465,6 @@ class TestNilDBEndpoints:
                 "nilai_api.routers.endpoints.responses.state.get_model"
             ) as mock_get_model,
             patch(
-                "nilai_api.routers.endpoints.responses.UserManager.update_token_usage"
-            ) as mock_update_usage,
-            patch(
-                "nilai_api.routers.endpoints.responses.QueryLogManager.log_query"
-            ) as mock_log_query,
-            patch(
                 "nilai_api.routers.endpoints.responses.handle_responses_tool_workflow"
             ) as mock_handle_tool_workflow,
         ):
@@ -488,9 +475,6 @@ class TestNilDBEndpoints:
             mock_model_endpoint.metadata.tool_support = True
             mock_model_endpoint.metadata.multimodal_support = True
             mock_get_model.return_value = mock_model_endpoint
-
-            mock_update_usage.return_value = None
-            mock_log_query.return_value = None
 
             mock_client_instance = MagicMock()
             mock_response = MagicMock()
@@ -505,8 +489,13 @@ class TestNilDBEndpoints:
             mock_meter = MagicMock()
             mock_meter.set_response = MagicMock()
 
+            mock_log_ctx = MagicMock()
+
             await create_response(
-                req=request, auth_info=mock_auth_info, meter=mock_meter
+                req=request,
+                auth_info=mock_auth_info,
+                meter=mock_meter,
+                log_ctx=mock_log_ctx,
             )
 
             mock_get_prompt.assert_called_once_with(mock_prompt_document)
@@ -521,7 +510,7 @@ class TestNilDBEndpoints:
         )
 
         mock_user = MagicMock()
-        mock_user.userid = "test-user-id"
+        mock_user.user_id = "test-user-id"
         mock_user.name = "Test User"
         mock_user.apikey = "test-api-key"
         mock_user.rate_limits = RateLimits().get_effective_limits()
@@ -548,8 +537,16 @@ class TestNilDBEndpoints:
 
             mock_get_prompt.side_effect = Exception("Unable to extract prompt")
 
+            mock_meter = MagicMock()
+            mock_log_ctx = MagicMock()
+
             with pytest.raises(HTTPException) as exc_info:
-                await create_response(req=request, auth_info=mock_auth_info)
+                await create_response(
+                    req=request,
+                    auth_info=mock_auth_info,
+                    meter=mock_meter,
+                    log_ctx=mock_log_ctx,
+                )
 
             assert exc_info.value.status_code == status.HTTP_403_FORBIDDEN
             assert (
@@ -563,7 +560,7 @@ class TestNilDBEndpoints:
         from nilai_api.routers.endpoints.responses import create_response
 
         mock_user = MagicMock()
-        mock_user.userid = "test-user-id"
+        mock_user.user_id = "test-user-id"
         mock_user.name = "Test User"
         mock_user.apikey = "test-api-key"
         mock_user.rate_limits = RateLimits().get_effective_limits()
@@ -606,12 +603,6 @@ class TestNilDBEndpoints:
                 "nilai_api.routers.endpoints.responses.state.get_model"
             ) as mock_get_model,
             patch(
-                "nilai_api.routers.endpoints.responses.UserManager.update_token_usage"
-            ) as mock_update_usage,
-            patch(
-                "nilai_api.routers.endpoints.responses.QueryLogManager.log_query"
-            ) as mock_log_query,
-            patch(
                 "nilai_api.routers.endpoints.responses.handle_responses_tool_workflow"
             ) as mock_handle_tool_workflow,
         ):
@@ -620,9 +611,6 @@ class TestNilDBEndpoints:
             mock_model_endpoint.metadata.tool_support = True
             mock_model_endpoint.metadata.multimodal_support = True
             mock_get_model.return_value = mock_model_endpoint
-
-            mock_update_usage.return_value = None
-            mock_log_query.return_value = None
 
             mock_client_instance = MagicMock()
             mock_response = MagicMock()
@@ -637,8 +625,13 @@ class TestNilDBEndpoints:
             mock_meter = MagicMock()
             mock_meter.set_response = MagicMock()
 
+            mock_log_ctx = MagicMock()
+
             await create_response(
-                req=request, auth_info=mock_auth_info, meter=mock_meter
+                req=request,
+                auth_info=mock_auth_info,
+                meter=mock_meter,
+                log_ctx=mock_log_ctx,
             )
 
             mock_get_prompt.assert_not_called()

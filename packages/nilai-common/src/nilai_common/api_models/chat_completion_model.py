@@ -1,3 +1,5 @@
+import uuid
+
 from typing import (
     Annotated,
     Iterable,
@@ -54,10 +56,6 @@ __all__ = [
     "ResultContent",
     "Choice",
     "Source",
-    "SearchResult",
-    "Topic",
-    "TopicResponse",
-    "TopicQuery",
     "MessageAdapter",
     "WebSearchEnhancedMessages",
     "WebSearchContext",
@@ -77,7 +75,6 @@ __all__ = [
 class ResultContent(BaseModel):
     text: str
     truncated: bool = False
-Message: TypeAlias = ChatCompletionMessageParam
 
 
 class Choice(OpenaAIChoice):
