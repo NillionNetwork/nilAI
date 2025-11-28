@@ -67,7 +67,7 @@ services:
         condition: service_healthy
     command: >
       --model Qwen/Qwen3-VL-4B-Instruct
-      --gpu-memory-utilization 0.23
+      --gpu-memory-utilization 0.8
       --max-model-len 10000
       --max-num-batched-tokens 10000
       --tensor-parallel-size 1
@@ -93,4 +93,3 @@ services:
       timeout: 10s
 volumes:
   hugging_face_models:
-
