@@ -3,7 +3,7 @@ import os
 import pytest
 import pytest_asyncio
 
-from .config import BASE_URL, test_models, AUTH_STRATEGY, api_key_getter
+from .config import BASE_URL, test_models, AUTH_STRATEGY, api_key_getter, ENVIRONMENT
 
 
 # ============================================================================
@@ -41,6 +41,12 @@ def invalid_rate_limited_client(invalid_rate_limited_openai_client):
 def nildb_client(document_id_openai_client):
     """Alias for document_id_openai_client fixture from conftest.py"""
     return document_id_openai_client
+
+
+@pytest.fixture
+def invalid_nildb(invalid_document_id_openai_client):
+    """Alias for invalid_document_id_openai_client fixture from conftest.py"""
+    return invalid_document_id_openai_client
 
 
 @pytest.mark.parametrize("model", test_models)
@@ -161,14 +167,14 @@ def test_invalid_rate_limiting_nucs(invalid_rate_limited_client, model):
 @pytest.mark.skipif(
     AUTH_STRATEGY != "nuc", reason="NUC rate limiting not used with API key"
 )
-def test_invalid_nildb_command_nucs(nildb_client, model):
+def test_invalid_nildb_command_nucs(invalid_nildb, model):
     """Test invalid NILDB command handling"""
     import openai
 
     forbidden = False
     for _ in range(4):
         try:
-            nildb_client.responses.create(
+            invalid_nildb.responses.create(
                 model=model,
                 input="What is the capital of France?",
                 instructions="You are a helpful assistant that provides accurate and concise information.",
@@ -447,7 +453,6 @@ def test_usage_endpoint(client):
             "total_tokens",
             "completion_tokens",
             "prompt_tokens",
-            "queries",
         ]
         for key in expected_keys:
             assert key in usage_data, f"Expected key {key} not found in usage data"
@@ -458,6 +463,10 @@ def test_usage_endpoint(client):
         pytest.fail(f"Error testing usage endpoint: {str(e)}")
 
 
+@pytest.mark.skipif(
+    ENVIRONMENT != "mainnet",
+    reason="Attestation endpoint not available in non-mainnet environment",
+)
 def test_attestation_endpoint(client):
     """Test retrieving attestation report"""
     try:

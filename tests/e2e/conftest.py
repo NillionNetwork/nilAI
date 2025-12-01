@@ -3,6 +3,7 @@ from .nuc import (
     get_rate_limited_nuc_token,
     get_invalid_rate_limited_nuc_token,
     get_document_id_nuc_token,
+    get_invalid_nildb_nuc_token,
 )
 import httpx
 import pytest
@@ -107,6 +108,22 @@ def document_id_client():
     )
 
 
+@pytest.fixture
+def invalid_nildb():
+    """Create an HTTPX client with default headers"""
+    invocation_token = get_invalid_nildb_nuc_token()
+    return httpx.Client(
+        base_url=BASE_URL,
+        headers={
+            "accept": "application/json",
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {invocation_token}",
+        },
+        timeout=None,
+        verify=False,
+    )
+
+
 # ============================================================================
 # OpenAI SDK Client Fixtures (for test_chat_completions.py, test_responses.py)
 # ============================================================================
@@ -174,6 +191,13 @@ def document_id_openai_client():
 
 
 @pytest.fixture
+def nildb_openai_client():
+    """Create an OpenAI SDK client with document ID token"""
+    invocation_token = get_invalid_nildb_nuc_token()
+    return _create_openai_client(invocation_token)
+
+
+@pytest.fixture
 def high_web_search_rate_limit(monkeypatch):
     """Set high rate limits for web search for RPS tests"""
     monkeypatch.setenv("WEB_SEARCH_RATE_LIMIT_MINUTE", "9999")
@@ -212,4 +236,4 @@ def high_web_search_rate_limit(monkeypatch):
 # async_client = async_openai_client
 # rate_limited_client = rate_limited_openai_client
 # invalid_rate_limited_client = invalid_rate_limited_openai_client
-# nildb_client = document_id_openai_client
+nildb_client = document_id_openai_client

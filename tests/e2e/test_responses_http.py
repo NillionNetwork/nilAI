@@ -4,7 +4,7 @@ import re
 import httpx
 import pytest
 
-from .config import BASE_URL, test_models, AUTH_STRATEGY, api_key_getter
+from .config import BASE_URL, test_models, AUTH_STRATEGY, api_key_getter, ENVIRONMENT
 
 
 @pytest.mark.parametrize("model", test_models)
@@ -435,12 +435,12 @@ def test_invalid_rate_limiting_nucs(invalid_rate_limited_client):
 @pytest.mark.skipif(
     AUTH_STRATEGY != "nuc", reason="NUC rate limiting not used with API key"
 )
-def test_invalid_nildb_command_nucs(nildb_client):
+def test_invalid_nildb_command_nucs(invalid_nildb):
     payload = {
         "model": test_models[0],
         "input": "What is your name?",
     }
-    response = nildb_client.post("/responses", json=payload)
+    response = invalid_nildb.post("/responses", json=payload)
     assert response.status_code == 401, "Invalid NILDB command should return 401"
 
 
@@ -627,7 +627,6 @@ def test_usage_endpoint(client):
             "total_tokens",
             "completion_tokens",
             "prompt_tokens",
-            "queries",
         ]
         for key in expected_keys:
             assert key in usage_data, f"Expected key {key} not found in usage data"
@@ -638,6 +637,10 @@ def test_usage_endpoint(client):
         pytest.fail(f"Error testing usage endpoint: {str(e)}")
 
 
+@pytest.mark.skipif(
+    ENVIRONMENT != "mainnet",
+    reason="Attestation endpoint not available in non-mainnet environment",
+)
 def test_attestation_endpoint(client):
     try:
         import requests

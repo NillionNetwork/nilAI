@@ -2,6 +2,9 @@ from nilai_api.auth.nuc_helpers import (
     NilAuthPrivateKey,
 )
 
+from nuc.builder import NucTokenBuilder
+from nuc.token import Did, InvocationBody, Command
+
 from nilai_py import (
     Client,
     DelegationTokenServer,
@@ -124,3 +127,23 @@ def get_document_id_nuc_client() -> Client:
 def get_document_id_nuc_token() -> str:
     """Convenience function for getting NILDB NUC tokens."""
     return get_document_id_nuc_client()._get_invocation_token()
+
+
+def get_invalid_nildb_nuc_token() -> str:
+    """Convenience function for getting NILDB NUC tokens."""
+    http_client = DefaultHttpxClient(verify=False)
+    client = Client(
+        base_url="https://localhost/nuc/v1",
+        auth_type=AuthType.API_KEY,
+        http_client=http_client,
+        api_key=PRIVATE_KEY,
+    )
+
+    invocation_token: str = (
+        NucTokenBuilder.extending(client.root_token)
+        .body(InvocationBody(args={}))
+        .audience(Did(client.nilai_public_key.serialize()))
+        .command(Command(["nil", "db", "generate"]))
+        .build(NilAuthPrivateKey(PRIVATE_KEY))
+    )
+    return invocation_token
