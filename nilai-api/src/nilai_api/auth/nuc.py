@@ -86,11 +86,11 @@ def validate_nuc(nuc_token: str) -> Tuple[str, str]:
 
     # Validate the
     # Return the subject of the token, the subscription holder
-    subscription_holder = token.subject.public_key.hex()
-    user = token.issuer.public_key.hex()
+    subscription_holder = token.subject
+    user = token.issuer
     logger.info(f"Subscription holder: {subscription_holder}")
     logger.info(f"User: {user}")
-    return subscription_holder, user
+    return str(subscription_holder), str(user)
 
 
 def get_token_rate_limit(nuc_token: str) -> Optional[TokenRateLimits]:

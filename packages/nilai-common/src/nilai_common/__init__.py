@@ -32,6 +32,7 @@ from nilai_common.api_models import (
     ResponseInputItemParam,
     EasyInputMessageParam,
     ResponseFunctionToolCallParam,
+    Usage,
 )
 from nilai_common.config import SETTINGS, MODEL_SETTINGS, MODEL_CAPABILITIES
 from nilai_common.discovery import ModelServiceDiscovery
@@ -74,4 +75,5 @@ __all__ = [
     "ResponseInputItemParam",
     "EasyInputMessageParam",
     "ResponseFunctionToolCallParam",
+    "Usage",
 ]

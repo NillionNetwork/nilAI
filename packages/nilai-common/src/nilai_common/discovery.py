@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import Dict, Optional
 
 import redis.asyncio as redis
-from nilai_common.api_model import ModelEndpoint, ModelMetadata
+from nilai_common.api_models import ModelEndpoint, ModelMetadata
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 # Configure logging
