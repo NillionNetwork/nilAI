@@ -7,7 +7,7 @@ services:
           devices:
             - driver: nvidia
               count: 1
-              capabilities: [gpu]
+              capabilities: [ gpu ]
 
     ulimits:
       memlock: -1
@@ -16,27 +16,20 @@ services:
       - .env
     restart: unless-stopped
     depends_on:
-      etcd:
+      redis:
         condition: service_healthy
     command: >
-      --model openai/gpt-oss-20b
-      --gpu-memory-utilization 0.95
-      --max-model-len 10000
-      --max-num-batched-tokens 10000
-      --max-num-seqs 2
-      --tensor-parallel-size 1
-      --uvicorn-log-level warning
-      --async-scheduling
+      --model openai/gpt-oss-20b --gpu-memory-utilization 0.95 --max-model-len 10000 --max-num-batched-tokens 10000 --max-num-seqs 2 --tensor-parallel-size 1 --uvicorn-log-level warning --async-scheduling
     environment:
       - SVC_HOST=gpt_20b_gpu
       - SVC_PORT=8000
-      - ETCD_HOST=etcd
-      - ETCD_PORT=2379
+      - DISCOVERY_HOST=redis
+      - DISCOVERY_PORT=6379
       - TOOL_SUPPORT=true
     volumes:
-      - hugging_face_models:/root/.cache/huggingface  # cache models
+      - hugging_face_models:/root/.cache/huggingface # cache models
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
       interval: 30s
       retries: 10
       start_period: 900s

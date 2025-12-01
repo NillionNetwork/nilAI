@@ -70,3 +70,4 @@ __all__ = [
 ]
 
 logging.info(CONFIG.prettify())
+print(CONFIG.prettify())

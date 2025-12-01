@@ -2,7 +2,7 @@ import asyncio
 
 import pytest
 import pytest_asyncio
-from nilai_common.api_model import ModelEndpoint, ModelMetadata
+from nilai_common.api_models import ModelEndpoint, ModelMetadata
 from nilai_common.discovery import ModelServiceDiscovery
 
 

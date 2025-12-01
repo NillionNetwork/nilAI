@@ -11,13 +11,14 @@ requires-python = ">=3.12"
 dependencies = [
     "nilai-api",
     "nilai-common",
-    "nilai-models"
+    "nilai-models",
+    "nilai-py",
 ]
 
 [dependency-groups]
 dev = [
     "black>=25.9.0",
-    "isort>=6.1.0",
+    "isort>=7.0.0",
     "pytest-mock>=3.14.0",
     "pytest>=8.3.3",
     "ruff>=0.11.7",
@@ -37,12 +38,14 @@ build-backend = "setuptools.build_meta"
 find = { include = ["nilai"] }
 
 [tool.uv.workspace]
-members = ["nilai-models", "nilai-api", "packages/nilai-common"]
+members = ["nilai-models", "nilai-api", "packages/nilai-common", "clients/nilai-py"]
 
 [tool.uv.sources]
 nilai-common = { workspace = true }
 nilai-api = { workspace = true }
 nilai-models = { workspace = true }
+nilai-py = { workspace = true }
+
 [tool.pyright]
 exclude = ["**/.venv", "**/.venv/**"]
 

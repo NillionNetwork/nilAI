@@ -96,11 +96,9 @@ async def get_nildb_delegation_token(user_did: str) -> PromptDelegationToken:
     return PromptDelegationToken(token=delegation_token, did=builder_did)
 
 
-""" Read nilDB records from owned data collection based on the store id given by the user on the request """
-
-
 async def get_prompt_from_nildb(prompt_document: PromptDocument) -> str:
     """Read a specific document - core functionality"""
+
     read_params = ReadDataRequestParams(
         collection=CONFIG.nildb.collection,
         document=Uuid(prompt_document.document_id),
@@ -125,7 +123,6 @@ async def get_prompt_from_nildb(prompt_document: PromptDocument) -> str:
         data_dict = document_data.model_dump()
     else:
         data_dict = dict(document_data) if document_data else {}
-
     if data_dict.get("owner", None) != str(prompt_document.owner_did):
         raise ValueError(
             "Non-owning entity trying to invoke access to a document resource"
