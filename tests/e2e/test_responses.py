@@ -44,9 +44,9 @@ def nildb_client(document_id_openai_client):
 
 
 @pytest.fixture
-def invalid_nildb(invalid_document_id_openai_client):
-    """Alias for invalid_document_id_openai_client fixture from conftest.py"""
-    return invalid_document_id_openai_client
+def invalid_nildb(invalid_nildb_openai_client):
+    """Alias for invalid_nildb_openai_client fixture from conftest.py"""
+    return invalid_nildb_openai_client
 
 
 @pytest.mark.parametrize("model", test_models)

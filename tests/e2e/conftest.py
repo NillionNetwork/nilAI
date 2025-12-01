@@ -191,7 +191,7 @@ def document_id_openai_client():
 
 
 @pytest.fixture
-def nildb_openai_client():
+def invalid_nildb_openai_client():
     """Create an OpenAI SDK client with document ID token"""
     invocation_token = get_invalid_nildb_nuc_token()
     return _create_openai_client(invocation_token)

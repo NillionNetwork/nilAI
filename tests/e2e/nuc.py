@@ -131,6 +131,7 @@ def get_document_id_nuc_token() -> str:
 
 def get_invalid_nildb_nuc_token() -> str:
     """Convenience function for getting NILDB NUC tokens."""
+    private_key = NilAuthPrivateKey(bytes.fromhex(PRIVATE_KEY))
     http_client = DefaultHttpxClient(verify=False)
     client = Client(
         base_url="https://localhost/nuc/v1",
@@ -144,6 +145,6 @@ def get_invalid_nildb_nuc_token() -> str:
         .body(InvocationBody(args={}))
         .audience(Did(client.nilai_public_key.serialize()))
         .command(Command(["nil", "db", "generate"]))
-        .build(NilAuthPrivateKey(PRIVATE_KEY))
+        .build(private_key)
     )
     return invocation_token
