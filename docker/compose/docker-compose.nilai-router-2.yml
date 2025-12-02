@@ -65,7 +65,7 @@ services:
         condition: service_healthy
     command: >
       --model Qwen/Qwen3-4B-Thinking-2507
-      --gpu-memory-utilization 0.23
+      --gpu-memory-utilization 0.20
       --max-model-len 10000
       --max-num-batched-tokens 10000
       --tensor-parallel-size 1
