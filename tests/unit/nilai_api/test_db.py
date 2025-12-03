@@ -15,7 +15,7 @@ async def test_insert_user(mock_db):
     """Test user insertion functionality."""
     user = await mock_db.insert_user("Test User", "test@example.com")
 
-    assert "userid" in user
+    assert "user_id" in user
     assert "apikey" in user
     assert len(mock_db.users) == 1
 
@@ -38,9 +38,9 @@ async def test_token_usage(mock_db):
     """Test token usage tracking."""
     user = await mock_db.insert_user("Test User", "test@example.com")
 
-    await mock_db.update_token_usage(user["userid"], 50, 20)
+    await mock_db.update_token_usage(user["user_id"], 50, 20)
 
-    token_usage = await mock_db.get_token_usage(user["userid"])
+    token_usage = await mock_db.get_token_usage(user["user_id"])
     assert token_usage["prompt_tokens"] == 50
     assert token_usage["completion_tokens"] == 20
     assert token_usage["queries"] == 1
@@ -51,9 +51,9 @@ async def test_query_logging(mock_db):
     """Test query logging functionality."""
     user = await mock_db.insert_user("Test User", "test@example.com")
 
-    await mock_db.log_query(user["userid"], "test-model", 10, 15)
+    await mock_db.log_query(user["user_id"], "test-model", 10, 15)
 
     assert len(mock_db.query_logs) == 1
     log_entry = list(mock_db.query_logs.values())[0]
-    assert log_entry["userid"] == user["userid"]
+    assert log_entry["user_id"] == user["user_id"]
     assert log_entry["model"] == "test-model"

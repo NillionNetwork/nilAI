@@ -14,11 +14,11 @@ from sqlalchemy.orm import sessionmaker
 
 from nilai_api.config import CONFIG
 
-_engine: Optional[sqlalchemy.ext.asyncio.AsyncEngine] = None
+_engine: Optional[sqlalchemy.ext.asyncio.AsyncEngine] = None  # type: ignore[reportAttributeAccessIssue]
 _SessionLocal: Optional[sessionmaker] = None
 
 # Create base and engine with improved configuration
-Base = sqlalchemy.orm.declarative_base()
+Base = sqlalchemy.orm.declarative_base()  # type: ignore[reportAttributeAccessIssue]
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,7 @@ class DatabaseConfig:
         return DatabaseConfig(database_url)
 
 
-def get_engine() -> sqlalchemy.ext.asyncio.AsyncEngine:
+def get_engine() -> sqlalchemy.ext.asyncio.AsyncEngine:  # type: ignore[reportAttributeAccessIssue]
     global _engine
     if _engine is None:
         config = DatabaseConfig.from_env()

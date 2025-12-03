@@ -33,20 +33,10 @@ services:
         condition: service_healthy
       nilauth-credit-server:
         condition: service_healthy
-    environment:
-      - POSTGRES_DB=${POSTGRES_DB_NUC}
     volumes:
       - ./nilai-api/:/app/nilai-api/
       - ./packages/:/app/packages/
       - ./nilai-auth/nuc-helpers/:/app/nilai-auth/nuc-helpers/
-  attestation:
-    ports:
-      - "8081:8080"
-    env_file:
-      - .env
-    volumes:
-      - ./nilai-attestation/:/app/nilai-attestation/
-      - ./packages/:/app/packages/
   redis:
     ports:
       - "6379:6379"
@@ -62,12 +52,24 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./scripts/postgres-init.sh:/docker-entrypoint-initdb.d/postgres-init.sh
     healthcheck:
-      test: ["CMD", "sh", "-c", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB} -h localhost"]
+      test: [ "CMD", "sh", "-c", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB} -h localhost" ]
       interval: 30s
       retries: 5
       start_period: 10s
       timeout: 10s
   grafana:
+    container_name: grafana
+    image: 'grafana/grafana:11.5.1'
+    restart: unless-stopped
+    user: "$UID:$GID"
+    environment:
+      - GF_USERS_ALLOW_SIGN_UP=false
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:3000/api/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     env_file:
       - .env
     ports:
@@ -77,10 +79,6 @@ services:
       - ${PWD}/grafana/datasources/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
       - ${PWD}/grafana/dashboards/filesystem.yml:/etc/grafana/provisioning/dashboards/filesystem.yml
       - ${PWD}/grafana/config/grafana.ini:/etc/grafana/grafana.ini
-  prometheus:
-    volumes:
-      - ${PWD}/prometheus/config/prometheus.yml:/etc/prometheus/prometheus.yml
-      - ${PWD}/prometheus/data:/prometheus/data
   nilauth-postgres:
     image: postgres:16-alpine
     environment:
@@ -90,13 +88,14 @@ services:
     ports:
       - "30432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U nilauth -d nilauth_credit"]
+      test: [ "CMD-SHELL", "pg_isready -U nilauth -d nilauth_credit" ]
       interval: 5s
       timeout: 5s
       retries: 5
 
   nilauth-credit-server:
-    image: ghcr.io/nillionnetwork/nilauth-credit:sha-cb9e36a
+    image: ghcr.io/nillionnetwork/nilauth-credit:sha-6754a1d
+    platform: linux/amd64 # for macOS to force running on Rosetta 2
     environment:
       DATABASE_URL: postgresql://nilauth:nilauth_dev_password@nilauth-postgres:5432/nilauth_credit
       HOST: 0.0.0.0
@@ -106,8 +105,10 @@ services:
     depends_on:
       nilauth-postgres:
         condition: service_healthy
+    volumes:
+      - ./scripts/credit-init.sql:/app/migrations/20251015000006_seed_test_data.sql
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/health" ]
       interval: 30s
       retries: 3
       start_period: 15s

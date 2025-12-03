@@ -2,8 +2,8 @@ from pydantic import BaseModel
 from typing import Optional
 from fastapi import HTTPException, status
 from nilai_api.db.users import UserData
-from nuc_helpers.usage import TokenRateLimits, TokenRateLimit
-from nuc_helpers.nildb_document import PromptDocument
+from nilai_api.auth.nuc_helpers.usage import TokenRateLimits, TokenRateLimit
+from nilai_api.auth.nuc_helpers.nildb_document import PromptDocument
 
 
 class AuthenticationError(HTTPException):

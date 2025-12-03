@@ -83,7 +83,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT \n  COUNT(q.id) AS \"Queries\" \nFROM query_logs q\nLEFT JOIN users u ON q.userid = u.userid\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${user_filter:single}' = 'All' OR u.name = '${user_filter:single}')",
+          "rawSql": "SELECT \n  COUNT(q.id) AS \"Queries\" \nFROM query_logs q\nLEFT JOIN users u ON q.user_id = u.user_id\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${user_filter:single}' = 'All' OR u.name = '${user_filter:single}')",
           "refId": "A",
           "sql": {
             "columns": [
@@ -165,7 +165,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT SUM(total_tokens) AS total_tokens\nFROM query_logs q\nLEFT JOIN users u ON q.userid = u.userid\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${user_filter:single}' = 'All' OR u.name = '${user_filter:single}')",
+          "rawSql": "SELECT SUM(total_tokens) AS total_tokens\nFROM query_logs q\nLEFT JOIN users u ON q.user_id = u.user_id\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${user_filter:single}' = 'All' OR u.name = '${user_filter:single}')",
           "refId": "A",
           "sql": {
             "columns": [
@@ -248,7 +248,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT SUM(q.prompt_tokens) AS total_tokens\nFROM query_logs q\nLEFT JOIN users u ON q.userid = u.userid\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${user_filter:single}' = 'All' OR u.name = '${user_filter:single}')",
+          "rawSql": "SELECT SUM(q.prompt_tokens) AS total_tokens\nFROM query_logs q\nLEFT JOIN users u ON q.user_id = u.user_id\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${user_filter:single}' = 'All' OR u.name = '${user_filter:single}')",
           "refId": "A",
           "sql": {
             "columns": [
@@ -331,7 +331,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT SUM(q.completion_tokens) AS total_tokens\nFROM query_logs q\nLEFT JOIN users u ON q.userid = u.userid\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${user_filter:single}' = 'All' OR u.name = '${user_filter:single}')",
+          "rawSql": "SELECT SUM(q.completion_tokens) AS total_tokens\nFROM query_logs q\nLEFT JOIN users u ON q.user_id = u.user_id\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${user_filter:single}' = 'All' OR u.name = '${user_filter:single}')",
           "refId": "A",
           "sql": {
             "columns": [

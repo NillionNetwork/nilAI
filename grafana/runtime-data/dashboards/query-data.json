@@ -126,7 +126,7 @@
             "editorMode": "code",
             "format": "time_series",
             "rawQuery": true,
-            "rawSql": "SELECT \n  date_trunc('${time_granularity}', q.query_timestamp) AS \"time\", \n  COUNT(q.id) AS \"Queries\"\nFROM query_logs q\nLEFT JOIN users u ON q.userid = u.userid\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${user_filter:value}' = 'All' OR u.name = '${user_filter:value}')\n  AND ('${model_filter:single}' = 'All' OR q.model = '${model_filter:single}')\nGROUP BY date_trunc('${time_granularity}', q.query_timestamp)\nORDER BY \"time\";",
+            "rawSql": "SELECT \n  date_trunc('${time_granularity}', q.query_timestamp) AS \"time\", \n  COUNT(q.id) AS \"Queries\"\nFROM query_logs q\nLEFT JOIN users u ON q.user_id = u.user_id\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${user_filter:value}' = 'All' OR u.name = '${user_filter:value}')\n  AND ('${model_filter:single}' = 'All' OR q.model = '${model_filter:single}')\nGROUP BY date_trunc('${time_granularity}', q.query_timestamp)\nORDER BY \"time\";",
             "refId": "A",
             "sql": {
               "columns": [
@@ -218,7 +218,7 @@
             "editorMode": "code",
             "format": "table",
             "rawQuery": true,
-            "rawSql": "SELECT \n  q.model, \n  COUNT(q.id) AS total_queries\nFROM query_logs q\nLEFT JOIN users u ON q.userid = u.userid\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${user_filter:single}' = 'All' OR u.name = '${user_filter:single}')\nGROUP BY q.model\nORDER BY total_queries DESC;",
+            "rawSql": "SELECT \n  q.model, \n  COUNT(q.id) AS total_queries\nFROM query_logs q\nLEFT JOIN users u ON q.user_id = u.user_id\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${user_filter:single}' = 'All' OR u.name = '${user_filter:single}')\nGROUP BY q.model\nORDER BY total_queries DESC;",
             "refId": "A",
             "sql": {
               "columns": [
@@ -352,7 +352,7 @@
             "editorMode": "code",
             "format": "table",
             "rawQuery": true,
-            "rawSql": "SELECT \n  CASE \n    WHEN LENGTH(u.name) > 12 THEN LEFT(u.name, 3) || '...' || RIGHT(u.name, 3)\n    ELSE u.name\n  END AS \"User\", \n  COUNT(q.id) AS \"Queries\" \nFROM query_logs q \nJOIN users u ON q.userid = u.userid\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${model_filter:single}' = 'All' OR q.model = '${model_filter:single}')\nGROUP BY u.name\nORDER BY \"Queries\" DESC;",
+            "rawSql": "SELECT \n  CASE \n    WHEN LENGTH(u.name) > 12 THEN LEFT(u.name, 3) || '...' || RIGHT(u.name, 3)\n    ELSE u.name\n  END AS \"User\", \n  COUNT(q.id) AS \"Queries\" \nFROM query_logs q \nJOIN users u ON q.user_id = u.user_id\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${model_filter:single}' = 'All' OR q.model = '${model_filter:single}')\nGROUP BY u.name\nORDER BY \"Queries\" DESC;",
             "refId": "A",
             "sql": {
               "columns": [
@@ -360,7 +360,7 @@
                   "alias": "\"User\"",
                   "parameters": [
                     {
-                      "name": "userid",
+                      "name": "user_id",
                       "type": "functionParameter"
                     }
                   ],
@@ -381,7 +381,7 @@
               "groupBy": [
                 {
                   "property": {
-                    "name": "userid",
+                    "name": "user_id",
                     "type": "string"
                   },
                   "type": "groupBy"
@@ -481,7 +481,7 @@
             "editorMode": "code",
             "format": "table",
             "rawQuery": true,
-            "rawSql": "SELECT \n  CASE \n    WHEN LENGTH(u.name) > 8 THEN LEFT(u.name, 3) || '...' || RIGHT(u.name, 3)\n    ELSE u.name\n  END AS \"User\",\n  q.model AS \"Model\",\n  COUNT(q.id) AS \"Queries\",\n  MIN(q.query_timestamp) AS \"First Query\",\n  MAX(q.query_timestamp) AS \"Last Query\"\nFROM query_logs q \nJOIN users u ON q.userid = u.userid\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${user_filter:single}' = 'All' OR u.name = '${user_filter:single}')\n  AND ('${model_filter:single}' = 'All' OR q.model = '${model_filter:single}')\nGROUP BY u.name, q.model\nORDER BY \"Queries\" DESC\nLIMIT 20;",
+            "rawSql": "SELECT \n  CASE \n    WHEN LENGTH(u.name) > 8 THEN LEFT(u.name, 3) || '...' || RIGHT(u.name, 3)\n    ELSE u.name\n  END AS \"User\",\n  q.model AS \"Model\",\n  COUNT(q.id) AS \"Queries\",\n  MIN(q.query_timestamp) AS \"First Query\",\n  MAX(q.query_timestamp) AS \"Last Query\"\nFROM query_logs q \nJOIN users u ON q.user_id = u.user_id\nWHERE \n  q.query_timestamp >= $__timeFrom()\n  AND q.query_timestamp <= $__timeTo()\n  AND ('${user_filter:single}' = 'All' OR u.name = '${user_filter:single}')\n  AND ('${model_filter:single}' = 'All' OR q.model = '${model_filter:single}')\nGROUP BY u.name, q.model\nORDER BY \"Queries\" DESC\nLIMIT 20;",
             "refId": "A",
             "sql": {
               "columns": [

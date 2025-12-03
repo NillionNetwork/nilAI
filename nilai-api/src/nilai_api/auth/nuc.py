@@ -7,13 +7,13 @@ from functools import lru_cache
 from nilai_api.state import state
 from nilai_api.auth.common import AuthenticationError
 
-from nilai_common.logger import setup_logger
 
-from nuc_helpers.usage import TokenRateLimits
-from nuc_helpers.nildb_document import PromptDocument
+from nilai_api.auth.nuc_helpers.usage import TokenRateLimits
+from nilai_api.auth.nuc_helpers.nildb_document import PromptDocument
 
-logger = setup_logger(__name__)
+import logging
 
+logger = logging.getLogger(__name__)
 
 NILAI_BASE_COMMAND: Command = Command.parse("/nil/ai")
 
@@ -86,11 +86,11 @@ def validate_nuc(nuc_token: str) -> Tuple[str, str]:
 
     # Validate the
     # Return the subject of the token, the subscription holder
-    subscription_holder = token.subject.public_key.hex()
-    user = token.issuer.public_key.hex()
+    subscription_holder = token.subject
+    user = token.issuer
     logger.info(f"Subscription holder: {subscription_holder}")
     logger.info(f"User: {user}")
-    return subscription_holder, user
+    return str(subscription_holder), str(user)
 
 
 def get_token_rate_limit(nuc_token: str) -> Optional[TokenRateLimits]:

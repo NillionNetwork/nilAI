@@ -24,7 +24,7 @@ async def test_runs_in_a_loop():
 @pytest.fixture
 def mock_user():
     mock = MagicMock(spec=UserModel)
-    mock.userid = "test-user-id"
+    mock.user_id = "test-user-id"
     mock.name = "Test User"
     mock.apikey = "test-api-key"
     mock.prompt_tokens = 100
@@ -43,61 +43,26 @@ def mock_user_manager(mock_user, mocker):
     from nilai_api.db.users import UserManager
     from nilai_api.db.logs import QueryLogManager
 
+    # Patch QueryLogManager for usage
     mocker.patch.object(
-        UserManager,
-        "get_token_usage",
-        return_value={
-            "prompt_tokens": 100,
-            "completion_tokens": 50,
-            "total_tokens": 150,
-            "queries": 10,
-        },
-    )
-    mocker.patch.object(UserManager, "update_token_usage")
-    mocker.patch.object(
-        UserManager,
+        QueryLogManager,
         "get_user_token_usage",
         return_value={
             "prompt_tokens": 100,
             "completion_tokens": 50,
             "total_tokens": 150,
-            "completion_tokens_details": None,
-            "prompt_tokens_details": None,
             "queries": 10,
         },
     )
-    mocker.patch.object(
-        UserManager,
-        "insert_user",
-        return_value={
-            "userid": "test-user-id",
-            "apikey": "test-api-key",
-            "rate_limits": RateLimits().get_effective_limits().model_dump_json(),
-        },
-    )
-    mocker.patch.object(
-        UserManager,
-        "check_api_key",
+    mocker.patch.object(QueryLogManager, "log_query")
+
+    # Mock validate_credential for authentication
+    mocker.patch(
+        "nilai_api.auth.strategies.validate_credential",
+        new_callable=AsyncMock,
         return_value=mock_user,
     )
-    mocker.patch.object(
-        UserManager,
-        "get_all_users",
-        return_value=[
-            {
-                "userid": "test-user-id",
-                "apikey": "test-api-key",
-                "rate_limits": RateLimits().get_effective_limits().model_dump_json(),
-            },
-            {
-                "userid": "test-user-id-2",
-                "apikey": "test-api-key",
-                "rate_limits": RateLimits().get_effective_limits().model_dump_json(),
-            },
-        ],
-    )
-    mocker.patch.object(QueryLogManager, "log_query")
-    mocker.patch.object(UserManager, "update_last_activity")
+
     return UserManager
 
 
@@ -107,6 +72,7 @@ def mock_state(mocker):
 
     mock_discovery_service = mocker.Mock()
     mock_discovery_service.discover_models = AsyncMock(return_value=expected_models)
+    mock_discovery_service.initialize = AsyncMock()
 
     mocker.patch.object(state, "discovery_service", mock_discovery_service)
 
@@ -138,7 +104,7 @@ def mock_metering_context(mocker):
 
 
 @pytest.fixture
-def client(mock_user_manager, mock_metering_context):
+def client(mock_user_manager, mock_state, mock_metering_context):
     from nilai_api.app import app
     from nilai_api.credit import LLMMeter
 
@@ -210,6 +176,11 @@ def test_create_response(mock_user, mock_state, mock_user_manager, mocker, clien
         "nilai_api.routers.endpoints.responses.handle_responses_tool_workflow",
         return_value=(response_data, 0, 0),
     )
+    mocker.patch(
+        "nilai_api.routers.endpoints.responses.state.get_model",
+        return_value=model_endpoint,
+    )
+    mocker.patch("nilai_api.db.logs.QueryLogContext.commit", new_callable=AsyncMock)
 
     payload = {
         "model": "meta-llama/Llama-3.2-1B-Instruct",
@@ -308,6 +279,11 @@ def test_create_response_stream_includes_sources(
         "nilai_api.routers.endpoints.responses.AsyncOpenAI",
         return_value=mock_async_openai_instance,
     )
+    mocker.patch(
+        "nilai_api.routers.endpoints.responses.state.get_model",
+        return_value=model_endpoint,
+    )
+    mocker.patch("nilai_api.db.logs.QueryLogContext.commit", new_callable=AsyncMock)
 
     payload = {
         "model": "meta-llama/Llama-3.2-1B-Instruct",
