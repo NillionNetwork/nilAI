@@ -17,6 +17,17 @@ from nuc.envelope import NucTokenEnvelope
 logger = logging.getLogger(__name__)
 
 
+class NoOpMeteringContext:
+    """A no-op metering context for requests that should skip metering (e.g., Docs Token)."""
+
+    def __init__(self):
+        self.lock_id: str = "noop-lock-id"
+
+    def set_response(self, response_data: dict) -> None:
+        """No-op method that does nothing."""
+        pass
+
+
 class LLMCost(BaseModel):
     prompt_tokens_price: float
     completion_tokens_price: float
@@ -92,7 +103,7 @@ CreditClientSingleton.configure(
 )
 
 
-def user_id_extractor() -> Callable[[Request], Awaitable[str]]:
+def credential_extractor() -> Callable[[Request], Awaitable[str]]:
     if CONFIG.auth.auth_strategy == "nuc":
         return from_nuc_bearer_root_token()
     else:
@@ -144,8 +155,35 @@ def llm_cost_calculator(llm_cost_dict: LLMCostDict):
     return calculator
 
 
-LLMMeter = create_metering_dependency(
-    user_id_extractor=user_id_extractor(),
+_base_llm_meter = create_metering_dependency(
+    credential_extractor=credential_extractor(),
     estimated_cost=2.0,
     cost_calculator=llm_cost_calculator(MyCostDictionary),
+    public_identifiers=CONFIG.auth.auth_strategy == "nuc",
 )
+
+
+async def LLMMeter(request: Request):
+    """
+    Metering dependency that skips metering for Docs Token requests.
+    """
+    # Check if the request is using the docs token
+    if CONFIG.docs.token:
+        auth_header: str | None = request.headers.get("Authorization", None)
+        if auth_header:
+            # Extract the token from the Bearer header
+            token = (
+                auth_header.replace("Bearer ", "")
+                if auth_header.startswith("Bearer ")
+                else auth_header
+            )
+
+            # Skip metering if this is the docs token
+            if token == CONFIG.docs.token:
+                logger.info("Skipping metering for Docs Token request")
+                yield NoOpMeteringContext()
+                return
+
+    # Otherwise, apply normal metering
+    async for meter in _base_llm_meter(request):
+        yield meter

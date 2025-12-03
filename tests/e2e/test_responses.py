@@ -1,80 +1,52 @@
 import json
 import os
-import httpx
 import pytest
 import pytest_asyncio
-from openai import OpenAI
-from openai import AsyncOpenAI
 
-from .config import BASE_URL, test_models, AUTH_STRATEGY, api_key_getter
-from .nuc import (
-    get_rate_limited_nuc_token,
-    get_invalid_rate_limited_nuc_token,
-    get_nildb_nuc_token,
-)
+from .config import BASE_URL, test_models, AUTH_STRATEGY, api_key_getter, ENVIRONMENT
 
 
-def _create_openai_client(api_key: str) -> OpenAI:
-    """Helper function to create an OpenAI client with SSL verification disabled"""
-    transport = httpx.HTTPTransport(verify=False)
-    return OpenAI(
-        base_url=BASE_URL,
-        api_key=api_key,
-        http_client=httpx.Client(transport=transport),
-    )
-
-
-def _create_async_openai_client(api_key: str) -> AsyncOpenAI:
-    transport = httpx.AsyncHTTPTransport(verify=False)
-    return AsyncOpenAI(
-        base_url=BASE_URL,
-        api_key=api_key,
-        http_client=httpx.AsyncClient(transport=transport),
-    )
+# ============================================================================
+# Fixture Aliases for OpenAI SDK Tests
+# These create local aliases that reference the centralized fixtures in conftest.py
+# This allows tests to use 'client' instead of 'openai_client', maintaining backward compatibility
+# ============================================================================
 
 
 @pytest.fixture
-def client():
-    invocation_token: str = api_key_getter()
-    return _create_openai_client(invocation_token)
+def client(openai_client):
+    """Alias for openai_client fixture from conftest.py"""
+    return openai_client
 
 
 @pytest_asyncio.fixture
-async def async_client():
-    invocation_token: str = api_key_getter()
-    transport = httpx.AsyncHTTPTransport(verify=False)
-    httpx_client = httpx.AsyncClient(transport=transport)
-    client = AsyncOpenAI(
-        base_url=BASE_URL, api_key=invocation_token, http_client=httpx_client
-    )
-    yield client
-    await httpx_client.aclose()
+async def async_client(async_openai_client):
+    """Alias for async_openai_client fixture from conftest.py"""
+    return async_openai_client
 
 
 @pytest.fixture
-def rate_limited_client():
-    invocation_token = get_rate_limited_nuc_token(rate_limit=1)
-    return _create_openai_client(invocation_token.token)
+def rate_limited_client(rate_limited_openai_client):
+    """Alias for rate_limited_openai_client fixture from conftest.py"""
+    return rate_limited_openai_client
 
 
 @pytest.fixture
-def invalid_rate_limited_client():
-    invocation_token = get_invalid_rate_limited_nuc_token()
-    return _create_openai_client(invocation_token.token)
+def invalid_rate_limited_client(invalid_rate_limited_openai_client):
+    """Alias for invalid_rate_limited_openai_client fixture from conftest.py"""
+    return invalid_rate_limited_openai_client
 
 
 @pytest.fixture
-def nildb_client():
-    invocation_token = get_nildb_nuc_token()
-    return _create_openai_client(invocation_token.token)
+def nildb_client(document_id_openai_client):
+    """Alias for document_id_openai_client fixture from conftest.py"""
+    return document_id_openai_client
 
 
 @pytest.fixture
-def high_web_search_rate_limit(monkeypatch):
-    monkeypatch.setenv("WEB_SEARCH_RATE_LIMIT_MINUTE", "9999")
-    monkeypatch.setenv("WEB_SEARCH_RATE_LIMIT_HOUR", "9999")
-    monkeypatch.setenv("WEB_SEARCH_RATE_LIMIT_DAY", "9999")
-    monkeypatch.setenv("WEB_SEARCH_RATE_LIMIT", "9999")
+def invalid_nildb(invalid_nildb_openai_client):
+    """Alias for invalid_nildb_openai_client fixture from conftest.py"""
+    return invalid_nildb_openai_client
 
 
 @pytest.mark.parametrize("model", test_models)
@@ -195,14 +167,14 @@ def test_invalid_rate_limiting_nucs(invalid_rate_limited_client, model):
 @pytest.mark.skipif(
     AUTH_STRATEGY != "nuc", reason="NUC rate limiting not used with API key"
 )
-def test_invalid_nildb_command_nucs(nildb_client, model):
+def test_invalid_nildb_command_nucs(invalid_nildb, model):
     """Test invalid NILDB command handling"""
     import openai
 
     forbidden = False
     for _ in range(4):
         try:
-            nildb_client.responses.create(
+            invalid_nildb.responses.create(
                 model=model,
                 input="What is the capital of France?",
                 instructions="You are a helpful assistant that provides accurate and concise information.",
@@ -481,7 +453,6 @@ def test_usage_endpoint(client):
             "total_tokens",
             "completion_tokens",
             "prompt_tokens",
-            "queries",
         ]
         for key in expected_keys:
             assert key in usage_data, f"Expected key {key} not found in usage data"
@@ -492,6 +463,10 @@ def test_usage_endpoint(client):
         pytest.fail(f"Error testing usage endpoint: {str(e)}")
 
 
+@pytest.mark.skipif(
+    ENVIRONMENT != "mainnet",
+    reason="Attestation endpoint not available in non-mainnet environment",
+)
 def test_attestation_endpoint(client):
     """Test retrieving attestation report"""
     try:

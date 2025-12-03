@@ -6,6 +6,7 @@ import signal
 import httpx
 
 from nilai_common import (
+    MODEL_CAPABILITIES,
     MODEL_SETTINGS,
     SETTINGS,
     ModelEndpoint,
@@ -37,8 +38,8 @@ async def get_metadata():
                     license="Apache 2.0",
                     source=f"https://huggingface.co/{model_name}",
                     supported_features=["chat_completion"],
-                    tool_support=SETTINGS.tool_support,
-                    multimodal_support=SETTINGS.multimodal_support,
+                    tool_support=MODEL_CAPABILITIES.tool_support,
+                    multimodal_support=MODEL_CAPABILITIES.multimodal_support,
                 )
 
         except Exception as e:
@@ -57,13 +58,13 @@ async def get_metadata():
 
 async def run_service(discovery_service, model_endpoint):
     """Register model with discovery service and keep it alive."""
-    lease = None
+    key = None
     try:
         logger.info(f"Registering model: {model_endpoint.metadata.id}")
-        lease = await discovery_service.register_model(model_endpoint, prefix="/models")
+        key = await discovery_service.register_model(model_endpoint, prefix="/models")
         logger.info(f"Model registered successfully: {model_endpoint}")
 
-        await discovery_service.keep_alive(lease)
+        await discovery_service.keep_alive(key, model_endpoint)
 
     except asyncio.CancelledError:
         logger.info("Service shutdown requested")
@@ -72,12 +73,15 @@ async def run_service(discovery_service, model_endpoint):
         logger.error(f"Service error: {e}")
         raise
     finally:
-        if lease:
+        if key:
             try:
                 await discovery_service.unregister_model(model_endpoint.metadata.id)
                 logger.info(f"Model unregistered: {model_endpoint.metadata.id}")
             except Exception as e:
                 logger.error(f"Error unregistering model: {e}")
+
+        # Close the discovery service connection
+        await discovery_service.close()
 
 
 async def main():
@@ -86,8 +90,9 @@ async def main():
 
     # Initialize discovery service
     discovery_service = ModelServiceDiscovery(
-        host=SETTINGS.etcd_host, port=SETTINGS.etcd_port
+        host=SETTINGS.discovery_host, port=SETTINGS.discovery_port
     )
+    await discovery_service.initialize()
 
     # Fetch metadata and create endpoint
     metadata = await get_metadata()

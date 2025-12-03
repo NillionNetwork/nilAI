@@ -3,7 +3,6 @@ from nilai_common.api_models import (
     HealthCheckResponse,
     ModelEndpoint,
     ModelMetadata,
-    Nonce,
     AMDAttestationToken,
     NVAttestationToken,
     SearchResult,
@@ -33,10 +32,10 @@ from nilai_common.api_models import (
     ResponseInputItemParam,
     EasyInputMessageParam,
     ResponseFunctionToolCallParam,
+    Usage,
 )
-from nilai_common.config import SETTINGS, MODEL_SETTINGS
+from nilai_common.config import SETTINGS, MODEL_SETTINGS, MODEL_CAPABILITIES
 from nilai_common.discovery import ModelServiceDiscovery
-from openai.types.completion_usage import CompletionUsage as Usage
 
 __all__ = [
     "Message",
@@ -49,16 +48,15 @@ __all__ = [
     "ChatCompletionMessageToolCall",
     "ChatToolFunction",
     "ModelMetadata",
-    "Usage",
     "AttestationReport",
     "HealthCheckResponse",
     "ModelEndpoint",
     "ModelServiceDiscovery",
-    "Nonce",
     "AMDAttestationToken",
     "NVAttestationToken",
     "SETTINGS",
     "MODEL_SETTINGS",
+    "MODEL_CAPABILITIES",
     "SearchResult",
     "Source",
     "TopicResponse",
@@ -77,4 +75,5 @@ __all__ = [
     "ResponseInputItemParam",
     "EasyInputMessageParam",
     "ResponseFunctionToolCallParam",
+    "Usage",
 ]

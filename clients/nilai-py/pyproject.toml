@@ -1,0 +1,31 @@
+[project]
+name = "nilai-py"
+version = "0.0.0a0"
+description = "Nilai Python SDK"
+readme = "README.md"
+authors = [
+    { name = "José Cabrero-Holgueras", email = "jose.cabrero@nillion.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "httpx>=0.28.1",
+    "nuc>=0.1.0",
+    "openai>=1.108.1",
+    "pydantic>=2.11.9",
+    "python-dotenv>=1.1.1",
+    "secretvaults>=0.2.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+    "pytest-cov>=7.0.0",
+    "ruff>=0.13.1",
+]

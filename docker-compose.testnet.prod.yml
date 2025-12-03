@@ -10,8 +10,3 @@ services:
       - AUTH_STRATEGY=nuc
     volumes:
       - ${FILES}/testnet/nilai-api/config.yaml:/app/nilai-api/src/nilai_api/config/config.yaml
-  grafana:
-      env_file:
-        - .env.mainnet
-      volumes:
-      - ${FILES}/grafana/testnet-nuc-query-data.json:/var/lib/grafana/dashboards/testnet-nuc-query-data.json

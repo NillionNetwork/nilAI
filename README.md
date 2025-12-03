@@ -162,60 +162,6 @@ docker compose -f production-compose.yml up -d
 docker compose -f production-compose.yml logs -f
 ```
 
-### 3. Manual Component Deployment
-
-#### Components
-
-- **API Frontend**: Handles user requests and routes model interactions
-- **Databases**:
-  - **SQLite**: User registry and access management
-  - **etcd3**: Distributed key-value store for model lifecycle management
-
-#### Setup Steps
-
-1. **Start etcd3 Instance**
-   ```shell
-   docker run -d --name etcd-server \
-     -p 2379:2379 -p 2380:2380 \
-     -e ALLOW_NONE_AUTHENTICATION=yes \
-     bitnami/etcd:latest
-
-   docker run -d --name redis \
-     -p 6379:6379 \
-     redis:latest
-    ```
-
-2. **Start PostgreSQL**
-    ```shell
-    docker run -d --name postgres \
-      -e POSTGRES_USER=${POSTGRES_USER} \
-      -e POSTGRES_PASSWORD=${POSTGRES_PASSWORD} \
-      -e POSTGRES_DB=${POSTGRES_DB} \
-      -p 5432:5432 \
-      --network frontend_net \
-      --volume postgres_data:/var/lib/postgresql/data \
-      postgres:16
-    ```
-
-2. **Run API Server**
-   ```shell
-   # Development Environment
-    fastapi dev nilai-api/src/nilai_api/__main__.py --port 8080
-
-   # Production Environment
-   uv run fastapi run nilai-api/src/nilai_api/__main__.py --port 8080
-   ```
-
-3. **Run Model Instances**
-   ```shell
-   # Example: Llama 3.2 1B Model
-   # Development Environment
-   uv run fastapi dev nilai-models/src/nilai_models/models/llama_1b_cpu/__init__.py
-
-   # Production Environment
-   uv run fastapi run nilai-models/src/nilai_models/models/llama_1b_cpu/__init__.py
-   ```
-
 ## Developer Workflow
 
 ### Code Quality and Formatting
@@ -228,7 +174,7 @@ uv run pre-commit install
 
 ## Model Lifecycle Management
 
-- Models register themselves in the etcd database
+- Models register themselves in the Redis Discovery database
 - Registration includes address information with an auto-expiring lifetime
 - If a model disconnects, it is automatically removed from the available models
 
