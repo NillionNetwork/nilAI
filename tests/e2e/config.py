@@ -1,9 +1,9 @@
-from .nuc import get_nuc_token
+from .nuc import get_nuc_client
 from nilai_api.config import CONFIG
 
 ENVIRONMENT = CONFIG.environment.environment
 # Left for API key for backwards compatibility
-AUTH_TOKEN = CONFIG.auth.auth_token
+AUTH_TOKEN = "SecretTestApiKey"
 AUTH_STRATEGY = CONFIG.auth.auth_strategy
 
 match AUTH_STRATEGY:
@@ -17,7 +17,7 @@ match AUTH_STRATEGY:
 
 def api_key_getter() -> str:
     if AUTH_STRATEGY == "nuc":
-        return get_nuc_token().token
+        return get_nuc_client()._get_invocation_token()
     elif AUTH_STRATEGY == "api_key":
         if AUTH_TOKEN is None:
             raise ValueError("Expected AUTH_TOKEN to be set")

@@ -21,11 +21,11 @@ class MockUserDatabase:
 
     async def insert_user(self, name: str, email: str) -> Dict[str, str]:
         """Insert a new user into the mock database."""
-        userid = self.generate_user_id()
+        user_id = self.generate_user_id()
         apikey = self.generate_api_key()
 
         user_data = {
-            "userid": userid,
+            "user_id": user_id,
             "name": name,
             "email": email,
             "apikey": apikey,
@@ -36,34 +36,34 @@ class MockUserDatabase:
             "last_activity": None,
         }
 
-        self.users[userid] = user_data
-        return {"userid": userid, "apikey": apikey}
+        self.users[user_id] = user_data
+        return {"user_id": user_id, "apikey": apikey}
 
     async def check_api_key(self, api_key: str) -> Optional[dict]:
         """Validate an API key in the mock database."""
         for user in self.users.values():
             if user["apikey"] == api_key:
-                return {"name": user["name"], "userid": user["userid"]}
+                return {"name": user["name"], "user_id": user["user_id"]}
         return None
 
     async def update_token_usage(
-        self, userid: str, prompt_tokens: int, completion_tokens: int
+        self, user_id: str, prompt_tokens: int, completion_tokens: int
     ):
         """Update token usage for a specific user."""
-        if userid in self.users:
-            user = self.users[userid]
+        if user_id in self.users:
+            user = self.users[user_id]
             user["prompt_tokens"] += prompt_tokens
             user["completion_tokens"] += completion_tokens
             user["queries"] += 1
             user["last_activity"] = datetime.now(timezone.utc)
 
     async def log_query(
-        self, userid: str, model: str, prompt_tokens: int, completion_tokens: int
+        self, user_id: str, model: str, prompt_tokens: int, completion_tokens: int
     ):
         """Log a user's query in the mock database."""
         query_log = {
             "id": self._next_query_log_id,
-            "userid": userid,
+            "user_id": user_id,
             "query_timestamp": datetime.now(timezone.utc),
             "model": model,
             "prompt_tokens": prompt_tokens,
@@ -74,9 +74,9 @@ class MockUserDatabase:
         self.query_logs[self._next_query_log_id] = query_log
         self._next_query_log_id += 1
 
-    async def get_token_usage(self, userid: str) -> Optional[Dict[str, Any]]:
+    async def get_token_usage(self, user_id: str) -> Optional[Dict[str, Any]]:
         """Get token usage for a specific user."""
-        user = self.users.get(userid)
+        user = self.users.get(user_id)
         if user:
             return {
                 "prompt_tokens": user["prompt_tokens"],
@@ -90,9 +90,9 @@ class MockUserDatabase:
         """Retrieve all users from the mock database."""
         return list(self.users.values()) if self.users else None
 
-    async def get_user_token_usage(self, userid: str) -> Optional[Dict[str, int]]:
+    async def get_user_token_usage(self, user_id: str) -> Optional[Dict[str, int]]:
         """Retrieve total token usage for a user."""
-        user = self.users.get(userid)
+        user = self.users.get(user_id)
         if user:
             return {
                 "prompt_tokens": user["prompt_tokens"],

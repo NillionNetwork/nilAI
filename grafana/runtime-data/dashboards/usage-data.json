@@ -299,7 +299,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT \n  u.email AS \"User ID\", \n  COUNT(q.id) AS \"Queries\" \nFROM query_logs q \nJOIN users u ON q.userid = u.userid\nWHERE q.query_timestamp >= NOW() - INTERVAL '1 hours'\nGROUP BY u.email;",
+          "rawSql": "SELECT \n  u.email AS \"User ID\", \n  COUNT(q.id) AS \"Queries\" \nFROM query_logs q \nJOIN users u ON q.user_id = u.user_id\nWHERE q.query_timestamp >= NOW() - INTERVAL '1 hours'\nGROUP BY u.email;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -307,7 +307,7 @@
                 "alias": "\"User ID\"",
                 "parameters": [
                   {
-                    "name": "userid",
+                    "name": "user_id",
                     "type": "functionParameter"
                   }
                 ],
@@ -328,7 +328,7 @@
             "groupBy": [
               {
                 "property": {
-                  "name": "userid",
+                  "name": "user_id",
                   "type": "string"
                 },
                 "type": "groupBy"
@@ -430,7 +430,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT \n  u.email AS \"User ID\", \n  COUNT(q.id) AS \"Queries\" \nFROM query_logs q \nJOIN users u ON q.userid = u.userid\nWHERE q.query_timestamp >= NOW() - INTERVAL '7 days'\nGROUP BY u.email;",
+          "rawSql": "SELECT \n  u.email AS \"User ID\", \n  COUNT(q.id) AS \"Queries\" \nFROM query_logs q \nJOIN users u ON q.user_id = u.user_id\nWHERE q.query_timestamp >= NOW() - INTERVAL '7 days'\nGROUP BY u.email;",
           "refId": "A",
           "sql": {
             "columns": [
