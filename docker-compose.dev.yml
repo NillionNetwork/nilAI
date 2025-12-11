@@ -21,7 +21,6 @@ services:
     volumes:
       - ./nilai-api/:/app/nilai-api/
       - ./packages/:/app/packages/
-      - ./nilai-auth/nuc-helpers/:/app/nilai-auth/nuc-helpers/
   nuc-api:
     platform: linux/amd64 # for macOS to force running on Rosetta 2
     ports:
@@ -36,7 +35,6 @@ services:
     volumes:
       - ./nilai-api/:/app/nilai-api/
       - ./packages/:/app/packages/
-      - ./nilai-auth/nuc-helpers/:/app/nilai-auth/nuc-helpers/
   redis:
     ports:
       - "6379:6379"

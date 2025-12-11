@@ -7,10 +7,10 @@ from nilai_common.discovery import ModelServiceDiscovery
 
 
 @pytest_asyncio.fixture
-async def model_service_discovery(redis_host_port):
+async def model_service_discovery(redis_url):
     """Create a ModelServiceDiscovery instance connected to the test Redis container."""
-    host, port = redis_host_port
-    discovery = ModelServiceDiscovery(host=host, port=port, lease_ttl=60)
+    url = redis_url
+    discovery = ModelServiceDiscovery(redis_url=url, lease_ttl=60)
     await discovery.initialize()
     yield discovery
     await discovery.close()

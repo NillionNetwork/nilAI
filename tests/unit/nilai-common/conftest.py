@@ -12,8 +12,8 @@ def redis_server():
 
 
 @pytest.fixture
-def redis_host_port(redis_server):
+def redis_url(redis_server):
     """Get Redis host and port from the container."""
     host_ip = redis_server.get_container_host_ip()
     host_port = redis_server.get_exposed_port(6379)
-    return host_ip, host_port
+    return f"redis://{host_ip}:{host_port}"

@@ -76,15 +76,12 @@ async def _fetch_model_ids(
 async def _announce_model(
     metadata: ModelMetadata,
     base_url: str,
-    discovery_host: str,
-    discovery_port: int,
+    redis_url: str,
     lease_ttl: int,
     prefix: str,
 ):
     """Register and maintain a model announcement in Redis."""
-    discovery = ModelServiceDiscovery(
-        host=discovery_host, port=discovery_port, lease_ttl=lease_ttl
-    )
+    discovery = ModelServiceDiscovery(redis_url=redis_url, lease_ttl=lease_ttl)
     await discovery.initialize()
 
     endpoint = ModelEndpoint(url=base_url.rstrip("/"), metadata=metadata)
@@ -194,12 +191,13 @@ async def main():
         "LMSTUDIO_MODEL_SOURCE_TEMPLATE", "lmstudio://{model_id}"
     )
 
+    redis_url = SETTINGS.redis_url or "redis://localhost:6379"
+
     logger.info(
-        "Announcing LMStudio models %s via %s with Redis at %s:%s",
+        "Announcing LMStudio models %s via %s with Redis at %s",
         ", ".join(model_ids),
         registration_url,
-        SETTINGS.discovery_host,
-        SETTINGS.discovery_port,
+        redis_url,
     )
 
     # Create announcement tasks for all models
@@ -220,8 +218,7 @@ async def main():
                     multimodal_default,
                 ),
                 base_url=registration_url,
-                discovery_host=SETTINGS.discovery_host,
-                discovery_port=SETTINGS.discovery_port,
+                redis_url=redis_url,
                 lease_ttl=lease_ttl,
                 prefix=discovery_prefix,
             )

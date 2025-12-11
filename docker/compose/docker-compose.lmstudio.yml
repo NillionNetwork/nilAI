@@ -3,14 +3,13 @@ services:
     image: nilai/lmstudio-announcer:latest
     container_name: nilai-lmstudio-announcer
     restart: unless-stopped
-    depends_on:
-      redis:
-        condition: service_healthy
+    # depends_on:
+    #   redis:
+    #     condition: service_healthy
     environment:
       - SVC_HOST=host.docker.internal
       - SVC_PORT=1234
-      - DISCOVERY_HOST=redis
-      - DISCOVERY_PORT=6379
+      - DISCOVERY_URL=redis://appuser:c9e8cbea8d381cd52f80a555811608b15246adb3414d799c32d7e3fa59b93f38@discovery.nilai.sandbox.nilogy.xyz:6379
       - LMSTUDIO_SUPPORTED_FEATURES=chat_completion
     extra_hosts:
       - "host.docker.internal:host-gateway"

@@ -10,8 +10,7 @@ class DatabaseConfig(BaseModel):
 
 
 class DiscoveryConfig(BaseModel):
-    host: str = Field(default="localhost", description="Redis host for discovery")
-    port: int = Field(default=6379, description="Redis port for discovery")
+    url: str = Field(description="Redis URL for discovery")
 
 
 class RedisConfig(BaseModel):

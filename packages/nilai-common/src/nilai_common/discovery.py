@@ -3,6 +3,7 @@ import logging
 from asyncio import CancelledError
 from datetime import datetime, timezone
 from typing import Dict, Optional
+from urllib.parse import urlparse
 
 import redis.asyncio as redis
 from nilai_common.api_models import ModelEndpoint, ModelMetadata
@@ -14,19 +15,43 @@ logger = logging.getLogger(__name__)
 
 
 class ModelServiceDiscovery:
-    def __init__(self, host: str = "localhost", port: int = 6379, lease_ttl: int = 60):
+    def __init__(
+        self,
+        host: str = "localhost",
+        port: int = 6379,
+        lease_ttl: int = 60,
+        redis_url: Optional[str] = None,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+    ):
         """
         Initialize Redis client for model service discovery.
 
-        :param host: Redis server host
-        :param port: Redis server port
+        :param host: Redis server host (ignored if redis_url is provided)
+        :param port: Redis server port (ignored if redis_url is provided)
         :param lease_ttl: TTL time for endpoint registration (in seconds)
+        :param redis_url: Complete Redis URL with credentials (e.g., redis://user:pass@host:port)
+        :param username: Redis username (ignored if redis_url is provided)
+        :param password: Redis password (ignored if redis_url is provided)
         """
-        self.host = host
-        self.port = port
         self.lease_ttl = lease_ttl
         self._client: Optional[redis.Redis] = None
         self._model_key: Optional[str] = None
+
+        # Parse Redis connection parameters
+        if redis_url:
+            parsed = urlparse(redis_url)
+            self.host = parsed.hostname or "localhost"
+            self.port = parsed.port or 6379
+            self.username = parsed.username
+            self.password = parsed.password
+            self.redis_url = redis_url
+        else:
+            self.host = host
+            self.port = port
+            self.username = username
+            self.password = password
+            self.redis_url = None
 
         self.is_healthy = True
         self.last_refresh = None
@@ -39,9 +64,25 @@ class ModelServiceDiscovery:
         Initialize the Redis client.
         """
         if self._client is None:
-            self._client = await redis.Redis(
-                host=self.host, port=self.port, decode_responses=True
-            )
+            if self.redis_url:
+                # Use the complete Redis URL for connection
+                self._client = redis.Redis.from_url(
+                    self.redis_url, decode_responses=True
+                )
+            else:
+                # Use individual connection parameters
+                connection_kwargs = {
+                    "host": self.host,
+                    "port": self.port,
+                    "decode_responses": True,
+                }
+
+                if self.username:
+                    connection_kwargs["username"] = self.username
+                if self.password:
+                    connection_kwargs["password"] = self.password
+
+                self._client = redis.Redis(**connection_kwargs)
 
     @property
     async def client(self) -> redis.Redis:
