@@ -28,8 +28,7 @@ services:
       --tool-call-parser llama3_json
       --uvicorn-log-level warning
     environment:
-      - SVC_HOST=llama_3b_gpu
-      - SVC_PORT=8000
+      - SVC_URL=http://llama_3b_gpu:8000
       - DISCOVERY_URL=redis://redis:6379
       - TOOL_SUPPORT=true
     volumes:

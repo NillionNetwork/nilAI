@@ -172,8 +172,7 @@ async def test_keep_alive(model_service_discovery, model_endpoint):
     """Test the keep_alive functionality that refreshes TTL."""
     # Register a model with a short TTL
     short_ttl_discovery = ModelServiceDiscovery(
-        host=model_service_discovery.host,
-        port=model_service_discovery.port,
+        redis_url=model_service_discovery.redis_url,
         lease_ttl=2,  # 2 second TTL
     )
     await short_ttl_discovery.initialize()
@@ -214,8 +213,7 @@ async def test_keep_alive_with_stored_key(model_service_discovery, model_endpoin
     """Test keep_alive using the stored key from registration."""
     # Register a model with a short TTL
     short_ttl_discovery = ModelServiceDiscovery(
-        host=model_service_discovery.host,
-        port=model_service_discovery.port,
+        redis_url=model_service_discovery.redis_url,
         lease_ttl=2,  # 2 second TTL
     )
     await short_ttl_discovery.initialize()

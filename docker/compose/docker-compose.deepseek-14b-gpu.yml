@@ -22,8 +22,7 @@ services:
       --tensor-parallel-size 1
       --uvicorn-log-level warning
     environment:
-      - SVC_HOST=deepseek_14b_gpu
-      - SVC_PORT=8000
+      - SVC_URL=http://deepseek_14b_gpu:8000
       - DISCOVERY_URL=redis://redis:6379
       - TOOL_SUPPORT=false
     volumes:

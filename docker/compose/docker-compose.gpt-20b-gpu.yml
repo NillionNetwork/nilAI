@@ -26,8 +26,7 @@ services:
       --tensor-parallel-size 1
       --uvicorn-log-level warning
     environment:
-      - SVC_HOST=gpt_20b_gpu
-      - SVC_PORT=8000
+      - SVC_URL=http://gpt_20b_gpu:8000
       - DISCOVERY_URL=redis://redis:6379
       - TOOL_SUPPORT=true
     volumes:

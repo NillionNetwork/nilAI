@@ -12,18 +12,16 @@ def to_bool(value: str) -> bool:
 class HostSettings(BaseModel):
     """Infrastructure and service host configuration."""
 
-    host: str = Field(default="localhost", description="Host of the service")
-    port: int = Field(default=8000, description="Port of the service")
-    redis_url: str | None = Field(
-        default=None, description="Redis URL for discovery service"
+    url: str = Field(default="http://localhost:8000", description="URL of the service")
+    redis_url: str = Field(
+        default="redis://localhost:6379", description="Redis URL for discovery service"
     )
     gunicorn_workers: int = Field(default=10, description="Number of gunicorn workers")
 
 
 # Global host settings instance
 SETTINGS: HostSettings = HostSettings(
-    host=str(os.getenv("SVC_HOST", "localhost")),
-    port=int(os.getenv("SVC_PORT", 8000)),
+    url=os.getenv("SVC_URL", "http://localhost:8000"),
     redis_url=os.getenv("DISCOVERY_URL", "redis://localhost:6379"),
     gunicorn_workers=int(os.getenv("NILAI_GUNICORN_WORKERS", 10)),
 )

@@ -17,10 +17,8 @@ logger = logging.getLogger(__name__)
 class ModelServiceDiscovery:
     def __init__(
         self,
-        host: str = "localhost",
-        port: int = 6379,
+        redis_url: str = "redis://localhost:6379",
         lease_ttl: int = 60,
-        redis_url: Optional[str] = None,
         username: Optional[str] = None,
         password: Optional[str] = None,
     ):
@@ -38,20 +36,13 @@ class ModelServiceDiscovery:
         self._client: Optional[redis.Redis] = None
         self._model_key: Optional[str] = None
 
-        # Parse Redis connection parameters
-        if redis_url:
-            parsed = urlparse(redis_url)
-            self.host = parsed.hostname or "localhost"
-            self.port = parsed.port or 6379
-            self.username = parsed.username
-            self.password = parsed.password
-            self.redis_url = redis_url
-        else:
-            self.host = host
-            self.port = port
-            self.username = username
-            self.password = password
-            self.redis_url = None
+        # Parse Redis connection parameters:
+        parsed = urlparse(redis_url)
+        self.host = parsed.hostname or "localhost"
+        self.port = parsed.port or 6379
+        self.username = parsed.username
+        self.password = parsed.password
+        self.redis_url = redis_url
 
         self.is_healthy = True
         self.last_refresh = None
@@ -64,25 +55,7 @@ class ModelServiceDiscovery:
         Initialize the Redis client.
         """
         if self._client is None:
-            if self.redis_url:
-                # Use the complete Redis URL for connection
-                self._client = redis.Redis.from_url(
-                    self.redis_url, decode_responses=True
-                )
-            else:
-                # Use individual connection parameters
-                connection_kwargs = {
-                    "host": self.host,
-                    "port": self.port,
-                    "decode_responses": True,
-                }
-
-                if self.username:
-                    connection_kwargs["username"] = self.username
-                if self.password:
-                    connection_kwargs["password"] = self.password
-
-                self._client = redis.Redis(**connection_kwargs)
+            self._client = redis.Redis.from_url(self.redis_url, decode_responses=True)
 
     @property
     async def client(self) -> redis.Redis:
