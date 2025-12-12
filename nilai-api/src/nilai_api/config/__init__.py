@@ -59,6 +59,30 @@ class NilAIConfig(BaseModel):
                     ):
                         value[k] = "***************"
 
+        # Remove the password from the redis url anything between : and @
+
+        if "discovery" in config_dict:
+            if "url" in config_dict["discovery"]:
+                value = config_dict["discovery"]["url"]
+                # Remove the password from the redis url anything between : and @ if it exists
+                split_value = value.split(":")
+                if len(split_value) > 2 and "@" in split_value[2]:
+                    password = split_value[2].split("@")[0]
+                    config_dict["discovery"]["url"] = value.replace(
+                        password, "***************"
+                    )
+
+        if "redis" in config_dict:
+            if "url" in config_dict["redis"]:
+                value = config_dict["redis"]["url"]
+                # Remove the password from the redis url anything between : and @ if it exists
+                split_value = value.split(":")
+                if len(split_value) > 2 and "@" in split_value[2]:
+                    password = split_value[2].split("@")[0]
+                    config_dict["redis"]["url"] = value.replace(
+                        password, "***************"
+                    )
+
         return json.dumps(config_dict, indent=4)
 
 
