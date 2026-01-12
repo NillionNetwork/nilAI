@@ -781,6 +781,9 @@ def test_web_search(client, model, high_web_search_rate_limit):
 @pytest.mark.skipif(
     AUTH_STRATEGY != "nuc", reason="NUC required for this tests on nilDB"
 )
+@pytest.mark.skip(
+    reason="Skipping test_nildb_delegation because it requires a newer version of secretvaults-py"
+)
 def test_nildb_delegation(client: httpx.Client):
     from secretvaults.common.keypair import Keypair
     from nuc.envelope import NucTokenEnvelope

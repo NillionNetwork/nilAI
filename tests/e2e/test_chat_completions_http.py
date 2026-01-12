@@ -681,6 +681,9 @@ def test_model_streaming_request_high_token(client):
 @pytest.mark.skipif(
     AUTH_STRATEGY != "nuc", reason="NUC required for this tests on nilDB"
 )
+@pytest.mark.skip(
+    reason="Skipping test_nildb_delegation because it requires a newer version of secretvaults-py"
+)
 def test_nildb_delegation(client: httpx.Client):
     """Tests getting a delegation token for nilDB and validating that token to be valid"""
     from secretvaults.common.keypair import Keypair
