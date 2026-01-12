@@ -1,14 +1,29 @@
 import logging
 from typing import Union
 
-import nilrag
-
-from nilai_common import ChatRequest, MessageAdapter
 from fastapi import HTTPException, status
-from sentence_transformers import SentenceTransformer
+from nilai_common import ChatRequest, MessageAdapter
+
+try:
+    import nilrag  # type: ignore[reportMissingImports]
+except ImportError:  # pragma: no cover - optional dependency
+    nilrag = None
+
+try:
+    from sentence_transformers import SentenceTransformer  # type: ignore[reportMissingImports]
+except ImportError:  # pragma: no cover - optional dependency
+    SentenceTransformer = None
 
 logger = logging.getLogger(__name__)
 embeddings_model = None
+
+
+def _require_optional_dependencies() -> None:
+    if nilrag is None or SentenceTransformer is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="nilrag dependencies are not installed",
+        )
 
 
 def get_embeddings_model():
@@ -16,6 +31,9 @@ def get_embeddings_model():
     Lazy load the embeddings model on CPU.
     """
     global embeddings_model
+    if SentenceTransformer is None:
+        _require_optional_dependencies()
+    assert SentenceTransformer is not None
     if embeddings_model is None:
         embeddings_model = SentenceTransformer(
             "sentence-transformers/all-MiniLM-L6-v2", device="cpu"
@@ -49,6 +67,7 @@ async def handle_nilrag(req: ChatRequest):
     """
     try:
         logger.debug("Rag is starting.")
+        _require_optional_dependencies()
 
         # Step 1: Get inputs
         # Get nilDB instances
@@ -58,6 +77,7 @@ async def handle_nilrag(req: ChatRequest):
                 detail="nilrag configuration is missing or invalid",
             )
         nodes = []
+        assert nilrag is not None
         for node_data in req.nilrag["nodes"]:
             nodes.append(
                 nilrag.Node(

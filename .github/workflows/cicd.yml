@@ -40,7 +40,14 @@ jobs:
         run: |
           export ACLOCAL=aclocal
           export AUTOMAKE=automake
-          uv sync
+          # Skip large optional ML dependencies to keep CI disk usage under control.
+          uv sync --package nilai-api \
+            --no-install-package sentence-transformers \
+            --no-install-package torch \
+            --no-install-package torchvision \
+            --no-install-package torchaudio \
+            --no-install-package accelerate \
+            --no-install-package nilrag
 
       - name: Run Ruff format check
         if: matrix.test-type == 'pyright'
