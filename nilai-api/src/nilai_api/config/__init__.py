@@ -8,6 +8,7 @@ from .auth import AuthConfig, DocsConfig
 from .nildb import NilDBConfig
 from .web_search import WebSearchSettings
 from .rate_limiting import RateLimitingConfig
+from .pricing import LLMPricingConfig, LLMPriceConfig
 from .utils import create_config_model, CONFIG_DATA
 
 
@@ -36,6 +37,9 @@ class NilAIConfig(BaseModel):
     )
     nildb: NilDBConfig = create_config_model(
         NilDBConfig, "nildb", CONFIG_DATA, "NILDB_"
+    )
+    llm_pricing: LLMPricingConfig = create_config_model(
+        LLMPricingConfig, "llm_pricing", CONFIG_DATA
     )
 
     def prettify(self):
@@ -66,7 +70,10 @@ class NilAIConfig(BaseModel):
 CONFIG = NilAIConfig()
 __all__ = [
     # Main config object
-    "CONFIG"
+    "CONFIG",
+    # Pricing config for external use
+    "LLMPriceConfig",
+    "LLMPricingConfig",
 ]
 
 logging.info(CONFIG.prettify())

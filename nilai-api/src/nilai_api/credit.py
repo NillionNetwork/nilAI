@@ -11,6 +11,7 @@ from nilauth_credit_middleware import (
 )
 
 from nilai_api.config import CONFIG
+from nilai_api.pricing_service import get_pricing_service
 
 from nuc.envelope import NucTokenEnvelope
 
@@ -51,6 +52,22 @@ class LLMCost(BaseModel):
             prompt_tokens_price=2.0, completion_tokens_price=2.0, web_search_cost=0.05
         )
 
+    @staticmethod
+    async def from_redis(model_name: str) -> "LLMCost":
+        """Fetch pricing from Redis for a specific model."""
+        try:
+            pricing_service = get_pricing_service()
+            price_config = await pricing_service.get_price(model_name)
+            return LLMCost(
+                prompt_tokens_price=price_config.prompt_tokens_price,
+                completion_tokens_price=price_config.completion_tokens_price,
+                web_search_cost=price_config.web_search_cost,
+            )
+        except RuntimeError:
+            # Pricing service not initialized, use default
+            logger.warning("Pricing service not initialized, using default pricing")
+            return LLMCost.default()
+
     def total_cost(
         self, prompt_tokens: int, completion_tokens: int, web_searches: int
     ) -> float:
@@ -86,14 +103,6 @@ class LLMResponse(BaseModel):
 
 
 LLMCostDict: TypeAlias = dict[str, LLMCost]
-
-
-MyCostDictionary: LLMCostDict = {
-    "meta-llama/Llama-3.2-1B-Instruct": LLMCost(
-        prompt_tokens_price=3.0, completion_tokens_price=3.0, web_search_cost=0.05
-    ),
-    "default": LLMCost.default(),
-}
 
 # Configure the singleton credit client
 CreditClientSingleton.configure(
@@ -138,10 +147,10 @@ def from_nuc_bearer_root_token() -> Callable[[Request], Awaitable[str]]:
     return extractor
 
 
-def llm_cost_calculator(llm_cost_dict: LLMCostDict):
+def llm_cost_calculator():
     async def calculator(request: Request, response_data: dict) -> float:
         model_name = getattr(request, "model", "default")
-        llm_cost = llm_cost_dict.get(model_name, LLMCost.default())
+        llm_cost = await LLMCost.from_redis(model_name)
         total_cost = 0.0
         usage: Optional[LLMUsage] = response_data.get("usage", None)
         if usage is None:
@@ -158,7 +167,7 @@ def llm_cost_calculator(llm_cost_dict: LLMCostDict):
 _base_llm_meter = create_metering_dependency(
     credential_extractor=credential_extractor(),
     estimated_cost=2.0,
-    cost_calculator=llm_cost_calculator(MyCostDictionary),
+    cost_calculator=llm_cost_calculator(),
     public_identifiers=CONFIG.auth.auth_strategy == "nuc",
 )
 

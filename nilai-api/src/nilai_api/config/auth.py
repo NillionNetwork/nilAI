@@ -13,6 +13,9 @@ class AuthConfig(BaseModel):
     auth_token: Optional[str] = Field(
         default=None, description="Auth token for e2e tests and development"
     )
+    admin_token: Optional[str] = Field(
+        default=None, description="Admin token for pricing updates"
+    )
 
     @property
     def credit_service_url(self) -> str:

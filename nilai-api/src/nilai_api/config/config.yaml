@@ -9,6 +9,7 @@ auth:
   strategy: "api_key"
   nilauth_trusted_root_issuers:
     - http://nilauth-credit-server:3000
+  admin_token: null  # Set via ADMIN_TOKEN env var for pricing management
 
 # Documentation Configuration
 docs:
@@ -46,3 +47,43 @@ rate_limiting:
     openai/gpt-oss-20b: 50
     google/gemma-3-27b-it: 50
     default: 50
+
+# LLM Pricing Configuration
+llm_pricing:
+  default:
+    prompt_tokens_price: 2.0
+    completion_tokens_price: 2.0
+    web_search_cost: 0.05
+  models:
+    meta-llama/Llama-3.2-1B-Instruct:
+      prompt_tokens_price: 3.0
+      completion_tokens_price: 3.0
+      web_search_cost: 0.05
+    meta-llama/Llama-3.2-3B-Instruct:
+      prompt_tokens_price: 3.0
+      completion_tokens_price: 3.0
+      web_search_cost: 0.05
+    meta-llama/Llama-3.1-8B-Instruct:
+      prompt_tokens_price: 3.0
+      completion_tokens_price: 3.0
+      web_search_cost: 0.05
+    cognitivecomputations/Dolphin3.0-Llama3.1-8B:
+      prompt_tokens_price: 3.0
+      completion_tokens_price: 3.0
+      web_search_cost: 0.05
+    deepseek-ai/DeepSeek-R1-Distill-Qwen-14B:
+      prompt_tokens_price: 5.0
+      completion_tokens_price: 5.0
+      web_search_cost: 0.05
+    hugging-quants/Meta-Llama-3.1-70B-Instruct-AWQ-INT4:
+      prompt_tokens_price: 8.0
+      completion_tokens_price: 8.0
+      web_search_cost: 0.05
+    openai/gpt-oss-20b:
+      prompt_tokens_price: 4.0
+      completion_tokens_price: 4.0
+      web_search_cost: 0.05
+    google/gemma-3-27b-it:
+      prompt_tokens_price: 5.0
+      completion_tokens_price: 5.0
+      web_search_cost: 0.05
