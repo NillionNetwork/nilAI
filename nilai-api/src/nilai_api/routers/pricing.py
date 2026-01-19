@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/v1/pricing", tags=["Pricing"])
 
 
-def verify_admin_token(request: Request) -> None:
-    """Verify that the request has a valid admin token."""
+async def verify_admin_token(request: Request) -> None:
+    """Dependency to verify that the request has a valid admin token."""
     admin_token = CONFIG.auth.admin_token
     if not admin_token:
         raise HTTPException(
@@ -69,8 +69,7 @@ async def get_model_price(
 async def update_model_price(
     model_name: str,
     price_config: LLMPriceConfig,
-    request: Request,
-    auth_info: AuthenticationInfo = Depends(get_auth_info),
+    _: None = Depends(verify_admin_token),
 ) -> LLMPriceConfig:
     """
     Update price for a specific model (admin only).
@@ -80,7 +79,6 @@ async def update_model_price(
 
     Requires admin token in Authorization header.
     """
-    verify_admin_token(request)
 
     # Validate price values
     if price_config.prompt_tokens_price < 0:
@@ -109,8 +107,7 @@ async def update_model_price(
 @router.delete("/{model_name:path}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_model_price(
     model_name: str,
-    request: Request,
-    auth_info: AuthenticationInfo = Depends(get_auth_info),
+    _: None = Depends(verify_admin_token),
 ) -> None:
     """
     Delete custom price for a model (admin only).
@@ -120,7 +117,6 @@ async def delete_model_price(
     After deletion, the model will use default pricing.
     Requires admin token in Authorization header.
     """
-    verify_admin_token(request)
 
     if model_name == "default":
         raise HTTPException(
