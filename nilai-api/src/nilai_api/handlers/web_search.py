@@ -580,7 +580,6 @@ async def analyze_web_search_topics(
     req = {
         "model": model_name,
         "messages": messages,
-        "temperature": 0.0,
         "response_format": {"type": "json_object"},
     }
 

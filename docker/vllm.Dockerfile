@@ -11,7 +11,6 @@ FROM vllm/vllm-openai:v0.11.2
 
 ENV PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 COPY --link . /daemon/
-COPY --link vllm_templates /opt/vllm/templates
 
 WORKDIR /daemon/nilai-models/
 

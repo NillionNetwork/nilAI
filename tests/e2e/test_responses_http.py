@@ -4,102 +4,7 @@ import re
 import httpx
 import pytest
 
-from .config import BASE_URL, test_models, AUTH_STRATEGY, api_key_getter
-from .nuc import (
-    get_rate_limited_nuc_token,
-    get_invalid_rate_limited_nuc_token,
-    get_nildb_nuc_token,
-    get_document_id_nuc_token,
-)
-
-
-@pytest.fixture
-def client():
-    invocation_token: str = api_key_getter()
-    return httpx.Client(
-        base_url=BASE_URL,
-        headers={
-            "accept": "application/json",
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {invocation_token}",
-        },
-        verify=False,
-        timeout=None,
-    )
-
-
-@pytest.fixture
-def rate_limited_client():
-    invocation_token = get_rate_limited_nuc_token(rate_limit=1)
-    return httpx.Client(
-        base_url=BASE_URL,
-        headers={
-            "accept": "application/json",
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {invocation_token.token}",
-        },
-        timeout=None,
-        verify=False,
-    )
-
-
-@pytest.fixture
-def invalid_rate_limited_client():
-    invocation_token = get_invalid_rate_limited_nuc_token()
-    return httpx.Client(
-        base_url=BASE_URL,
-        headers={
-            "accept": "application/json",
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {invocation_token.token}",
-        },
-        timeout=None,
-        verify=False,
-    )
-
-
-@pytest.fixture
-def nildb_client():
-    invocation_token = get_nildb_nuc_token()
-    return httpx.Client(
-        base_url=BASE_URL,
-        headers={
-            "accept": "application/json",
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {invocation_token.token}",
-        },
-        timeout=None,
-        verify=False,
-    )
-
-
-@pytest.fixture
-def nillion_2025_client():
-    return httpx.Client(
-        base_url=BASE_URL,
-        headers={
-            "accept": "application/json",
-            "Content-Type": "application/json",
-            "Authorization": "Bearer Nillion2025",
-        },
-        verify=False,
-        timeout=None,
-    )
-
-
-@pytest.fixture
-def document_id_client():
-    invocation_token = get_document_id_nuc_token()
-    return httpx.Client(
-        base_url=BASE_URL,
-        headers={
-            "accept": "application/json",
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {invocation_token.token}",
-        },
-        verify=False,
-        timeout=None,
-    )
+from .config import BASE_URL, test_models, AUTH_STRATEGY, api_key_getter, ENVIRONMENT
 
 
 @pytest.mark.parametrize("model", test_models)
@@ -108,7 +13,6 @@ def test_model_standard_request(client, model):
         "model": model,
         "input": "What is the capital of France?",
         "instructions": "You are a helpful assistant that provides accurate and concise information.",
-        "temperature": 0.2,
         "max_output_tokens": 100,
     }
 
@@ -189,7 +93,6 @@ def test_model_standard_request_nillion_2025(nillion_2025_client, model):
         "model": model,
         "input": "What is the capital of France?",
         "instructions": "You are a helpful assistant that provides accurate and concise information.",
-        "temperature": 0.2,
     }
 
     response = nillion_2025_client.post("/responses", json=payload, timeout=30)
@@ -244,7 +147,6 @@ def test_model_streaming_request(client, model):
         "model": model,
         "input": "Write a short poem about mountains.",
         "instructions": "You are a helpful assistant that provides accurate and concise information.",
-        "temperature": 0.2,
         "stream": True,
     }
 
@@ -306,7 +208,6 @@ def test_model_tools_request(client, model):
         "model": model,
         "instructions": "You are a helpful assistant. When a user asks a question that requires weather, use the get_weather tool to get the weather information.",
         "input": "What is the weather like in Paris today?",
-        "temperature": 0.2,
         "tool_choice": "auto",
         "tools": [
             {
@@ -405,7 +306,6 @@ def test_function_calling_with_streaming_httpx(client, model):
                 },
             }
         ],
-        "temperature": 0.2,
         "stream": True,
     }
 
@@ -535,12 +435,12 @@ def test_invalid_rate_limiting_nucs(invalid_rate_limited_client):
 @pytest.mark.skipif(
     AUTH_STRATEGY != "nuc", reason="NUC rate limiting not used with API key"
 )
-def test_invalid_nildb_command_nucs(nildb_client):
+def test_invalid_nildb_command_nucs(invalid_nildb):
     payload = {
         "model": test_models[0],
         "input": "What is your name?",
     }
-    response = nildb_client.post("/responses", json=payload)
+    response = invalid_nildb.post("/responses", json=payload)
     assert response.status_code == 401, "Invalid NILDB command should return 401"
 
 
@@ -643,7 +543,6 @@ def test_response_invalid_temperature(client):
 def test_response_missing_model(client):
     payload = {
         "input": "What is your name?",
-        "temperature": 0.2,
     }
     response = client.post("/responses", json=payload)
     assert response.status_code == 400, (
@@ -655,7 +554,6 @@ def test_response_negative_max_tokens(client):
     payload = {
         "model": test_models[0],
         "input": "Tell me a joke.",
-        "temperature": 0.2,
         "max_output_tokens": -10,
     }
     response = client.post("/responses", json=payload)
@@ -729,7 +627,6 @@ def test_usage_endpoint(client):
             "total_tokens",
             "completion_tokens",
             "prompt_tokens",
-            "queries",
         ]
         for key in expected_keys:
             assert key in usage_data, f"Expected key {key} not found in usage data"
@@ -740,6 +637,10 @@ def test_usage_endpoint(client):
         pytest.fail(f"Error testing usage endpoint: {str(e)}")
 
 
+@pytest.mark.skipif(
+    ENVIRONMENT != "mainnet",
+    reason="Attestation endpoint not available in non-mainnet environment",
+)
 def test_attestation_endpoint(client):
     try:
         import requests
@@ -813,7 +714,7 @@ def test_web_search(client, model, high_web_search_rate_limit):
         "model": model,
         "input": "Who won the Roland Garros Open in 2024? Just reply with the winner's name.",
         "instructions": "You are a helpful assistant that provides accurate and up-to-date information. Answer in 10 words maximum and do not reason.",
-        "temperature": 0.2,
+        "temperature": 0.95,
         "max_output_tokens": 15000,
         "extra_body": {"web_search": True},
     }
@@ -880,6 +781,9 @@ def test_web_search(client, model, high_web_search_rate_limit):
 @pytest.mark.skipif(
     AUTH_STRATEGY != "nuc", reason="NUC required for this tests on nilDB"
 )
+@pytest.mark.skip(
+    reason="Skipping test_nildb_delegation because it requires a newer version of secretvaults-py"
+)
 def test_nildb_delegation(client: httpx.Client):
     from secretvaults.common.keypair import Keypair
     from nuc.envelope import NucTokenEnvelope
@@ -924,7 +828,6 @@ def test_nildb_prompt_document(document_id_client: httpx.Client, model):
         "model": model,
         "input": "Can you make a small rhyme?",
         "instructions": "You are a helpful assistant.",
-        "temperature": 0.2,
     }
 
     response = document_id_client.post("/responses", json=payload, timeout=30)

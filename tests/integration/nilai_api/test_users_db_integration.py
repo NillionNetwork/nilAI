@@ -4,6 +4,7 @@ Integration tests for user database operations.
 These tests use a real PostgreSQL database via testcontainers.
 """
 
+import uuid
 import pytest
 import json
 
@@ -17,37 +18,19 @@ class TestUserManagerIntegration:
     async def test_simple_user_creation(self, clean_database):
         """Test creating a simple user and retrieving it."""
         # Insert user with minimal data
-        user = await UserManager.insert_user(name="Simple Test User")
+        user = await UserManager.insert_user(user_id="Simple Test User")
 
         # Verify user creation
-        assert user.name == "Simple Test User"
-        assert user.userid is not None
-        assert user.apikey is not None
-        assert user.userid != user.apikey  # Should be different UUIDs
+        assert user.user_id == "Simple Test User"
+        assert user.rate_limits is None, (
+            f"Rate limits are not set for user {user.user_id}"
+        )
 
         # Retrieve user by ID
-        found_user = await UserManager.check_user(user.userid)
+        found_user = await UserManager.check_user(user.user_id)
         assert found_user is not None
-        assert found_user.userid == user.userid
-        assert found_user.name == "Simple Test User"
-        assert found_user.apikey == user.apikey
-
-    @pytest.mark.asyncio
-    async def test_api_key_validation(self, clean_database):
-        """Test API key validation functionality."""
-        # Create user
-        user = await UserManager.insert_user("API Test User")
-
-        # Validate correct API key
-        api_user = await UserManager.check_api_key(user.apikey)
-        assert api_user is not None
-        assert api_user.apikey == user.apikey
-        assert api_user.userid == user.userid
-        assert api_user.name == "API Test User"
-
-        # Test invalid API key
-        invalid_user = await UserManager.check_api_key("invalid-api-key")
-        assert invalid_user is None
+        assert found_user.user_id == user.user_id
+        assert found_user.rate_limits == user.rate_limits
 
     @pytest.mark.asyncio
     async def test_rate_limits_json_crud_basic(self, clean_database):
@@ -66,14 +49,14 @@ class TestUserManagerIntegration:
 
         # CREATE: Insert user with rate limits
         user = await UserManager.insert_user(
-            name="Rate Limits Test User", rate_limits=rate_limits
+            user_id="Rate Limits Test User", rate_limits=rate_limits
         )
 
         # Verify rate limits are stored as JSON
         assert user.rate_limits == rate_limits.model_dump()
 
         # READ: Retrieve user and verify rate limits JSON
-        retrieved_user = await UserManager.check_user(user.userid)
+        retrieved_user = await UserManager.check_user(user.user_id)
         assert retrieved_user is not None
         assert retrieved_user.rate_limits == rate_limits.model_dump()
 
@@ -98,11 +81,11 @@ class TestUserManagerIntegration:
         )
 
         user = await UserManager.insert_user(
-            name="Update Rate Limits User", rate_limits=initial_rate_limits
+            user_id="Update Rate Limits User", rate_limits=initial_rate_limits
         )
 
         # Verify initial rate limits
-        retrieved_user = await UserManager.check_user(user.userid)
+        retrieved_user = await UserManager.check_user(user.user_id)
         assert retrieved_user is not None
         assert retrieved_user.rate_limits == initial_rate_limits.model_dump()
 
@@ -125,19 +108,19 @@ class TestUserManagerIntegration:
             stmt = sa.text("""
                 UPDATE users
                 SET rate_limits = :rate_limits_json
-                WHERE userid = :userid
+                WHERE user_id = :user_id
             """)
             await session.execute(
                 stmt,
                 {
                     "rate_limits_json": updated_rate_limits.model_dump_json(),
-                    "userid": user.userid,
+                    "user_id": user.user_id,
                 },
             )
             await session.commit()
 
         # READ: Verify the update worked
-        updated_user = await UserManager.check_user(user.userid)
+        updated_user = await UserManager.check_user(user.user_id)
         assert updated_user is not None
         assert updated_user.rate_limits == updated_rate_limits.model_dump()
 
@@ -162,11 +145,11 @@ class TestUserManagerIntegration:
         )
 
         user = await UserManager.insert_user(
-            name="Partial Rate Limits User", rate_limits=partial_rate_limits
+            user_id="Partial Rate Limits User", rate_limits=partial_rate_limits
         )
 
         # Verify partial data is stored correctly
-        retrieved_user = await UserManager.check_user(user.userid)
+        retrieved_user = await UserManager.check_user(user.user_id)
         assert retrieved_user is not None
         assert retrieved_user.rate_limits == partial_rate_limits.model_dump()
 
@@ -183,13 +166,13 @@ class TestUserManagerIntegration:
                     '{user_rate_limit_hour}',
                     '75'
                 )
-                WHERE userid = :userid
+                WHERE user_id = :user_id
             """)
-            await session.execute(stmt, {"userid": user.userid})
+            await session.execute(stmt, {"user_id": user.user_id})
             await session.commit()
 
         # Verify partial update worked
-        updated_user = await UserManager.check_user(user.userid)
+        updated_user = await UserManager.check_user(user.user_id)
         assert updated_user is not None
 
         expected_data = partial_rate_limits.model_dump()
@@ -211,7 +194,7 @@ class TestUserManagerIntegration:
         )
 
         user = await UserManager.insert_user(
-            name="Delete Rate Limits User", rate_limits=rate_limits
+            user_id="Delete Rate Limits User", rate_limits=rate_limits
         )
 
         # DELETE: Set rate_limits to NULL
@@ -219,12 +202,14 @@ class TestUserManagerIntegration:
         import sqlalchemy as sa
 
         async with get_db_session() as session:
-            stmt = sa.text("UPDATE users SET rate_limits = NULL WHERE userid = :userid")
-            await session.execute(stmt, {"userid": user.userid})
+            stmt = sa.text(
+                "UPDATE users SET rate_limits = NULL WHERE user_id = :user_id"
+            )
+            await session.execute(stmt, {"user_id": user.user_id})
             await session.commit()
 
         # Verify NULL handling
-        null_user = await UserManager.check_user(user.userid)
+        null_user = await UserManager.check_user(user.user_id)
         assert null_user is not None
         assert null_user.rate_limits is None
 
@@ -239,15 +224,15 @@ class TestUserManagerIntegration:
             # First set some data
             new_data = {"user_rate_limit_day": 500, "web_search_rate_limit_day": 25}
             stmt = sa.text(
-                "UPDATE users SET rate_limits = :data WHERE userid = :userid"
+                "UPDATE users SET rate_limits = :data WHERE user_id = :user_id"
             )
             await session.execute(
-                stmt, {"data": json.dumps(new_data), "userid": user.userid}
+                stmt, {"data": json.dumps(new_data), "user_id": user.user_id}
             )
             await session.commit()
 
         # Verify data was set
-        updated_user = await UserManager.check_user(user.userid)
+        updated_user = await UserManager.check_user(user.user_id)
         assert updated_user is not None
         assert updated_user.rate_limits == new_data
 
@@ -256,13 +241,13 @@ class TestUserManagerIntegration:
             stmt = sa.text("""
                 UPDATE users
                 SET rate_limits = rate_limits::jsonb - 'web_search_rate_limit_day'
-                WHERE userid = :userid
+                WHERE user_id = :user_id
             """)
-            await session.execute(stmt, {"userid": user.userid})
+            await session.execute(stmt, {"user_id": user.user_id})
             await session.commit()
 
         # Verify field was removed
-        final_user = await UserManager.check_user(user.userid)
+        final_user = await UserManager.check_user(user.user_id)
         expected_final_data = {"user_rate_limit_day": 500}
         assert final_user is not None
         assert final_user.rate_limits == expected_final_data
@@ -293,15 +278,15 @@ class TestUserManagerIntegration:
         for i, test_data in enumerate(test_cases):
             async with get_db_session() as session:
                 stmt = sa.text(
-                    "UPDATE users SET rate_limits = :data WHERE userid = :userid"
+                    "UPDATE users SET rate_limits = :data WHERE user_id = :user_id"
                 )
                 await session.execute(
-                    stmt, {"data": json.dumps(test_data), "userid": user.userid}
+                    stmt, {"data": json.dumps(test_data), "user_id": user.user_id}
                 )
                 await session.commit()
 
             # Retrieve and verify
-            updated_user = await UserManager.check_user(user.userid)
+            updated_user = await UserManager.check_user(user.user_id)
             assert updated_user is not None
             assert updated_user.rate_limits == test_data
 
@@ -327,11 +312,13 @@ class TestUserManagerIntegration:
 
         # Test empty JSON object
         async with get_db_session() as session:
-            stmt = sa.text("UPDATE users SET rate_limits = '{}' WHERE userid = :userid")
-            await session.execute(stmt, {"userid": user.userid})
+            stmt = sa.text(
+                "UPDATE users SET rate_limits = '{}' WHERE user_id = :user_id"
+            )
+            await session.execute(stmt, {"user_id": user.user_id})
             await session.commit()
 
-        empty_user = await UserManager.check_user(user.userid)
+        empty_user = await UserManager.check_user(user.user_id)
         assert empty_user is not None
         assert empty_user.rate_limits == {}
         empty_rate_limits_obj = empty_user.rate_limits_obj
@@ -343,18 +330,18 @@ class TestUserManagerIntegration:
             async with get_db_session() as session:
                 # This should work as PostgreSQL JSONB validates JSON
                 stmt = sa.text(
-                    "UPDATE users SET rate_limits = :data WHERE userid = :userid"
+                    "UPDATE users SET rate_limits = :data WHERE user_id = :user_id"
                 )
                 await session.execute(
                     stmt,
                     {
                         "data": '{"user_rate_limit_day": 5000}',  # Valid JSON string
-                        "userid": user.userid,
+                        "user_id": user.user_id,
                     },
                 )
                 await session.commit()
 
-            json_string_user = await UserManager.check_user(user.userid)
+            json_string_user = await UserManager.check_user(user.user_id)
             assert json_string_user is not None
             assert json_string_user.rate_limits == {"user_rate_limit_day": 5000}
 
@@ -366,16 +353,15 @@ class TestUserManagerIntegration:
     async def test_rate_limits_update_workflow(self, clean_database):
         """Test complete workflow: create user with no rate limits -> update rate limits -> verify update."""
         # Step 1: Create user with NO rate limits
-        user = await UserManager.insert_user(name="Rate Limits Workflow User")
+        user_id = str(uuid.uuid4())
+        user = await UserManager.insert_user(user_id=user_id)
 
         # Verify user was created with no rate limits
-        assert user.name == "Rate Limits Workflow User"
-        assert user.userid is not None
-        assert user.apikey is not None
+        assert user.user_id == user_id
         assert user.rate_limits is None  # No rate limits initially
 
         # Step 2: Retrieve user and confirm no rate limits
-        retrieved_user = await UserManager.check_user(user.userid)
+        retrieved_user = await UserManager.check_user(user.user_id)
         assert retrieved_user is not None
         print(retrieved_user.to_pydantic())
         assert retrieved_user is not None
@@ -401,12 +387,12 @@ class TestUserManagerIntegration:
 
         # Step 4: Update the user's rate limits using the new function
         update_success = await UserManager.update_rate_limits(
-            user.userid, new_rate_limits
+            user.user_id, new_rate_limits
         )
         assert update_success is True
 
         # Step 5: Retrieve user again and verify rate limits were updated
-        updated_user = await UserManager.check_user(user.userid)
+        updated_user = await UserManager.check_user(user.user_id)
         assert updated_user is not None
         assert updated_user.rate_limits is not None
         assert updated_user.rate_limits == new_rate_limits.model_dump()
@@ -431,12 +417,12 @@ class TestUserManagerIntegration:
         )
 
         partial_update_success = await UserManager.update_rate_limits(
-            user.userid, partial_rate_limits
+            user.user_id, partial_rate_limits
         )
         assert partial_update_success is True
 
         # Step 8: Verify partial update worked
-        final_user = await UserManager.check_user(user.userid)
+        final_user = await UserManager.check_user(user.user_id)
         assert final_user is not None
         assert final_user.rate_limits == partial_rate_limits.model_dump()
 
@@ -447,8 +433,8 @@ class TestUserManagerIntegration:
         # Other fields should have config defaults (not None due to get_effective_limits)
 
         # Step 9: Test error case - update non-existent user
-        fake_userid = "non-existent-user-id"
+        fake_user_id = "non-existent-user-id"
         error_update = await UserManager.update_rate_limits(
-            fake_userid, new_rate_limits
+            fake_user_id, new_rate_limits
         )
         assert error_update is False

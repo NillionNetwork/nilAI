@@ -1,0 +1,16 @@
+services:
+  lmstudio_announcer:
+    image: nilai/lmstudio-announcer:latest
+    container_name: nilai-lmstudio-announcer
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - SVC_HOST=host.docker.internal
+      - SVC_PORT=1234
+      - DISCOVERY_HOST=redis
+      - DISCOVERY_PORT=6379
+      - LMSTUDIO_SUPPORTED_FEATURES=chat_completion
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

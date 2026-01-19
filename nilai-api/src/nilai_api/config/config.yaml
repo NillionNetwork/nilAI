@@ -7,7 +7,8 @@ environment: "mainnet"
 # Authentication Configuration
 auth:
   strategy: "api_key"
-  nilauth_trusted_root_issuers: []
+  nilauth_trusted_root_issuers:
+    - http://nilauth-credit-server:3000
 
 # Documentation Configuration
 docs:

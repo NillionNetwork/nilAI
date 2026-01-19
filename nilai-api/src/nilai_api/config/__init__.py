@@ -3,7 +3,7 @@ import json
 import logging
 from pydantic import BaseModel
 from .environment import EnvironmentConfig
-from .database import DatabaseConfig, EtcdConfig, RedisConfig
+from .database import DatabaseConfig, DiscoveryConfig, RedisConfig
 from .auth import AuthConfig, DocsConfig
 from .nildb import NilDBConfig
 from .web_search import WebSearchSettings
@@ -20,7 +20,9 @@ class NilAIConfig(BaseModel):
     database: DatabaseConfig = create_config_model(
         DatabaseConfig, "database", CONFIG_DATA, "POSTGRES_"
     )
-    etcd: EtcdConfig = create_config_model(EtcdConfig, "etcd", CONFIG_DATA, "ETCD_")
+    discovery: DiscoveryConfig = create_config_model(
+        DiscoveryConfig, "discovery", CONFIG_DATA, "DISCOVERY_"
+    )
     redis: RedisConfig = create_config_model(
         RedisConfig, "redis", CONFIG_DATA, "REDIS_"
     )
@@ -68,3 +70,4 @@ __all__ = [
 ]
 
 logging.info(CONFIG.prettify())
+print(CONFIG.prettify())
