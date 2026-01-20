@@ -1,7 +1,8 @@
 import logging
 from typing import Dict
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Security, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from nilai_api.auth import get_auth_info, AuthenticationInfo
 from nilai_api.config import CONFIG
@@ -11,9 +12,12 @@ from nilai_api.pricing_service import get_pricing_service
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/v1/pricing", tags=["Pricing"])
+admin_bearer_scheme = HTTPBearer()
 
 
-async def verify_admin_token(request: Request) -> None:
+async def verify_admin_token(
+    credentials: HTTPAuthorizationCredentials = Security(admin_bearer_scheme),
+) -> None:
     """Dependency to verify that the request has a valid admin token."""
     admin_token = CONFIG.auth.admin_token
     if not admin_token:
@@ -22,13 +26,7 @@ async def verify_admin_token(request: Request) -> None:
             detail="Admin operations are disabled (no admin token configured)",
         )
 
-    auth_header = request.headers.get("Authorization", "")
-    if auth_header.startswith("Bearer "):
-        token = auth_header[7:]
-    else:
-        token = auth_header
-
-    if token != admin_token:
+    if credentials.credentials != admin_token:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invalid admin token",
