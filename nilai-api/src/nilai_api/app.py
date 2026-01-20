@@ -94,7 +94,7 @@ app = FastAPI(
 
 app.include_router(public.router)
 app.include_router(private.router, dependencies=[Depends(get_auth_info)])
-app.include_router(pricing.router, dependencies=[Depends(get_auth_info)])
+app.include_router(pricing.router)
 
 app.add_middleware(
     CORSMiddleware,
