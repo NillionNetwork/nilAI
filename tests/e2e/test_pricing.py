@@ -79,8 +79,8 @@ class TestPricingGet:
 
         price = response.json()
         # Should return default pricing
-        assert price["prompt_tokens_price"] == 2.0
-        assert price["completion_tokens_price"] == 2.0
+        assert price["prompt_tokens_price"] == 0.15
+        assert price["completion_tokens_price"] == 0.45
         assert price["web_search_cost"] == 0.05
 
     def test_get_default_price(self, http_client):
@@ -89,8 +89,8 @@ class TestPricingGet:
         assert response.status_code == 200
 
         price = response.json()
-        assert price["prompt_tokens_price"] == 2.0
-        assert price["completion_tokens_price"] == 2.0
+        assert price["prompt_tokens_price"] == 0.15
+        assert price["completion_tokens_price"] == 0.45
 
 
 class TestPricingUpdateDelete:
@@ -167,7 +167,9 @@ class TestPricingUpdateDelete:
         # Verify it now returns default pricing
         get_response = http_client.get(f"/v1/pricing/{model_name}")
         fetched = get_response.json()
-        assert fetched["prompt_tokens_price"] == 2.0  # Default
+        assert fetched["prompt_tokens_price"] == 0.15  # Default
+        assert fetched["completion_tokens_price"] == 0.45
+        assert fetched["web_search_cost"] == 0.05
 
     @pytest.mark.skipif(
         not CONFIG.auth.admin_token, reason="Admin token not configured"
