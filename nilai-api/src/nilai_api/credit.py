@@ -166,7 +166,7 @@ def llm_cost_calculator():
 
 _base_llm_meter = create_metering_dependency(
     credential_extractor=credential_extractor(),
-    estimated_cost=2.0,
+    estimated_cost=0.5,
     cost_calculator=llm_cost_calculator(),
     public_identifiers=CONFIG.auth.auth_strategy == "nuc",
 )

@@ -51,8 +51,8 @@ async def test_initialize_from_config(pricing_service, redis_client):
     assert default_json is not None
 
     default_config = LLMPriceConfig.model_validate_json(default_json)
-    assert default_config.prompt_tokens_price == 2.0
-    assert default_config.completion_tokens_price == 2.0
+    assert default_config.prompt_tokens_price == 0.15
+    assert default_config.completion_tokens_price == 0.45
     assert default_config.web_search_cost == 0.05
 
 
@@ -86,8 +86,8 @@ async def test_get_price_returns_model_specific_price(pricing_service):
 
     # Get price for a model that should have specific pricing
     price = await pricing_service.get_price("meta-llama/Llama-3.2-1B-Instruct")
-    assert price.prompt_tokens_price == 3.0
-    assert price.completion_tokens_price == 3.0
+    assert price.prompt_tokens_price == 0.03
+    assert price.completion_tokens_price == 0.09
 
 
 @pytest.mark.asyncio
@@ -97,8 +97,8 @@ async def test_get_price_falls_back_to_default(pricing_service):
 
     # Get price for an unknown model
     price = await pricing_service.get_price("unknown/model")
-    assert price.prompt_tokens_price == 2.0
-    assert price.completion_tokens_price == 2.0
+    assert price.prompt_tokens_price == 0.15
+    assert price.completion_tokens_price == 0.45
     assert price.web_search_cost == 0.05
 
 
@@ -132,10 +132,15 @@ async def test_get_all_prices(pricing_service):
     all_prices = await pricing_service.get_all_prices()
 
     assert "default" in all_prices
-    assert all_prices["default"].prompt_tokens_price == 2.0
-
-    # Check that model-specific prices are included
+    assert all_prices["default"].prompt_tokens_price == 0.15
+    assert all_prices["default"].completion_tokens_price == 0.45
+    assert all_prices["default"].web_search_cost == 0.05
     assert "meta-llama/Llama-3.2-1B-Instruct" in all_prices
+    assert all_prices["meta-llama/Llama-3.2-1B-Instruct"].prompt_tokens_price == 0.03
+    assert (
+        all_prices["meta-llama/Llama-3.2-1B-Instruct"].completion_tokens_price == 0.09
+    )
+    assert all_prices["meta-llama/Llama-3.2-1B-Instruct"].web_search_cost == 0.05
 
 
 @pytest.mark.asyncio
@@ -145,13 +150,15 @@ async def test_delete_price(pricing_service):
 
     # Add a custom price
     custom_config = LLMPriceConfig(
-        prompt_tokens_price=50.0, completion_tokens_price=50.0, web_search_cost=1.0
+        prompt_tokens_price=0.15, completion_tokens_price=0.45, web_search_cost=0.05
     )
     await pricing_service.set_price("custom-model", custom_config)
 
     # Verify it exists
     price = await pricing_service.get_price("custom-model")
-    assert price.prompt_tokens_price == 50.0
+    assert price.prompt_tokens_price == 0.15
+    assert price.completion_tokens_price == 0.45
+    assert price.web_search_cost == 0.05
 
     # Delete it
     existed = await pricing_service.delete_price("custom-model")
@@ -159,7 +166,9 @@ async def test_delete_price(pricing_service):
 
     # Verify it falls back to default now
     price = await pricing_service.get_price("custom-model")
-    assert price.prompt_tokens_price == 2.0
+    assert price.prompt_tokens_price == 0.15
+    assert price.completion_tokens_price == 0.45
+    assert price.web_search_cost == 0.05
 
 
 @pytest.mark.asyncio
@@ -215,7 +224,7 @@ async def test_update_existing_price(pricing_service):
 
     # Get original price
     original = await pricing_service.get_price("meta-llama/Llama-3.2-1B-Instruct")
-    assert original.prompt_tokens_price == 3.0
+    assert original.prompt_tokens_price == 0.03
 
     # Update it
     new_config = LLMPriceConfig(
