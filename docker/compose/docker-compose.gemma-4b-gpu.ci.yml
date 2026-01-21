@@ -28,8 +28,7 @@ services:
     environment:
       - SVC_HOST=gemma_4b_gpu
       - SVC_PORT=8000
-      - DISCOVERY_HOST=redis
-      - DISCOVERY_PORT=6379
+      - DISCOVERY_URL=redis://redis:6379
       - TOOL_SUPPORT=false
       - MULTIMODAL_SUPPORT=true
       - CUDA_LAUNCH_BLOCKING=1
