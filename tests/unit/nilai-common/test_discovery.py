@@ -10,7 +10,7 @@ from nilai_common.discovery import ModelServiceDiscovery
 async def model_service_discovery(redis_host_port):
     """Create a ModelServiceDiscovery instance connected to the test Redis container."""
     host, port = redis_host_port
-    discovery = ModelServiceDiscovery(host=host, port=port, lease_ttl=60)
+    discovery = ModelServiceDiscovery(url=f"redis://{host}:{port}", lease_ttl=60)
     await discovery.initialize()
     yield discovery
     await discovery.close()
@@ -172,8 +172,7 @@ async def test_keep_alive(model_service_discovery, model_endpoint):
     """Test the keep_alive functionality that refreshes TTL."""
     # Register a model with a short TTL
     short_ttl_discovery = ModelServiceDiscovery(
-        host=model_service_discovery.host,
-        port=model_service_discovery.port,
+        url=model_service_discovery.url,
         lease_ttl=2,  # 2 second TTL
     )
     await short_ttl_discovery.initialize()
@@ -214,8 +213,7 @@ async def test_keep_alive_with_stored_key(model_service_discovery, model_endpoin
     """Test keep_alive using the stored key from registration."""
     # Register a model with a short TTL
     short_ttl_discovery = ModelServiceDiscovery(
-        host=model_service_discovery.host,
-        port=model_service_discovery.port,
+        url=model_service_discovery.url,
         lease_ttl=2,  # 2 second TTL
     )
     await short_ttl_discovery.initialize()

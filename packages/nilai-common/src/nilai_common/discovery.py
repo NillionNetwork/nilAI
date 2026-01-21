@@ -14,17 +14,21 @@ logger = logging.getLogger(__name__)
 
 
 class ModelServiceDiscovery:
-    def __init__(self, host: str = "localhost", port: int = 6379, lease_ttl: int = 60):
+    def __init__(
+        self,
+        url: str = "redis://localhost:6379",
+        lease_ttl: int = 60,
+    ):
         """
         Initialize Redis client for model service discovery.
 
+        :param url: Redis URL (e.g., redis:// or rediss://). Preferred default.
         :param host: Redis server host
         :param port: Redis server port
         :param lease_ttl: TTL time for endpoint registration (in seconds)
         """
-        self.host = host
-        self.port = port
         self.lease_ttl = lease_ttl
+        self.url = url
         self._client: Optional[redis.Redis] = None
         self._model_key: Optional[str] = None
 
@@ -39,9 +43,10 @@ class ModelServiceDiscovery:
         Initialize the Redis client.
         """
         if self._client is None:
-            self._client = await redis.Redis(
-                host=self.host, port=self.port, decode_responses=True
-            )
+            if self.url:
+                self._client = redis.from_url(self.url, decode_responses=True)
+            else:
+                raise ValueError("A Redis URL is required for service discovery")
 
     @property
     async def client(self) -> redis.Redis:
