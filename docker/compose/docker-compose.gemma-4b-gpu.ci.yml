@@ -26,8 +26,7 @@ services:
 
       --uvicorn-log-level warning
     environment:
-      - SVC_HOST=gemma_4b_gpu
-      - SVC_PORT=8000
+      - SVC_URL=http://gemma_4b_gpu:8000
       - DISCOVERY_URL=redis://redis:6379
       - TOOL_SUPPORT=false
       - MULTIMODAL_SUPPORT=true

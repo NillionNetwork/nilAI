@@ -23,7 +23,7 @@ async def get_metadata():
     while True:
         url = None
         try:
-            url = f"http://{SETTINGS.host}:{SETTINGS.port}/v1/models"
+            url = f"{SETTINGS.url}/v1/models"
             async with httpx.AsyncClient() as client:
                 response = await client.get(url)
                 response.raise_for_status()
@@ -94,9 +94,7 @@ async def main():
 
     # Fetch metadata and create endpoint
     metadata = await get_metadata()
-    model_endpoint = ModelEndpoint(
-        url=f"http://{SETTINGS.host}:{SETTINGS.port}", metadata=metadata
-    )
+    model_endpoint = ModelEndpoint(url=SETTINGS.url.rstrip("/"), metadata=metadata)
 
     # Create service task
     service_task = asyncio.create_task(run_service(discovery_service, model_endpoint))

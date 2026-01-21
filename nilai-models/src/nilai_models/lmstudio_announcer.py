@@ -144,9 +144,7 @@ async def main():
     logging.basicConfig(level=logging.INFO)
 
     # Load configuration from environment
-    api_base = os.getenv(
-        "LMSTUDIO_API_BASE", f"http://{SETTINGS.host}:{SETTINGS.port}"
-    ).rstrip("/")
+    api_base = os.getenv("LMSTUDIO_API_BASE", SETTINGS.url).rstrip("/")
     models_endpoint = os.getenv("LMSTUDIO_MODELS_ENDPOINT", "/v1/models")
     registration_url = os.getenv("LMSTUDIO_REGISTRATION_URL", api_base).rstrip("/")
     lease_ttl = int(os.getenv("LMSTUDIO_LEASE_TTL", "60"))
@@ -192,7 +190,7 @@ async def main():
     )
 
     logger.info(
-        "Announcing LMStudio models %s via %s with Redis at %s:%s",
+        "Announcing LMStudio models %s via %s with Redis at %s",
         ", ".join(model_ids),
         registration_url,
         SETTINGS.discovery_url,

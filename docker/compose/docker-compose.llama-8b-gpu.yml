@@ -29,8 +29,7 @@ services:
       --enable-auto-tool-choice
       --chat-template /daemon/nilai-models/templates/llama3.1_tool_json.jinja
     environment:
-      - SVC_HOST=llama_8b_gpu
-      - SVC_PORT=8000
+      - SVC_URL=http://llama_8b_gpu:8000
       - DISCOVERY_URL=redis://redis:6379
       - TOOL_SUPPORT=true
     volumes:

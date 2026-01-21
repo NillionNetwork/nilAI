@@ -27,8 +27,7 @@ services:
       --kv-cache-dtype fp8
       --uvicorn-log-level warning
     environment:
-      - SVC_HOST=gemma_27b_gpu
-      - SVC_PORT=8000
+      - SVC_URL=http://gemma_27b_gpu:8000
       - DISCOVERY_URL=redis://redis:6379
       - TOOL_SUPPORT=false
       - MULTIMODAL_SUPPORT=true

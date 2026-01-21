@@ -23,8 +23,6 @@ class ModelServiceDiscovery:
         Initialize Redis client for model service discovery.
 
         :param url: Redis URL (e.g., redis:// or rediss://). Preferred default.
-        :param host: Redis server host
-        :param port: Redis server port
         :param lease_ttl: TTL time for endpoint registration (in seconds)
         """
         self.lease_ttl = lease_ttl
