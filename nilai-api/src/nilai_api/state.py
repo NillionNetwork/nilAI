@@ -16,9 +16,7 @@ class AppState:
         self.private_key, self.public_key, self.b64_public_key = generate_key_pair()
         self.sem = Semaphore(2)
 
-        self.discovery_service = ModelServiceDiscovery(
-            host=CONFIG.discovery.host, port=CONFIG.discovery.port
-        )
+        self.discovery_service = ModelServiceDiscovery(url=CONFIG.discovery.url)
         self._discovery_initialized = False
         self._uptime = time.time()
 

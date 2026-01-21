@@ -89,9 +89,7 @@ async def main():
     logging.basicConfig(level=logging.INFO)
 
     # Initialize discovery service
-    discovery_service = ModelServiceDiscovery(
-        host=SETTINGS.discovery_host, port=SETTINGS.discovery_port
-    )
+    discovery_service = ModelServiceDiscovery(url=SETTINGS.discovery_url)
     await discovery_service.initialize()
 
     # Fetch metadata and create endpoint
