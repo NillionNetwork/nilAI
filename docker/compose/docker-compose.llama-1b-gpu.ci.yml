@@ -30,8 +30,7 @@ services:
       --uvicorn-log-level warning
       --dtype half
     environment:
-      - SVC_HOST=llama_1b_gpu
-      - SVC_PORT=8000
+      - SVC_URL=http://llama_1b_gpu:8000
       - DISCOVERY_URL=redis://redis:6379
       - TOOL_SUPPORT=true
       - CUDA_LAUNCH_BLOCKING=1

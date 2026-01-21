@@ -1,6 +1,3 @@
-# Fast API and serving
-
-
 from prometheus_fastapi_instrumentator import Instrumentator
 from fastapi import Depends, FastAPI
 from nilai_api.auth import get_auth_info
@@ -25,7 +22,8 @@ async def lifespan(app: FastAPI):
     yield {"redis": client, "redis_rate_limit_command": rate_limit_command}
 
 
-host = SETTINGS.host
+api_base = SETTINGS.url.rstrip("/")
+openapi_url = f"{api_base}/openapi.json"
 description = f"""
 An AI model serving platform powered by secure, confidential computing.
 
@@ -39,7 +37,7 @@ Want to use our API in your project? Great news! You can automatically generate 
 pip install openapi-generator-cli
 
 # Generate your Python client
-openapi-generator-cli generate -i https://{host}/openapi.json -g python -o ./python-client
+openapi-generator-cli generate -i {openapi_url} -g python -o ./python-client
 ```
 
 ### For JavaScript/TypeScript Developers
@@ -48,7 +46,7 @@ openapi-generator-cli generate -i https://{host}/openapi.json -g python -o ./pyt
 npm install @openapitools/openapi-generator-cli -g
 
 # Generate your TypeScript client
-openapi-generator-cli generate -i https://{host}/openapi.json -o ./typescript-client
+openapi-generator-cli generate -i {openapi_url} -o ./typescript-client
 ```
 
 After generating, you'll have a fully functional client library that makes it easy to interact with our AI services. No more manual API request handling!

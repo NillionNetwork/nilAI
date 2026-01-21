@@ -7,8 +7,7 @@ services:
       redis:
         condition: service_healthy
     environment:
-      - SVC_HOST=host.docker.internal
-      - SVC_PORT=1234
+      - SVC_URL=http://host.docker.internal:1234
       - DISCOVERY_URL=redis://redis:6379
       - LMSTUDIO_SUPPORTED_FEATURES=chat_completion
     extra_hosts:
