@@ -1,8 +1,7 @@
 from typing import Callable, Awaitable, Optional
-from datetime import datetime, timezone
 
+from fastapi import HTTPException
 from nilai_api.db.users import UserManager, UserModel, UserData
-from nilai_api.auth.jwt import validate_jwt
 from nilai_api.auth.nuc import (
     validate_nuc,
     get_token_rate_limit,
@@ -12,11 +11,18 @@ from nilai_api.config import CONFIG
 from nilai_api.auth.common import (
     PromptDocument,
     TokenRateLimits,
-    AuthenticationInfo,
     AuthenticationError,
+    AuthenticationInfo,
 )
 
+from nilauth_credit_middleware import (
+    CreditClientSingleton,
+)
+from nilauth_credit_middleware.api_model import ValidateCredentialResponse
+
+
 from enum import Enum
+
 # All strategies must return a UserModel
 # The strategies can raise any exception, which will be caught and converted to an AuthenticationError
 # The exception detail will be passed to the client
@@ -45,18 +51,10 @@ def allow_token(
                 return await function(token)
 
             if token == allowed_token:
-                user_model: UserModel | None = await UserManager.check_user(
-                    allowed_token
+                user_model = UserModel(
+                    user_id=allowed_token,
+                    rate_limits=None,
                 )
-                if user_model is None:
-                    user_model = UserModel(
-                        userid=allowed_token,
-                        name=allowed_token,
-                        apikey=allowed_token,
-                        signup_date=datetime.now(timezone.utc),
-                    )
-                    await UserManager.insert_user_model(user_model)
-
                 return AuthenticationInfo(
                     user=UserData.from_sqlalchemy(user_model),
                     token_rate_limit=None,
@@ -69,42 +67,41 @@ def allow_token(
     return decorator
 
 
+async def validate_credential(credential: str, is_public: bool) -> UserModel:
+    """
+    Validate a credential with nilauth credit middleware and return the user model
+    """
+    credit_client = CreditClientSingleton.get_client()
+    try:
+        validate_response: ValidateCredentialResponse = (
+            await credit_client.validate_credential(credential, is_public=is_public)
+        )
+    except HTTPException as e:
+        if e.status_code == 404:
+            raise AuthenticationError(f"Credential not found: {e.detail}")
+        elif e.status_code == 401:
+            raise AuthenticationError(f"Credential is inactive: {e.detail}")
+        else:
+            raise AuthenticationError(f"Failed to validate credential: {e.detail}")
+
+    user_model = await UserManager.check_user(validate_response.user_id)
+    if user_model is None:
+        user_model = UserModel(
+            user_id=validate_response.user_id,
+            rate_limits=None,
+        )
+    return user_model
+
+
 @allow_token(CONFIG.docs.token)
 async def api_key_strategy(api_key: str) -> AuthenticationInfo:
-    user_model: Optional[UserModel] = await UserManager.check_api_key(api_key)
-    if user_model:
-        return AuthenticationInfo(
-            user=UserData.from_sqlalchemy(user_model),
-            token_rate_limit=None,
-            prompt_document=None,
-        )
-    raise AuthenticationError("Missing or invalid API key")
+    user_model = await validate_credential(api_key, is_public=False)
 
-
-@allow_token(CONFIG.docs.token)
-async def jwt_strategy(jwt_creds: str) -> AuthenticationInfo:
-    result = validate_jwt(jwt_creds)
-    user_model: Optional[UserModel] = await UserManager.check_api_key(
-        result.user_address
+    return AuthenticationInfo(
+        user=UserData.from_sqlalchemy(user_model),
+        token_rate_limit=None,
+        prompt_document=None,
     )
-    if user_model:
-        return AuthenticationInfo(
-            user=UserData.from_sqlalchemy(user_model),
-            token_rate_limit=None,
-            prompt_document=None,
-        )
-    else:
-        user_model = UserModel(
-            userid=result.user_address,
-            name=result.pub_key,
-            apikey=result.user_address,
-        )
-        await UserManager.insert_user_model(user_model)
-        return AuthenticationInfo(
-            user=UserData.from_sqlalchemy(user_model),
-            token_rate_limit=None,
-            prompt_document=None,
-        )
 
 
 @allow_token(CONFIG.docs.token)
@@ -116,20 +113,7 @@ async def nuc_strategy(nuc_token) -> AuthenticationInfo:
     token_rate_limits: Optional[TokenRateLimits] = get_token_rate_limit(nuc_token)
     prompt_document: Optional[PromptDocument] = get_token_prompt_document(nuc_token)
 
-    user_model: Optional[UserModel] = await UserManager.check_user(user)
-    if user_model:
-        return AuthenticationInfo(
-            user=UserData.from_sqlalchemy(user_model),
-            token_rate_limit=token_rate_limits,
-            prompt_document=prompt_document,
-        )
-
-    user_model = UserModel(
-        userid=user,
-        name=user,
-        apikey=subscription_holder,
-    )
-    await UserManager.insert_user_model(user_model)
+    user_model = await validate_credential(subscription_holder, is_public=True)
     return AuthenticationInfo(
         user=UserData.from_sqlalchemy(user_model),
         token_rate_limit=token_rate_limits,
@@ -139,7 +123,6 @@ async def nuc_strategy(nuc_token) -> AuthenticationInfo:
 
 class AuthenticationStrategy(Enum):
     API_KEY = (api_key_strategy, "API Key")
-    JWT = (jwt_strategy, "JWT")
     NUC = (nuc_strategy, "NUC")
 
     async def __call__(self, *args, **kwargs) -> AuthenticationInfo:

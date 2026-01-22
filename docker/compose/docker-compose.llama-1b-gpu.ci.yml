@@ -17,7 +17,7 @@ services:
       - .env
     restart: unless-stopped
     depends_on:
-      etcd:
+      redis:
         condition: service_healthy
     command: >
       --model meta-llama/Llama-3.2-1B-Instruct
@@ -30,10 +30,8 @@ services:
       --uvicorn-log-level warning
       --dtype half
     environment:
-      - SVC_HOST=llama_1b_gpu
-      - SVC_PORT=8000
-      - ETCD_HOST=etcd
-      - ETCD_PORT=2379
+      - SVC_URL=http://llama_1b_gpu:8000
+      - DISCOVERY_URL=redis://redis:6379
       - TOOL_SUPPORT=true
       - CUDA_LAUNCH_BLOCKING=1
     volumes:

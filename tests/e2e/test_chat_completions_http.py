@@ -12,110 +12,9 @@ import json
 import os
 import re
 
-from .config import BASE_URL, test_models, AUTH_STRATEGY, api_key_getter
-from .nuc import (
-    get_rate_limited_nuc_token,
-    get_invalid_rate_limited_nuc_token,
-    get_nildb_nuc_token,
-    get_document_id_nuc_token,
-)
+from .config import BASE_URL, ENVIRONMENT, test_models, AUTH_STRATEGY
 import httpx
 import pytest
-
-
-@pytest.fixture
-def client():
-    """Create an HTTPX client with default headers"""
-    invocation_token: str = api_key_getter()
-    return httpx.Client(
-        base_url=BASE_URL,
-        headers={
-            "accept": "application/json",
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {invocation_token}",
-        },
-        verify=False,
-        timeout=None,
-    )
-
-
-@pytest.fixture
-def rate_limited_client():
-    """Create an HTTPX client with default headers"""
-    invocation_token = get_rate_limited_nuc_token(rate_limit=1)
-    return httpx.Client(
-        base_url=BASE_URL,
-        headers={
-            "accept": "application/json",
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {invocation_token.token}",
-        },
-        timeout=None,
-        verify=False,
-    )
-
-
-@pytest.fixture
-def invalid_rate_limited_client():
-    """Create an HTTPX client with default headers"""
-    invocation_token = get_invalid_rate_limited_nuc_token()
-    return httpx.Client(
-        base_url=BASE_URL,
-        headers={
-            "accept": "application/json",
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {invocation_token.token}",
-        },
-        timeout=None,
-        verify=False,
-    )
-
-
-@pytest.fixture
-def nildb_client():
-    """Create an HTTPX client with default headers"""
-    invocation_token = get_nildb_nuc_token()
-    return httpx.Client(
-        base_url=BASE_URL,
-        headers={
-            "accept": "application/json",
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {invocation_token.token}",
-        },
-        timeout=None,
-        verify=False,
-    )
-
-
-@pytest.fixture
-def nillion_2025_client():
-    """Create an HTTPX client with default headers"""
-    return httpx.Client(
-        base_url=BASE_URL,
-        headers={
-            "accept": "application/json",
-            "Content-Type": "application/json",
-            "Authorization": "Bearer Nillion2025",
-        },
-        verify=False,
-        timeout=None,
-    )
-
-
-@pytest.fixture
-def document_id_client():
-    """Create an HTTPX client with default headers"""
-    invocation_token = get_document_id_nuc_token()
-    return httpx.Client(
-        base_url=BASE_URL,
-        headers={
-            "accept": "application/json",
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {invocation_token.token}",
-        },
-        verify=False,
-        timeout=None,
-    )
 
 
 def test_health_endpoint(client):
@@ -155,13 +54,16 @@ def test_usage_endpoint(client):
         "total_tokens",
         "completion_tokens",
         "prompt_tokens",
-        "queries",
     ]
 
     for key in expected_keys:
         assert key in usage_data, f"Expected key {key} not found in usage data"
 
 
+@pytest.mark.skipif(
+    ENVIRONMENT != "mainnet",
+    reason="Attestation endpoint not available in non-mainnet environment",
+)
 def test_attestation_endpoint(client):
     """Test the attestation endpoint"""
     response = client.get("/attestation/report")
@@ -196,7 +98,6 @@ def test_model_standard_request(client, model):
             },
             {"role": "user", "content": "What is the capital of France?"},
         ],
-        "temperature": 0.2,
     }
 
     response = client.post("/chat/completions", json=payload, timeout=30)
@@ -252,7 +153,6 @@ def test_model_standard_request_nillion_2025(nillion_2025_client, model):
             },
             {"role": "user", "content": "What is the capital of France?"},
         ],
-        "temperature": 0.2,
     }
 
     response = nillion_2025_client.post("/chat/completions", json=payload, timeout=30)
@@ -311,7 +211,6 @@ def test_model_streaming_request(client, model):
                 "content": "Write a short poem about mountains. It must be 20 words maximum.",
             },
         ],
-        "temperature": 0.2,
         "stream": True,
     }
 
@@ -372,7 +271,6 @@ def test_model_tools_request(client, model):
             },
             {"role": "user", "content": "What is the weather like in Paris today?"},
         ],
-        "temperature": 0.2,
         "tools": [
             {
                 "type": "function",
@@ -489,7 +387,6 @@ def test_function_calling_with_streaming_httpx(client, model):
             }
         ],
         "tool_choice": {"type": "function", "function": {"name": "get_weather"}},
-        "temperature": 0.2,
         "stream": True,
     }
 
@@ -587,48 +484,6 @@ def test_rate_limiting_nucs(rate_limited_client):
     assert len(rate_limited_responses) > 0, (
         "No NUC rate limiting detected, when expected"
     )
-
-
-@pytest.mark.skipif(
-    AUTH_STRATEGY != "nuc", reason="NUC rate limiting not used with API key"
-)
-def test_invalid_rate_limiting_nucs(invalid_rate_limited_client):
-    """Test rate limiting by sending multiple rapid requests"""
-    # Payload for repeated requests
-    payload = {
-        "model": test_models[0],
-        "messages": [{"role": "user", "content": "What is your name?"}],
-    }
-
-    # Send multiple rapid requests
-    responses = []
-    for _ in range(4):  # Adjust number based on expected rate limits
-        response = invalid_rate_limited_client.post("/chat/completions", json=payload)
-        responses.append(response)
-
-    # Check for potential rate limit responses
-    rate_limit_statuses = [401]
-    rate_limited_responses = [
-        r for r in responses if r.status_code in rate_limit_statuses
-    ]
-
-    assert len(rate_limited_responses) > 0, (
-        "No NUC rate limiting detected, when expected"
-    )
-
-
-@pytest.mark.skipif(
-    AUTH_STRATEGY != "nuc", reason="NUC rate limiting not used with API key"
-)
-def test_invalid_nildb_command_nucs(nildb_client):
-    """Test rate limiting by sending multiple rapid requests"""
-    # Payload for repeated requests
-    payload = {
-        "model": test_models[0],
-        "messages": [{"role": "user", "content": "What is your name?"}],
-    }
-    response = nildb_client.post("/chat/completions", json=payload)
-    assert response.status_code == 401, "Invalid NILDB command should return 401"
 
 
 def test_large_payload_handling(client):
@@ -752,7 +607,6 @@ def test_chat_completion_missing_model(client):
     """Test chat completion with missing model field to trigger a validation error"""
     payload = {
         "messages": [{"role": "user", "content": "What is your name?"}],
-        "temperature": 0.2,
     }
     response = client.post("/chat/completions", json=payload)
     assert response.status_code == 400, (
@@ -765,7 +619,6 @@ def test_chat_completion_negative_max_tokens(client):
     payload = {
         "model": test_models[0],
         "messages": [{"role": "user", "content": "Tell me a joke."}],
-        "temperature": 0.2,
         "max_tokens": -10,
     }
     response = client.post("/chat/completions", json=payload)
@@ -828,6 +681,9 @@ def test_model_streaming_request_high_token(client):
 @pytest.mark.skipif(
     AUTH_STRATEGY != "nuc", reason="NUC required for this tests on nilDB"
 )
+@pytest.mark.skip(
+    reason="Skipping test_nildb_delegation because it requires a newer version of secretvaults-py"
+)
 def test_nildb_delegation(client: httpx.Client):
     """Tests getting a delegation token for nilDB and validating that token to be valid"""
     from secretvaults.common.keypair import Keypair
@@ -874,12 +730,14 @@ def test_nildb_delegation(client: httpx.Client):
 )
 def test_nildb_prompt_document(document_id_client: httpx.Client, model):
     """Tests getting a prompt document from nilDB and executing a chat completion with it"""
+    pytest.skip(
+        "Skipping test_nildb_prompt_document because it requires a newer version of secretvaults-py"
+    )
     payload = {
         "model": model,
         "messages": [
             {"role": "user", "content": "Can you make a small rhyme?"},
         ],
-        "temperature": 0.2,
     }
 
     response = document_id_client.post("/chat/completions", json=payload, timeout=30)

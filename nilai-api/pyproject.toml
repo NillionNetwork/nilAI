@@ -5,12 +5,13 @@ description = "Add your description here"
 readme = "README.md"
 authors = [
     { name = "José Cabrero-Holgueras", email = "jose.cabrero@nillion.com" },
-    { name = "Manuel Santos", email = "manuel.santos@nillion.com" },
-    { name = "Dimitris Mouris", email = "dimitris@nillion.com" }
+    { name = "Baptiste Lefort", email = "baptiste.lefort@nillion.com" }
 ]
 requires-python = ">=3.12"
 dependencies = [
+    "accelerate>=1.1.1",
     "alembic>=1.14.1",
+    "cryptography>=43.0.1",
     "fastapi[standard]>=0.115.5",
     "gunicorn>=23.0.0",
     "nilai-common",
@@ -19,24 +20,22 @@ dependencies = [
     "uvicorn>=0.32.1",
     "httpx>=0.27.2",
     "nilrag>=0.1.11",
-    "openai>=1.99.2",
+    "openai>=1.59.9",
+    "pg8000>=1.31.2",
     "prometheus_fastapi_instrumentator>=7.0.2",
     "asyncpg>=0.30.0",
-    "redis>=6.4.0",
+    "greenlet>=3.1.1",
+    "redis>=5.2.1",
+    "authlib>=1.4.1",
+    "verifier",
     "web3>=7.8.0",
     "click>=8.1.8",
-    "nuc-helpers",
     "nuc>=0.1.0",
     "pyyaml>=6.0.1",
     "trafilatura>=1.7.0",
     "secretvaults",
-    "pydantic>=2.0.0",
-    "ecdsa>=0.19.0",
-    "secp256k1>=0.14.0",
-    "hexbytes>=1.2.0",
-    "eth-account>=0.13.0",
-    "sentence-transformers>=5.1.1",
     "e2b-code-interpreter>=1.0.3",
+    "nilauth-credit-middleware>=0.1.2",
 ]
 
 
@@ -46,5 +45,6 @@ build-backend = "hatchling.build"
 
 [tool.uv.sources]
 nilai-common = { workspace = true }
-nuc-helpers = { workspace = true }
+
+# TODO: Remove this once the secretvaults package is released with the fix
 secretvaults = { git = "https://github.com/jcabrero/secretvaults-py", rev = "main" }

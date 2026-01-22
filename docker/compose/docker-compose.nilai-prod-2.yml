@@ -16,7 +16,7 @@ services:
       - .env
     restart: unless-stopped
     depends_on:
-      etcd:
+      redis:
         condition: service_healthy
       gpt_20b_gpu:
         # Llama takes less time to initialize
@@ -33,12 +33,10 @@ services:
       --tool-call-parser llama3_json
       --uvicorn-log-level warning
       --enable-auto-tool-choice
-      --chat-template /opt/vllm/templates/llama3.1_tool_json.jinja
+      --chat-template /daemon/nilai-models/templates/llama3.1_tool_json.jinja
     environment:
-      - SVC_HOST=llama_8b_gpu
-      - SVC_PORT=8000
-      - ETCD_HOST=etcd
-      - ETCD_PORT=2379
+      - SVC_URL=http://llama_8b_gpu:8000
+      - DISCOVERY_URL=redis://redis:6379
       - TOOL_SUPPORT=true
     volumes:
       - hugging_face_models:/root/.cache/huggingface
@@ -65,7 +63,7 @@ services:
       - .env
     restart: unless-stopped
     depends_on:
-      etcd:
+      redis:
         condition: service_healthy
     command: >
       --model openai/gpt-oss-20b
@@ -75,10 +73,8 @@ services:
       --tensor-parallel-size 1
       --uvicorn-log-level warning
     environment:
-      - SVC_HOST=gpt_20b_gpu
-      - SVC_PORT=8000
-      - ETCD_HOST=etcd
-      - ETCD_PORT=2379
+      - SVC_URL=http://gpt_20b_gpu:8000
+      - DISCOVERY_URL=redis://redis:6379
       - TOOL_SUPPORT=true
     volumes:
       - hugging_face_models:/root/.cache/huggingface  # cache models

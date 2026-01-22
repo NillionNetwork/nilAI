@@ -1,11 +1,9 @@
-# Fast API and serving
-
-
 from prometheus_fastapi_instrumentator import Instrumentator
 from fastapi import Depends, FastAPI
 from nilai_api.auth import get_auth_info
 from nilai_api.rate_limiting import setup_redis_conn
-from nilai_api.routers import private, public
+from nilai_api.routers import private, public, pricing
+from nilai_api.pricing_service import PricingService, set_pricing_service
 from nilai_api import config
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,10 +14,16 @@ from nilai_common.config import SETTINGS
 async def lifespan(app: FastAPI):
     client, rate_limit_command = await setup_redis_conn(config.CONFIG.redis.url)
 
+    # Initialize pricing service
+    pricing_service = PricingService(client)
+    await pricing_service.initialize_from_config()
+    set_pricing_service(pricing_service)
+
     yield {"redis": client, "redis_rate_limit_command": rate_limit_command}
 
 
-host = SETTINGS.host
+api_base = SETTINGS.url.rstrip("/")
+openapi_url = f"{api_base}/openapi.json"
 description = f"""
 An AI model serving platform powered by secure, confidential computing.
 
@@ -33,7 +37,7 @@ Want to use our API in your project? Great news! You can automatically generate 
 pip install openapi-generator-cli
 
 # Generate your Python client
-openapi-generator-cli generate -i https://{host}/openapi.json -g python -o ./python-client
+openapi-generator-cli generate -i {openapi_url} -g python -o ./python-client
 ```
 
 ### For JavaScript/TypeScript Developers
@@ -42,7 +46,7 @@ openapi-generator-cli generate -i https://{host}/openapi.json -g python -o ./pyt
 npm install @openapitools/openapi-generator-cli -g
 
 # Generate your TypeScript client
-openapi-generator-cli generate -i https://{host}/openapi.json -o ./typescript-client
+openapi-generator-cli generate -i {openapi_url} -o ./typescript-client
 ```
 
 After generating, you'll have a fully functional client library that makes it easy to interact with our AI services. No more manual API request handling!
@@ -88,6 +92,7 @@ app = FastAPI(
 
 app.include_router(public.router)
 app.include_router(private.router, dependencies=[Depends(get_auth_info)])
+app.include_router(pricing.router)
 
 app.add_middleware(
     CORSMiddleware,

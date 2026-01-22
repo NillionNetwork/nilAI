@@ -1,4 +1,4 @@
-FROM vllm/vllm-openai:v0.10.1
+FROM vllm/vllm-openai:v0.11.2
 
 # # Specify model name and path during build
 # ARG MODEL_NAME=llama_1b_cpu
@@ -9,8 +9,8 @@ FROM vllm/vllm-openai:v0.10.1
 # ENV MODEL_PATH=${MODEL_PATH}
 # ENV EXEC_PATH=nilai_models.models.${MODEL_NAME}:app
 
+ENV PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 COPY --link . /daemon/
-COPY --link vllm_templates /opt/vllm/templates
 
 WORKDIR /daemon/nilai-models/
 

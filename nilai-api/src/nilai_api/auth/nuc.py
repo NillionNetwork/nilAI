@@ -2,20 +2,18 @@ from datetime import datetime, timezone
 from typing import Optional, Tuple
 from nuc.validate import NucTokenValidator, ValidationParameters, InvocationRequirement
 from nuc.envelope import NucTokenEnvelope
-from nuc.nilauth import NilauthClient
 from nuc.token import Did, NucToken, Command
 from functools import lru_cache
-from nilai_api.config import CONFIG
 from nilai_api.state import state
 from nilai_api.auth.common import AuthenticationError
 
-from nilai_common.logger import setup_logger
 
-from nuc_helpers.usage import TokenRateLimits
-from nuc_helpers.nildb_document import PromptDocument
+from nilai_api.auth.nuc_helpers.usage import TokenRateLimits
+from nilai_api.auth.nuc_helpers.nildb_document import PromptDocument
 
-logger = setup_logger(__name__)
+import logging
 
+logger = logging.getLogger(__name__)
 
 NILAI_BASE_COMMAND: Command = Command.parse("/nil/ai")
 
@@ -29,16 +27,13 @@ def get_validator() -> NucTokenValidator:
         A NucTokenValidator that can be used to validate NUC tokens
         The validator is cached to avoid re-initializing the validator for each request
     """
-    try:
-        nilauth_public_keys = [
-            Did(NilauthClient(key).about().public_key.serialize())
-            for key in CONFIG.auth.nilauth_trusted_root_issuers
-        ]
-    except Exception as e:
-        logger.error(f"Error getting validator: {e}")
-        raise e
 
-    return NucTokenValidator(nilauth_public_keys)
+    # From now on, we don't need to trust any root issuer
+    # The users can issue their own tokens.
+    # The tokens are charged to the root issuer.
+    # Here we just validate that the token is valid and not expired.
+    # And that the chain is valid.
+    return NucTokenValidator([])
 
 
 @lru_cache(maxsize=1)
@@ -91,11 +86,11 @@ def validate_nuc(nuc_token: str) -> Tuple[str, str]:
 
     # Validate the
     # Return the subject of the token, the subscription holder
-    subscription_holder = token.subject.public_key.hex()
-    user = token.issuer.public_key.hex()
+    subscription_holder = token.subject
+    user = token.issuer
     logger.info(f"Subscription holder: {subscription_holder}")
     logger.info(f"User: {user}")
-    return subscription_holder, user
+    return str(subscription_holder), str(user)
 
 
 def get_token_rate_limit(nuc_token: str) -> Optional[TokenRateLimits]:

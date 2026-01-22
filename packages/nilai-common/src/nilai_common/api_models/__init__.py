@@ -30,6 +30,7 @@ from nilai_common.api_models.chat_completion_model import (
     MessageAdapter,
     ImageContent,
     TextContent,
+    Usage,
 )
 
 from nilai_common.api_models.responses_model import (
@@ -74,6 +75,7 @@ __all__ = [
     "MessageAdapter",
     "ImageContent",
     "TextContent",
+    "Usage",
     "Response",
     "ResponseCompletedEvent",
     "ResponseRequest",

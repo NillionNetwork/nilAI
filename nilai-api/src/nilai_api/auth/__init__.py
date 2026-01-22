@@ -4,11 +4,10 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from logging import getLogger
 
 from nilai_api.config import CONFIG
-from nilai_api.db.users import UserManager
 from nilai_api.auth.strategies import AuthenticationStrategy
 
 from nuc.validate import ValidationException
-from nuc_helpers.usage import UsageLimitError
+from nilai_api.auth.nuc_helpers.usage import UsageLimitError
 
 from nilai_api.auth.common import (
     AuthenticationInfo,
@@ -36,7 +35,6 @@ async def get_auth_info(
             )
 
         auth_info = await strategy(credentials.credentials)
-        await UserManager.update_last_activity(userid=auth_info.user.userid)
         return auth_info
     except AuthenticationError as e:
         raise e

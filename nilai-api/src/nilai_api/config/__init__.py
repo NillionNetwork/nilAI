@@ -3,11 +3,12 @@ import json
 import logging
 from pydantic import BaseModel
 from .environment import EnvironmentConfig
-from .database import DatabaseConfig, EtcdConfig, RedisConfig
+from .database import DatabaseConfig, DiscoveryConfig, RedisConfig
 from .auth import AuthConfig, DocsConfig
 from .nildb import NilDBConfig
 from .web_search import WebSearchSettings
 from .rate_limiting import RateLimitingConfig
+from .pricing import LLMPricingConfig, LLMPriceConfig
 from .utils import create_config_model, CONFIG_DATA
 
 
@@ -20,7 +21,9 @@ class NilAIConfig(BaseModel):
     database: DatabaseConfig = create_config_model(
         DatabaseConfig, "database", CONFIG_DATA, "POSTGRES_"
     )
-    etcd: EtcdConfig = create_config_model(EtcdConfig, "etcd", CONFIG_DATA, "ETCD_")
+    discovery: DiscoveryConfig = create_config_model(
+        DiscoveryConfig, "discovery", CONFIG_DATA, "DISCOVERY_"
+    )
     redis: RedisConfig = create_config_model(
         RedisConfig, "redis", CONFIG_DATA, "REDIS_"
     )
@@ -34,6 +37,9 @@ class NilAIConfig(BaseModel):
     )
     nildb: NilDBConfig = create_config_model(
         NilDBConfig, "nildb", CONFIG_DATA, "NILDB_"
+    )
+    llm_pricing: LLMPricingConfig = create_config_model(
+        LLMPricingConfig, "llm_pricing", CONFIG_DATA
     )
 
     def prettify(self):
@@ -64,7 +70,11 @@ class NilAIConfig(BaseModel):
 CONFIG = NilAIConfig()
 __all__ = [
     # Main config object
-    "CONFIG"
+    "CONFIG",
+    # Pricing config for external use
+    "LLMPriceConfig",
+    "LLMPricingConfig",
 ]
 
 logging.info(CONFIG.prettify())
+print(CONFIG.prettify())

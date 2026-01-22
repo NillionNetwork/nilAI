@@ -1,0 +1,51 @@
+name: Publish nilai-py to Test PyPI
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'clients/nilai-py/**'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  test-pypi-publish:
+    name: Publish nilai-py to Test PyPI
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Set up Python
+        run: uv python install
+
+      - name: Install dependencies
+        working-directory: clients/nilai-py
+        run: uv sync --all-extras --dev
+
+      - name: Run tests
+        working-directory: clients/nilai-py
+        run: uv run pytest tests/
+
+      - name: Get latest version from Test PyPI and increment
+        id: version
+        working-directory: clients/nilai-py
+        run: |
+          # Install requests for API calls
+          uv add --dev requests
+
+          # Run the version update script
+          NEW_VERSION=$(uv run python ../../.github/scripts/update_version.py | grep "NEW_VERSION=" | cut -d'=' -f2)
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Build package
+        working-directory: clients/nilai-py
+        run: uv build
+
+      - name: Publish to Test PyPI
+        working-directory: clients/nilai-py
+        env:
+          UV_PUBLISH_TOKEN: ${{ secrets.TEST_PYPI_API_TOKEN }}
+        run: uv publish --publish-url https://test.pypi.org/legacy/
