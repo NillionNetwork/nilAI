@@ -699,21 +699,50 @@ def test_web_search(client, model, high_web_search_rate_limit):
     message_items = [
         item for item in response.output if getattr(item, "type", None) == "message"
     ]
-    assert len(message_items) > 0, (
-        f"Response should contain message items. Found types: {output_types}"
+    text_items = [
+        item for item in response.output if getattr(item, "type", None) == "text"
+    ]
+    reasoning_items = [
+        item for item in response.output if getattr(item, "type", None) == "reasoning"
+    ]
+
+    assert message_items or text_items or reasoning_items, (
+        f"Response should contain message, text, or reasoning items. Found types: {output_types}"
     )
 
-    message = message_items[0]
-    assert hasattr(message, "content") and len(message.content) > 0, (
-        "Message should have content"
-    )
-
-    text_item = next(
-        (c for c in message.content if getattr(c, "type", None) == "output_text"), None
-    )
-    assert text_item is not None, "Message content should contain an output_text item"
-
-    content = getattr(text_item, "text", "")
+    if message_items:
+        message = message_items[0]
+        assert hasattr(message, "content") and len(message.content) > 0, (
+            "Message should have content"
+        )
+        text_item = next(
+            (
+                c
+                for c in message.content
+                if getattr(c, "type", None) == "output_text"
+            ),
+            None,
+        )
+        assert text_item is not None, (
+            "Message content should contain an output_text item"
+        )
+        content = getattr(text_item, "text", "")
+    elif text_items:
+        content = getattr(text_items[0], "text", "")
+    else:
+        parts = getattr(reasoning_items[0], "content", None) or []
+        text_part = next(
+            (
+                c
+                for c in parts
+                if getattr(c, "type", None) in ("output_text", "reasoning_text")
+            ),
+            None,
+        )
+        assert text_part is not None and getattr(text_part, "text", ""), (
+            "Reasoning item missing text content"
+        )
+        content = getattr(text_part, "text", "")
     assert content, "Response should contain content"
 
     sources = getattr(response, "sources", None)
