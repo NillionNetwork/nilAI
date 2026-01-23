@@ -1,5 +1,6 @@
 import json
 import os
+
 import pytest
 import pytest_asyncio
 
@@ -716,11 +717,7 @@ def test_web_search(client, model, high_web_search_rate_limit):
             "Message should have content"
         )
         text_item = next(
-            (
-                c
-                for c in message.content
-                if getattr(c, "type", None) == "output_text"
-            ),
+            (c for c in message.content if getattr(c, "type", None) == "output_text"),
             None,
         )
         assert text_item is not None, (
