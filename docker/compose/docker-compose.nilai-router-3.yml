@@ -1,0 +1,95 @@
+services:
+  arch_router_1_5b_gpu:
+    image: nillion/nilai-vllm:latest
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    ipc: host
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    env_file:
+      - .env
+    restart: unless-stopped
+    depends_on:
+      etcd:
+        condition: service_healthy
+    command: >
+      --model katanemo/Arch-Router-1.5B
+      --gpu-memory-utilization 0.15
+      --max-model-len 8000
+      --max-num-batched-tokens 8000
+      --tensor-parallel-size 1
+      --dtype bfloat16
+      --kv-cache-dtype fp8
+      --uvicorn-log-level warning
+    environment:
+      - SVC_HOST=arch_router_1_5b_gpu
+      - SVC_PORT=8000
+      - ETCD_HOST=etcd
+      - ETCD_PORT=2379
+      - TOOL_SUPPORT=false
+      - MODEL_NUM_RETRIES=60
+      - MODEL_RETRY_TIMEOUT=20
+    volumes:
+      - hugging_face_models:/root/.cache/huggingface
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      retries: 3
+      start_period: 60s
+      timeout: 10s
+
+  qwen3_vl_4b_gpu:
+    image: nillion/nilai-vllm:latest
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    ipc: host
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    env_file:
+      - .env
+    restart: unless-stopped
+    depends_on:
+      etcd:
+        condition: service_healthy
+      arch_router_1_5b_gpu:
+        condition: service_healthy
+    command: >
+      --model Qwen/Qwen3-VL-4B-Instruct
+      --gpu-memory-utilization 0.8
+      --max-model-len 10000
+      --max-num-batched-tokens 10000
+      --tensor-parallel-size 1
+      --dtype bfloat16
+      --kv-cache-dtype fp8
+      --uvicorn-log-level warning
+    environment:
+      - SVC_HOST=qwen3_vl_4b_gpu
+      - SVC_PORT=8000
+      - ETCD_HOST=etcd
+      - ETCD_PORT=2379
+      - TOOL_SUPPORT=true
+      - MULTIMODAL_SUPPORT=true
+      - MODEL_NUM_RETRIES=60
+      - MODEL_RETRY_TIMEOUT=20
+    volumes:
+      - hugging_face_models:/root/.cache/huggingface
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      retries: 3
+      start_period: 60s
+      timeout: 10s
+volumes:
+  hugging_face_models:
