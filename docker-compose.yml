@@ -1,54 +1,160 @@
+# NilAI Development Docker Compose
+# Usage: docker compose up
+#
+# Services:
+#   - redis: Service discovery + rate limiting + pricing cache
+#   - postgres: User store + query logs
+#   - nilauth-postgres: NilAuth credit service database
+#   - nilauth-credit-server: Credit/billing service
+#   - nilai-api: Rust API server (build from source)
+#   - nilai-model-daemon: Model registration sidecar (build from source)
+#
+# Optional (uncomment to enable):
+#   - vllm: Local LLM inference server (requires GPU)
+
 services:
+  # --- Infrastructure ---
+
   redis:
-    container_name: redis
-    image: 'redis:latest'
-    restart: unless-stopped
+    image: redis:7-alpine
+    container_name: nilai-redis
+    ports:
+      - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 5s
-  api:
-    container_name: nilai-api
-    image: nillion/nilai-api:latest
-    depends_on:
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/health"]
-      interval: 30s
-      retries: 3
-      start_period: 15s
-      timeout: 10s
-  nuc-api:
-    container_name: nilai-nuc-api
-    image: nillion/nilai-api:latest
-    depends_on:
-      redis:
-        condition: service_healthy
-      api:
-        condition: service_healthy
-    restart: unless-stopped
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: nilai-postgres
+    ports:
+      - "5432:5432"
     environment:
-      - AUTH_STRATEGY=nuc # Overwrite the default strategy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/health"]
-      interval: 30s
-      retries: 3
-      start_period: 15s
-      timeout: 10s
-  caddy:
-    image: caddy:latest
-    container_name: caddy
-    restart: unless-stopped
+      POSTGRES_USER: ${POSTGRES_USER:-nilai}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nilai_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-nilai}
     volumes:
-      - caddy_data:/data
-      - caddy_config:/config
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/postgres-init.sh:/docker-entrypoint-initdb.d/postgres-init.sh
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nilai} -d ${POSTGRES_DB:-nilai}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # --- NilAuth Credit Service ---
+
+  nilauth-postgres:
+    image: postgres:16-alpine
+    container_name: nilai-nilauth-postgres
+    environment:
+      POSTGRES_USER: nilauth
+      POSTGRES_PASSWORD: nilauth_dev_password
+      POSTGRES_DB: nilauth_credit
+    ports:
+      - "30432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nilauth -d nilauth_credit"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  nilauth-credit-server:
+    image: ghcr.io/nillionnetwork/nilauth-credit:sha-6ffbae7
+    container_name: nilai-nilauth
+    platform: linux/amd64
+    environment:
+      DATABASE_URL: postgresql://nilauth:nilauth_dev_password@nilauth-postgres:5432/nilauth_credit
+      HOST: 0.0.0.0
+      PORT: 3000
+    ports:
+      - "3030:3000"
+    depends_on:
+      nilauth-postgres:
+        condition: service_healthy
+    volumes:
+      - ./scripts/credit-init.sql:/app/migrations/20251015000006_seed_test_data.sql
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # --- NilAI Application ---
+
+  nilai-api:
+    build:
+      context: .
+      dockerfile: docker/nilai-api.Dockerfile
+    container_name: nilai-api
+    ports:
+      - "8081:8081"
+    environment:
+      RUST_LOG: nilai_api=info,tower_http=info
+      POSTGRES_USER: ${POSTGRES_USER:-nilai}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nilai_dev}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-nilai}
+      REDIS_URL: redis://redis:6379
+      DISCOVERY_URL: redis://redis:6379
+      ENVIRONMENT: ${ENVIRONMENT:-mainnet}
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      nilauth-credit-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # --- Model Daemon (optional, requires vLLM) ---
+  # Uncomment when running with a local model
+
+  # nilai-model-daemon:
+  #   build:
+  #     context: .
+  #     dockerfile: docker/nilai-api.Dockerfile
+  #   container_name: nilai-model-daemon
+  #   command: ["nilai-model-daemon"]
+  #   environment:
+  #     RUST_LOG: nilai_model_daemon=info
+  #     MODEL_URL: http://vllm:8000
+  #     DISCOVERY_URL: redis://redis:6379
+  #     LEASE_TTL: "60"
+  #   depends_on:
+  #     redis:
+  #       condition: service_healthy
+
+  # --- vLLM Model Server (optional, requires GPU) ---
+  # Uncomment to run a local model
+
+  # vllm:
+  #   image: vllm/vllm-openai:latest
+  #   container_name: nilai-vllm
+  #   runtime: nvidia
+  #   environment:
+  #     HUGGING_FACE_HUB_TOKEN: ${HF_TOKEN}
+  #   command: >
+  #     --model meta-llama/Llama-3.2-1B-Instruct
+  #     --max-model-len 4096
+  #   ports:
+  #     - "8000:8000"
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: 1
+  #             capabilities: [gpu]
 
 volumes:
-  hugging_face_models:
-  caddy_data:
-  caddy_config:
-  prometheus_data:
+  postgres_data:
