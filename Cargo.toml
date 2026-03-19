@@ -1,0 +1,72 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/nilai-domain",
+    "crates/nilai-infra",
+    "crates/nilai-auth",
+    "crates/nilai-discovery",
+    "crates/nilai-api",
+    "crates/nilai-model-daemon",
+]
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.80"
+license = "MIT"
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+async-trait = "0.1"
+futures = "0.3"
+
+# Web framework
+axum = { version = "0.8", features = ["macros"] }
+axum-extra = { version = "0.10", features = ["typed-header"] }
+tower = { version = "0.5", features = ["full"] }
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Database
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "json", "uuid", "chrono"] }
+redis = { version = "0.27", features = ["tokio-comp", "connection-manager"] }
+
+# HTTP client
+reqwest = { version = "0.12", features = ["json", "stream"] }
+url = { version = "2", features = ["serde"] }
+
+# Crypto
+k256 = { version = "0.13", features = ["ecdsa-core", "ecdsa"] }
+ecdsa = { version = "0.16", features = ["signing", "verifying", "der"] }
+base64 = "0.22"
+sha2 = "0.10"
+
+# Config
+figment = { version = "0.10", features = ["yaml", "env"] }
+
+# Error handling
+thiserror = "2"
+anyhow = "1"
+
+# Logging / Tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Misc
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+bytes = "1"
+fs2 = "0.4"
+
+# Auth
+nillion-nucs = { git = "https://github.com/NillionNetwork/nuc-rs" }
+hex = "0.4"
+
+# Domain crates
+nilai-domain = { path = "crates/nilai-domain" }
+nilai-infra = { path = "crates/nilai-infra" }
+nilai-auth = { path = "crates/nilai-auth" }
+nilai-discovery = { path = "crates/nilai-discovery" }

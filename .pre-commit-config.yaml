@@ -7,29 +7,25 @@ repos:
       - id: end-of-file-fixer
       - id: trailing-whitespace
 
-  # First repository: Uses Ruff for formatting and linting
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.9.6  # Specifies the version of the Ruff pre-commit hooks to use
-    hooks:
-      - id: ruff-format  # Runs Ruff's code formatter
-      - id: ruff  # Runs Ruff's linter
-        exclude: "packages/verifier/"  # Excludes the "packages/verifier/" directory from linting
-
-  # Second repository: Pyright for static type checking
   - repo: local
     hooks:
-      - id: pyright
-        name: pyright
-        entry: pyright
+      - id: cargo-fmt
+        name: cargo fmt
+        entry: cargo fmt --all --
         language: system
-        types: [python]
-  # Third repository: Local hooks (custom pre-commit checks)
-  - repo: local
-    hooks:
-      - id: pytest  # Defines a local hook for running pytest
-        name: pytest  # A human-readable name for the hook
-        entry: pytest  # The command to execute
-        language: system  # Uses the system-installed pytest instead of a virtual environment
-        types: [python]  # Applies only to Python files
-        pass_filenames: false  # Run pytest on the entire test suite rather than just changed files
-        args: ["-vvv", "tests/unit"]  # Runs pytest with verbose output and only unit tests
+        types: [rust]
+        pass_filenames: false
+
+      - id: cargo-clippy
+        name: cargo clippy
+        entry: cargo clippy --workspace -- -D warnings
+        language: system
+        types: [rust]
+        pass_filenames: false
+
+      - id: cargo-test
+        name: cargo test
+        entry: cargo test --workspace
+        language: system
+        types: [rust]
+        pass_filenames: false
