@@ -8,6 +8,7 @@
 #   - nilauth-credit-server: Credit/billing service
 #   - nilai-api: Rust API server (build from source)
 #   - nilai-model-daemon: Model registration sidecar (build from source)
+#   - nilai-lmstudio-announcer: Registers LMStudio/OpenAI-compatible models in Redis
 #
 # Optional (uncomment to enable):
 #   - vllm: Local LLM inference server (requires GPU)
@@ -116,8 +117,30 @@ services:
       retries: 5
       start_period: 15s
 
+  # --- LMStudio Announcer ---
+  # Registers models from an LMStudio (or any OpenAI-compatible) API in Redis.
+  # Point LMSTUDIO_API_BASE at your running LMStudio instance.
+
+  # nilai-lmstudio-announcer:
+  #   build:
+  #     context: .
+  #     dockerfile: docker/nilai-api.Dockerfile
+  #   container_name: nilai-lmstudio-announcer
+  #   command: ["nilai-lmstudio-announcer"]
+  #   environment:
+  #     RUST_LOG: nilai_lmstudio_announcer=info
+  #     LMSTUDIO_API_BASE: http://host.docker.internal:1234
+  #     LMSTUDIO_REGISTRATION_URL: http://host.docker.internal:1234
+  #     DISCOVERY_URL: redis://redis:6379
+  #     LMSTUDIO_LEASE_TTL: "60"
+  #     LMSTUDIO_TOOL_SUPPORT_DEFAULT: "true"
+  #     LMSTUDIO_MULTIMODAL_DEFAULT: "false"
+  #   depends_on:
+  #     redis:
+  #       condition: service_healthy
+
   # --- Model Daemon (optional, requires vLLM) ---
-  # Uncomment when running with a local model
+  # Uncomment when running with a local vLLM model server
 
   # nilai-model-daemon:
   #   build:
@@ -135,7 +158,6 @@ services:
   #       condition: service_healthy
 
   # --- vLLM Model Server (optional, requires GPU) ---
-  # Uncomment to run a local model
 
   # vllm:
   #   image: vllm/vllm-openai:latest

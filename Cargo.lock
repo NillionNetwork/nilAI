@@ -2703,6 +2703,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "nilai-lmstudio-announcer"
+version = "0.1.0"
+dependencies = [
+ "nilai-discovery",
+ "nilai-domain",
+ "redis",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "uuid 1.22.0",
+]
+
+[[package]]
 name = "nilai-model-daemon"
 version = "0.1.0"
 dependencies = [
