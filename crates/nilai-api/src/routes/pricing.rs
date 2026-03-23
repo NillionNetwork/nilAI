@@ -12,7 +12,7 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/v1/pricing", get(get_all_prices))
         .route(
-            "/v1/pricing/*model_name",
+            "/v1/pricing/{*model_name}",
             get(get_price).put(set_price).delete(delete_price),
         )
 }
@@ -41,6 +41,8 @@ async fn get_price(
     State(state): State<AppState>,
     Path(model_name): Path<String>,
 ) -> Result<Json<LLMPriceConfig>, (StatusCode, Json<serde_json::Value>)> {
+    let model_name = model_name.strip_prefix('/').unwrap_or(&model_name);
+
     let store = state.pricing_store.as_ref().ok_or_else(|| {
         (
             StatusCode::SERVICE_UNAVAILABLE,
@@ -49,7 +51,7 @@ async fn get_price(
     })?;
 
     let price = store
-        .get_price(&ModelName::new(&model_name))
+        .get_price(&ModelName::new(model_name))
         .await
         .map_err(|e| {
             (
@@ -67,6 +69,8 @@ async fn set_price(
     headers: HeaderMap,
     Json(config): Json<LLMPriceConfig>,
 ) -> Result<Json<LLMPriceConfig>, (StatusCode, Json<serde_json::Value>)> {
+    let model_name = model_name.strip_prefix('/').unwrap_or(&model_name);
+
     // Verify admin token
     verify_admin_token(&state, &headers)?;
 
@@ -89,7 +93,7 @@ async fn set_price(
     })?;
 
     store
-        .set_price(&ModelName::new(&model_name), &config)
+        .set_price(&ModelName::new(model_name), &config)
         .await
         .map_err(|e| {
             (
@@ -106,6 +110,8 @@ async fn delete_price(
     Path(model_name): Path<String>,
     headers: HeaderMap,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
+    let model_name = model_name.strip_prefix('/').unwrap_or(&model_name);
+
     verify_admin_token(&state, &headers)?;
 
     if model_name == "default" {
@@ -123,7 +129,7 @@ async fn delete_price(
     })?;
 
     let existed = store
-        .delete_price(&ModelName::new(&model_name))
+        .delete_price(&ModelName::new(model_name))
         .await
         .map_err(|e| {
             (
