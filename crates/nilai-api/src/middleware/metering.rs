@@ -1,5 +1,5 @@
 use nilai_domain::error::NilaiResult;
-use nilai_domain::ids::{Credits, LockId, UserId};
+use nilai_domain::ids::{ApiKey, Credits, LockId};
 use nilai_domain::ports::CreditService;
 use std::sync::Arc;
 
@@ -8,15 +8,21 @@ use std::sync::Arc;
 pub struct MeteringContext {
     credit_service: Arc<dyn CreditService>,
     lock_id: Option<LockId>,
-    user_id: UserId,
+    credential: ApiKey,
+    is_public: bool,
 }
 
 impl MeteringContext {
-    pub fn new(credit_service: Arc<dyn CreditService>, user_id: UserId) -> Self {
+    pub fn new(
+        credit_service: Arc<dyn CreditService>,
+        credential: ApiKey,
+        is_public: bool,
+    ) -> Self {
         Self {
             credit_service,
             lock_id: None,
-            user_id,
+            credential,
+            is_public,
         }
     }
 
@@ -24,7 +30,11 @@ impl MeteringContext {
     pub async fn lock(&mut self, estimated_cost: f64) -> NilaiResult<()> {
         let lock_id = self
             .credit_service
-            .lock_credits(&self.user_id, Credits::new(estimated_cost))
+            .lock_credits(
+                &self.credential,
+                Credits::new(estimated_cost),
+                self.is_public,
+            )
             .await?;
         self.lock_id = Some(lock_id);
         Ok(())
