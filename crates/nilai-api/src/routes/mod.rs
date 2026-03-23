@@ -1,4 +1,5 @@
 pub mod attestation;
+pub mod chat;
 pub mod delegation;
 pub mod health;
 pub mod models;
@@ -21,4 +22,5 @@ pub fn private_routes() -> Router<AppState> {
         .merge(pricing::router())
         .merge(delegation::router())
         .merge(responses::router())
+        .merge(chat::router())
 }

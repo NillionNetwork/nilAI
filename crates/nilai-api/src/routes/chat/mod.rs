@@ -1,10 +1,9 @@
 mod handler;
 mod stream;
 
-use axum::{routing::post, Router};
 use crate::state::AppState;
+use axum::{routing::post, Router};
 
 pub fn router() -> Router<AppState> {
-    Router::new()
-        .route("/v1/chat/completions", post(handler::chat_completion))
+    Router::new().route("/v1/chat/completions", post(handler::chat_completion))
 }
