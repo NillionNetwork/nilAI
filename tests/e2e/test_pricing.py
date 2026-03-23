@@ -1,9 +1,12 @@
 """E2E tests for pricing API endpoints."""
 
+import os
+
 import pytest
 from .config import BASE_URL, api_key_getter
-from nilai_api.config import CONFIG
 import httpx
+
+ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN")
 
 
 @pytest.fixture
@@ -27,7 +30,7 @@ def http_client():
 @pytest.fixture
 def admin_http_client():
     """Create an HTTPX client with admin authentication."""
-    admin_token = CONFIG.auth.admin_token
+    admin_token = ADMIN_TOKEN
     if not admin_token:
         pytest.skip("Admin token not configured")
 
@@ -114,7 +117,7 @@ class TestPricingUpdateDelete:
         assert response.status_code == 403
 
     @pytest.mark.skipif(
-        not CONFIG.auth.admin_token, reason="Admin token not configured"
+        not ADMIN_TOKEN, reason="Admin token not configured"
     )
     def test_update_price_with_admin_token(self, admin_http_client, http_client):
         """Test updating a model price with admin token."""
@@ -146,7 +149,7 @@ class TestPricingUpdateDelete:
         admin_http_client.delete(f"/v1/pricing/{model_name}")
 
     @pytest.mark.skipif(
-        not CONFIG.auth.admin_token, reason="Admin token not configured"
+        not ADMIN_TOKEN, reason="Admin token not configured"
     )
     def test_delete_price_with_admin_token(self, admin_http_client, http_client):
         """Test deleting a custom price with admin token."""
@@ -172,7 +175,7 @@ class TestPricingUpdateDelete:
         assert fetched["web_search_cost"] == 0.05
 
     @pytest.mark.skipif(
-        not CONFIG.auth.admin_token, reason="Admin token not configured"
+        not ADMIN_TOKEN, reason="Admin token not configured"
     )
     def test_delete_nonexistent_price_returns_404(self, admin_http_client):
         """Test that deleting a non-existent price returns 404."""
@@ -180,7 +183,7 @@ class TestPricingUpdateDelete:
         assert response.status_code == 404
 
     @pytest.mark.skipif(
-        not CONFIG.auth.admin_token, reason="Admin token not configured"
+        not ADMIN_TOKEN, reason="Admin token not configured"
     )
     def test_delete_default_fails(self, admin_http_client):
         """Test that deleting default pricing fails."""
@@ -188,7 +191,7 @@ class TestPricingUpdateDelete:
         assert response.status_code == 400
 
     @pytest.mark.skipif(
-        not CONFIG.auth.admin_token, reason="Admin token not configured"
+        not ADMIN_TOKEN, reason="Admin token not configured"
     )
     def test_update_price_with_invalid_values(self, admin_http_client):
         """Test that updating price with negative values fails."""

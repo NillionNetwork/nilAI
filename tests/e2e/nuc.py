@@ -1,6 +1,4 @@
-from nilai_api.auth.nuc_helpers import (
-    NilAuthPrivateKey,
-)
+from secp256k1 import PrivateKey as NilAuthPrivateKey
 
 from nuc.builder import NucTokenBuilder
 from nuc.token import Did, InvocationBody, Command

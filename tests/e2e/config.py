@@ -1,18 +1,22 @@
+import os
+
 from .nuc import get_nuc_client
-from nilai_api.config import CONFIG
 
-ENVIRONMENT = CONFIG.environment.environment
-# Left for API key for backwards compatibility
-AUTH_TOKEN = "SecretTestApiKey"
-AUTH_STRATEGY = CONFIG.auth.auth_strategy
+ENVIRONMENT = os.environ.get("ENVIRONMENT", "mainnet")
+AUTH_TOKEN = os.environ.get("AUTH_TOKEN", "SecretTestApiKey")
+AUTH_STRATEGY = os.environ.get("AUTH_STRATEGY", "api_key")
 
-match AUTH_STRATEGY:
-    case "nuc":
-        BASE_URL = "https://localhost/nuc/v1"
-    case "api_key":
-        BASE_URL = "https://localhost/v1"
-    case _:
-        raise ValueError(f"Invalid AUTH_STRATEGY: {AUTH_STRATEGY}")
+_base_url_override = os.environ.get("NILAI_BASE_URL")
+if _base_url_override:
+    BASE_URL = _base_url_override
+else:
+    match AUTH_STRATEGY:
+        case "nuc":
+            BASE_URL = "https://localhost/nuc/v1"
+        case "api_key":
+            BASE_URL = "https://localhost/v1"
+        case _:
+            raise ValueError(f"Invalid AUTH_STRATEGY: {AUTH_STRATEGY}")
 
 
 def api_key_getter() -> str:
@@ -46,4 +50,4 @@ if ENVIRONMENT not in models:
         f"Environment {ENVIRONMENT} not found in models, using {ENVIRONMENT} as default"
     )
 test_models = models[ENVIRONMENT]
-WEB_SEARCH_RPS = getattr(CONFIG.web_search, "rps", None)
+WEB_SEARCH_RPS = int(os.environ.get("WEB_SEARCH_RPS", "20"))

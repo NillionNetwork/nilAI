@@ -690,7 +690,6 @@ def test_nildb_delegation(client: httpx.Client):
     from nuc.envelope import NucTokenEnvelope
     from nuc.validate import NucTokenValidator, ValidationParameters
     from nuc.nilauth import NilauthClient
-    from nilai_api.config import CONFIG
     from nuc.token import Did
 
     keypair = Keypair.generate()
@@ -710,8 +709,9 @@ def test_nildb_delegation(client: httpx.Client):
 
     # Validate the token with nilAuth url for nilDB
     nuc_token_envelope = NucTokenEnvelope.parse(token)
+    nilauth_url = os.environ.get("NILAUTH_URL", "")
     nilauth_public_keys = [
-        Did(NilauthClient(CONFIG.nildb.nilauth_url).about().public_key.serialize())
+        Did(NilauthClient(nilauth_url).about().public_key.serialize())
     ]
     NucTokenValidator(nilauth_public_keys).validate(
         nuc_token_envelope, context={}, parameters=ValidationParameters.default()
