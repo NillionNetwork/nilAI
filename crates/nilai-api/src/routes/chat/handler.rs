@@ -1,21 +1,18 @@
-use std::sync::Arc;
 use axum::{
     body::Body,
     extract::State,
     http::StatusCode,
     response::{IntoResponse, Response},
-    Extension,
-    Json,
+    Extension, Json,
 };
-use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use nilai_domain::auth::AuthenticationInfo;
 use nilai_domain::chat::{ChatRequest, SignedChatCompletion};
 use nilai_domain::error::NilaiError;
 use nilai_domain::ids::ModelName;
 
+use super::stream;
 use crate::middleware::rate_limit;
 use crate::state::AppState;
-use super::stream;
 
 type ApiError = (StatusCode, Json<serde_json::Value>);
 
@@ -26,27 +23,47 @@ pub async fn chat_completion(
 ) -> Result<Response, ApiError> {
     // Validate request
     if req.messages.is_empty() {
-        return Err((StatusCode::BAD_REQUEST, Json(serde_json::json!({"detail": "Messages list cannot be empty"}))));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"detail": "Messages list cannot be empty"})),
+        ));
     }
 
     let model_name = &req.model;
 
     // Look up model endpoint
     let registry = state.model_registry.as_ref().ok_or_else(|| {
-        (StatusCode::SERVICE_UNAVAILABLE, Json(serde_json::json!({"detail": "Model registry unavailable"})))
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(serde_json::json!({"detail": "Model registry unavailable"})),
+        )
     })?;
 
-    let models = registry.discover_models(Some(&ModelName::new(model_name)), None).await.map_err(|e| {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"detail": format!("Model discovery error: {}", e)})))
-    })?;
+    let models = registry
+        .discover_models(Some(&ModelName::new(model_name)), None)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"detail": format!("Model discovery error: {}", e)})),
+            )
+        })?;
 
     let endpoint = models.values().next().ok_or_else(|| {
-        (StatusCode::BAD_REQUEST, Json(serde_json::json!({"detail": format!("Model '{}' not found", model_name)})))
+        (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"detail": format!("Model '{}' not found", model_name)})),
+        )
     })?;
 
     // Validate tool support
     if req.tools.is_some() && !endpoint.metadata.tool_support {
-        return Err((StatusCode::BAD_REQUEST, Json(serde_json::json!({"detail": format!("Model '{}' does not support tools", model_name)}))));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(
+                serde_json::json!({"detail": format!("Model '{}' does not support tools", model_name)}),
+            ),
+        ));
     }
 
     // Check rate limits if available
@@ -58,39 +75,63 @@ pub async fn chat_completion(
             &auth_info,
             web_search_enabled,
             web_search_rps,
-        ).await.map_err(|e| match e {
+        )
+        .await
+        .map_err(|e| match e {
             NilaiError::RateLimited { retry_after_ms } => {
                 let mut headers = axum::http::HeaderMap::new();
                 headers.insert("Retry-After", retry_after_ms.to_string().parse().unwrap());
-                (StatusCode::TOO_MANY_REQUESTS, Json(serde_json::json!({"detail": "Too Many Requests"})))
+                (
+                    StatusCode::TOO_MANY_REQUESTS,
+                    Json(serde_json::json!({"detail": "Too Many Requests"})),
+                )
             }
-            other => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"detail": format!("{}", other)})))
+            other => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"detail": format!("{}", other)})),
+            ),
         })?;
 
         // Concurrent rate limiting
         let concurrent_key = format!("chat:{}", model_name);
-        let max_concurrent = state.config.rate_limiting
+        let max_concurrent = state
+            .config
+            .rate_limiting
             .model_concurrent_rate_limit
             .get(model_name)
-            .or_else(|| state.config.rate_limiting.model_concurrent_rate_limit.get("default"))
+            .or_else(|| {
+                state
+                    .config
+                    .rate_limiting
+                    .model_concurrent_rate_limit
+                    .get("default")
+            })
             .copied()
             .unwrap_or(50);
 
-        let _guard = rate_limit::ConcurrentGuard::acquire(
-            limiter.clone(),
-            concurrent_key,
-            max_concurrent,
-        ).await.map_err(|_| {
-            (StatusCode::TOO_MANY_REQUESTS, Json(serde_json::json!({"detail": "Too Many Requests"})))
-        })?;
+        let _guard =
+            rate_limit::ConcurrentGuard::acquire(limiter.clone(), concurrent_key, max_concurrent)
+                .await
+                .map_err(|_| {
+                    (
+                        StatusCode::TOO_MANY_REQUESTS,
+                        Json(serde_json::json!({"detail": "Too Many Requests"})),
+                    )
+                })?;
     }
 
     let inference_client = state.inference_client.as_ref().ok_or_else(|| {
-        (StatusCode::SERVICE_UNAVAILABLE, Json(serde_json::json!({"detail": "Inference client unavailable"})))
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(serde_json::json!({"detail": "Inference client unavailable"})),
+        )
     })?;
 
     let base_url = url::Url::parse(&format!("{}/v1/", endpoint.url)).map_err(|e| {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"detail": format!("Invalid model URL: {}", e)})))
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"detail": format!("Invalid model URL: {}", e)})),
+        )
     })?;
 
     // Handle streaming vs non-streaming
@@ -98,13 +139,14 @@ pub async fn chat_completion(
 
     if is_streaming {
         // Streaming response
-        let sse_stream = stream::create_sse_stream(
-            inference_client.clone(),
-            base_url,
-            req,
-        ).await.map_err(|e| {
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"detail": format!("{}", e)})))
-        })?;
+        let sse_stream = stream::create_sse_stream(inference_client.clone(), base_url, req)
+            .await
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({"detail": format!("{}", e)})),
+                )
+            })?;
 
         Ok(Response::builder()
             .status(StatusCode::OK)
@@ -115,18 +157,33 @@ pub async fn chat_completion(
             .unwrap())
     } else {
         // Non-streaming response
-        let completion = inference_client.chat_completion(&base_url, &req).await.map_err(|e| {
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"detail": format!("{}", e)})))
-        })?;
+        let completion = inference_client
+            .chat_completion(&base_url, &req)
+            .await
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({"detail": format!("{}", e)})),
+                )
+            })?;
 
         // Sign the response
         let response_json = serde_json::to_string(&completion).map_err(|e| {
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"detail": format!("Serialization error: {}", e)})))
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"detail": format!("Serialization error: {}", e)})),
+            )
         })?;
 
-        let signature = state.keypair.sign_message_b64(&response_json).map_err(|e| {
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"detail": format!("Signing error: {}", e)})))
-        })?;
+        let signature = state
+            .keypair
+            .sign_message_b64(&response_json)
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({"detail": format!("Signing error: {}", e)})),
+                )
+            })?;
 
         let signed = SignedChatCompletion {
             completion,
@@ -135,7 +192,9 @@ pub async fn chat_completion(
         };
 
         // Log usage in background
-        if let (Some(ref log_store), Some(ref usage)) = (&state.query_log_store, &signed.completion.usage) {
+        if let (Some(ref log_store), Some(ref usage)) =
+            (&state.query_log_store, &signed.completion.usage)
+        {
             let log = nilai_domain::usage::QueryLog {
                 user_id: auth_info.user.user_id.as_str().to_string(),
                 model: model_name.clone(),
