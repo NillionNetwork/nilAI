@@ -225,10 +225,7 @@ fn wire_credit_service(
 ) -> Option<Arc<dyn nilai_domain::ports::CreditService>> {
     if let Some(url) = config.auth.credit_service_url() {
         Some(Arc::new(
-            nilai_infra::http::credit_client::NilauthCreditClient::new(
-                url.to_string(),
-                config.auth.credit_api_token.clone(),
-            ),
+            nilai_infra::http::credit_client::NilauthCreditClient::new(url.to_string()),
         ))
     } else {
         tracing::warn!("No credit service URL configured");

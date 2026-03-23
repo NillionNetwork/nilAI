@@ -10,6 +10,11 @@ pub trait CreditService: Send + Sync {
         credential: &ApiKey,
         is_public: bool,
     ) -> NilaiResult<UserId>;
-    async fn lock_credits(&self, user_id: &UserId, estimated_cost: Credits) -> NilaiResult<LockId>;
+    async fn lock_credits(
+        &self,
+        credential: &ApiKey,
+        estimated_cost: Credits,
+        is_public: bool,
+    ) -> NilaiResult<LockId>;
     async fn settle_credits(&self, lock_id: &LockId, actual_cost: Credits) -> NilaiResult<()>;
 }
