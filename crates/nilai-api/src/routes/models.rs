@@ -24,8 +24,5 @@ async fn list_models(
 
     let data: Vec<_> = models.values().map(|ep| &ep.metadata).collect();
 
-    Ok(Json(serde_json::json!({
-        "object": "list",
-        "data": data
-    })))
+    Ok(Json(serde_json::json!(data)))
 }
