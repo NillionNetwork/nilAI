@@ -627,8 +627,8 @@ def test_chat_completion_high_temperature(client):
     assert len(response.choices) > 0, "At least one choice should be present"
     assert (
         response.choices[0].message.content
-        or response.choices[0].message.reasoning_content
-    ), "Response should contain content or reasoning_content"
+        or getattr(response.choices[0].message, "reasoning", None)
+    ), "Response should contain content or reasoning"
 
 
 def test_model_streaming_request_high_token(client):
@@ -689,9 +689,9 @@ def test_web_search(client, model, high_web_search_rate_limit):
     assert len(response.choices) > 0, "Response should contain at least one choice"
 
     content = response.choices[0].message.content
-    reasoning_content = getattr(response.choices[0].message, "reasoning_content", None)
-    assert content or reasoning_content, (
-        "Response should contain content or reasoning_content"
+    reasoning = getattr(response.choices[0].message, "reasoning", None)
+    assert content or reasoning, (
+        "Response should contain content or reasoning"
     )
 
     sources = getattr(response, "sources", None)
