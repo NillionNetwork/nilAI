@@ -1,4 +1,4 @@
-FROM vllm/vllm-openai:v0.11.2
+FROM vllm/vllm-openai:v0.19.0
 
 # # Specify model name and path during build
 # ARG MODEL_NAME=llama_1b_cpu
