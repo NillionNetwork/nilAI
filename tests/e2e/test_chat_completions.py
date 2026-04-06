@@ -625,9 +625,8 @@ def test_chat_completion_high_temperature(client):
     assert response, "High temperature request should return a valid response"
     assert response.choices, "Response should contain choices"
     assert len(response.choices) > 0, "At least one choice should be present"
-    assert (
-        response.choices[0].message.content
-        or getattr(response.choices[0].message, "reasoning", None)
+    assert response.choices[0].message.content or getattr(
+        response.choices[0].message, "reasoning", None
     ), "Response should contain content or reasoning"
 
 
@@ -690,9 +689,7 @@ def test_web_search(client, model, high_web_search_rate_limit):
 
     content = response.choices[0].message.content
     reasoning = getattr(response.choices[0].message, "reasoning", None)
-    assert content or reasoning, (
-        "Response should contain content or reasoning"
-    )
+    assert content or reasoning, "Response should contain content or reasoning"
 
     sources = getattr(response, "sources", None)
     assert sources is not None, "Sources field should not be None"

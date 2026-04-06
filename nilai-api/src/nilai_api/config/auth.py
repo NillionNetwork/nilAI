@@ -4,12 +4,12 @@ from pydantic import BaseModel, Field
 
 class AuthConfig(BaseModel):
     auth_strategy: Literal["api_key", "jwt", "nuc"] = Field(
-        description="Authentication strategy"
+        default="api_key", description="Authentication strategy"
     )
     nilauth_trusted_root_issuers: List[str] = Field(
-        description="Trusted root issuers for nilauth"
+        default_factory=list, description="Trusted root issuers for nilauth"
     )
-    credit_api_token: str = Field(description="Credit service API token")
+    credit_api_token: str = Field(default="", description="Credit service API token")
     auth_token: Optional[str] = Field(
         default=None, description="Auth token for e2e tests and development"
     )
