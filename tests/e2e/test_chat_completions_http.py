@@ -791,11 +791,9 @@ def test_web_search(client, model, high_web_search_rate_limit):
 
     message = response_json["choices"][0].get("message", {})
     content = message.get("content", "")
-    reasoning_content = message.get("reasoning_content", "")
+    reasoning = message.get("reasoning", "")
 
-    assert content or reasoning_content, (
-        "Response should contain content or reasoning_content"
-    )
+    assert content or reasoning, "Response should contain content or reasoning"
 
     sources = response_json.get("sources")
     if sources is not None:

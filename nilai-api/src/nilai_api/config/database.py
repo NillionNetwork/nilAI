@@ -2,11 +2,11 @@ from pydantic import BaseModel, Field
 
 
 class DatabaseConfig(BaseModel):
-    user: str = Field(description="Database user")
-    password: str = Field(description="Database password")
-    host: str = Field(description="Database host")
-    port: int = Field(description="Database port")
-    db: str = Field(description="Database name")
+    user: str = Field(default="", description="Database user")
+    password: str = Field(default="", description="Database password")
+    host: str = Field(default="", description="Database host")
+    port: int = Field(default=5432, description="Database port")
+    db: str = Field(default="", description="Database name")
 
 
 class DiscoveryConfig(BaseModel):
@@ -17,4 +17,6 @@ class DiscoveryConfig(BaseModel):
 
 
 class RedisConfig(BaseModel):
-    url: str = Field(description="Redis URL for rate limiting")
+    url: str = Field(
+        default="redis://localhost:6379", description="Redis URL for rate limiting"
+    )
