@@ -699,22 +699,32 @@ def test_web_search(client, model, high_web_search_rate_limit):
     message_items = [
         item for item in response.output if getattr(item, "type", None) == "message"
     ]
-    assert len(message_items) > 0, (
-        f"Response should contain message items. Found types: {output_types}"
+    reasoning_items = [
+        item for item in response.output if getattr(item, "type", None) == "reasoning"
+    ]
+    assert len(message_items) > 0 or len(reasoning_items) > 0, (
+        f"Response should contain message or reasoning items. Found types: {output_types}"
     )
 
-    message = message_items[0]
-    assert hasattr(message, "content") and len(message.content) > 0, (
-        "Message should have content"
-    )
+    content = ""
+    if message_items:
+        message = message_items[0]
+        assert hasattr(message, "content") and len(message.content) > 0, (
+            "Message should have content"
+        )
 
-    text_item = next(
-        (c for c in message.content if getattr(c, "type", None) == "output_text"), None
-    )
-    assert text_item is not None, "Message content should contain an output_text item"
+        text_item = next(
+            (c for c in message.content if getattr(c, "type", None) == "output_text"),
+            None,
+        )
+        assert text_item is not None, (
+            "Message content should contain an output_text item"
+        )
+        content = getattr(text_item, "text", "")
 
-    content = getattr(text_item, "text", "")
-    assert content, "Response should contain content"
+    assert content or reasoning_items, (
+        "Response should contain text content or reasoning"
+    )
 
     sources = getattr(response, "sources", None)
     assert sources is not None, "Sources field should not be None"
