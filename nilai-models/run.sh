@@ -10,7 +10,7 @@ start_primary_process() {
 
 start_secondary_process() {
     echo "Starting the secondary process"
-    uv run python3 -m nilai_models.daemon
+    UV_PROJECT_ENVIRONMENT=/daemon/nilai-models/.venv uv run python3 -m nilai_models.daemon
 }
 
 main() {
