@@ -14,8 +14,8 @@ async def get_attestation_report(nonce: str) -> AttestationReport:
             response_json = response.json()
             return AttestationReport(
                 nonce=nonce,
-                gpu_attestation=response_json["report"],
-                cpu_attestation=response_json["gpu_token"],
+                gpu_attestation=response_json["gpu_token"],
+                cpu_attestation=response_json["report"],
                 verifying_key="",  # Added later by the API
             )
     except httpx.HTTPStatusError as e:
