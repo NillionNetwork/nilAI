@@ -6,10 +6,10 @@ class LLMPriceConfig(BaseModel):
     """Pricing configuration for a single LLM model."""
 
     prompt_tokens_price: float = Field(
-        default=2.0, description="Cost per 1M prompt tokens"
+        default=0.15, description="Cost per 1M prompt tokens"
     )
     completion_tokens_price: float = Field(
-        default=2.0, description="Cost per 1M completion tokens"
+        default=0.45, description="Cost per 1M completion tokens"
     )
     web_search_cost: float = Field(default=0.05, description="Cost per web search")
 
