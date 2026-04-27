@@ -1,0 +1,48 @@
+services:
+  qwen3_coder_30b_gpu:
+    image: nillion/nilai-vllm:latest
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    ipc: host
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    env_file:
+      - .env
+    restart: unless-stopped
+    depends_on:
+      etcd:
+        condition: service_healthy
+    command: >
+      --model Qwen/Qwen3-Coder-30B-A3B-Instruct
+      --gpu-memory-utilization 0.95
+      --max-model-len 100000
+      --max-num-batched-tokens 8192
+      --tensor-parallel-size 1
+      --dtype bfloat16
+      --kv-cache-dtype fp8
+      --uvicorn-log-level warning
+    environment:
+      - SVC_HOST=qwen3_coder_30b_gpu
+      - SVC_PORT=8000
+      - ETCD_HOST=etcd
+      - ETCD_PORT=2379
+      - TOOL_SUPPORT=true
+      - MODEL_NUM_RETRIES=60
+      - MODEL_RETRY_TIMEOUT=20
+    volumes:
+      - hugging_face_models:/root/.cache/huggingface
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      retries: 3
+      start_period: 180s
+      timeout: 10s
+volumes:
+  hugging_face_models:
+
